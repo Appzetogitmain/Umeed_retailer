@@ -972,14 +972,49 @@ async function getCategoryIdByName(name: string) {
 // Get Public FAQs
 export const getPublicFAQs = async (_req: Request, res: Response) => {
     try {
-        const faqs = await FAQ.find({ status: "Active" }).sort({ order: 1 }).lean();
+        let faqs = await FAQ.find({
+            status: "Active",
+            userType: { $in: ["All", "Customer"] }
+        }).sort({ order: 1 }).lean();
+
+        if (faqs.length === 0) {
+            const defaultCustomerFaqs = [
+                {
+                    question: "How do I place an order?",
+                    answer: "Browse products, add them to your cart, fill in your delivery address, and proceed to payment.",
+                    userType: "Customer",
+                    status: "Active",
+                    order: 1
+                },
+                {
+                    question: "How can I track my order?",
+                    answer: "You can track your active orders in real-time on the Order Tracking page under your Account section.",
+                    userType: "Customer",
+                    status: "Active",
+                    order: 2
+                },
+                {
+                    question: "What is the return/refund policy?",
+                    answer: "We offer hassle-free returns within 24 hours of delivery for fresh items and up to 7 days for other products.",
+                    userType: "Customer",
+                    status: "Active",
+                    order: 3
+                }
+            ];
+            await FAQ.insertMany(defaultCustomerFaqs);
+            faqs = await FAQ.find({
+                status: "Active",
+                userType: { $in: ["All", "Customer"] }
+            }).sort({ order: 1 }).lean();
+        }
         
         return res.status(200).json({
             success: true,
             data: faqs.map(f => ({
                 id: f._id.toString(),
                 question: f.question,
-                answer: f.answer
+                answer: f.answer,
+                userType: f.userType
             }))
         });
     } catch (error: any) {

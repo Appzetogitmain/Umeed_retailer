@@ -156,6 +156,47 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
+    // Calculate rider earning dynamically
+    let riderEarning = 0;
+    try {
+        const AppSettings = require('../../../models/AppSettings').default;
+        const settings = await AppSettings.findOne();
+        let commissionRate = 0;
+        let usedDistanceBased = false;
+
+        if (
+            settings &&
+            settings.deliveryConfig?.isDistanceBased === true &&
+            settings.deliveryConfig?.deliveryBoyKmRate &&
+            order.deliveryDistanceKm &&
+            order.deliveryDistanceKm > 0
+        ) {
+            commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
+            riderEarning = order.deliveryDistanceKm * commissionRate;
+            usedDistanceBased = true;
+        }
+
+        if (!usedDistanceBased && order.deliveryBoy) {
+            const Delivery = require('../../../models/Delivery').default;
+            const deliveryBoy = await Delivery.findById(order.deliveryBoy);
+            const rate = (deliveryBoy && deliveryBoy.commissionRate !== undefined && deliveryBoy.commissionRate !== null)
+                ? deliveryBoy.commissionRate
+                : 5; // Fallback to 5%
+            riderEarning = (order.subtotal * rate) / 100;
+        } else if (!usedDistanceBased) {
+            riderEarning = (order.subtotal * 5) / 100;
+        }
+    } catch (err) {
+        console.error("Error calculating rider earning for order details:", err);
+        riderEarning = (order.subtotal * 5) / 100;
+    }
+
+    if (!riderEarning || riderEarning <= 0) {
+        riderEarning = order.shipping || 40;
+    }
+
+    riderEarning = Math.round(riderEarning * 100) / 100;
+
     const formattedOrder = {
         id: order._id,
         orderId: order.orderNumber,
@@ -166,6 +207,8 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
         status: order.status,
         items: mapOrderItems(order.items), // Real populated items
         totalAmount: order.total,
+        riderEarning: riderEarning, // Added rider earning
+        paymentMethod: order.paymentMethod,
         createdAt: order.createdAt,
         distance: null
     };

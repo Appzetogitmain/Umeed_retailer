@@ -6,6 +6,7 @@ export interface IFAQ extends Document {
     category?: string;
     order: number;
     status: "Active" | "Inactive";
+    userType: "All" | "Customer" | "Seller" | "Delivery Partner";
     createdAt: Date;
     updatedAt: Date;
 }
@@ -35,6 +36,11 @@ const faqSchema = new Schema<IFAQ>(
             type: String,
             enum: ["Active", "Inactive"],
             default: "Active",
+        },
+        userType: {
+            type: String,
+            enum: ["All", "Customer", "Seller", "Delivery Partner"],
+            default: "All",
         },
     },
     {

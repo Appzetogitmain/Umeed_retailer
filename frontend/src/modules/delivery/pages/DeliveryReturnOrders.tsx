@@ -56,7 +56,6 @@ export default function DeliveryReturnOrders() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
-      <DeliveryHeader />
       <div className="px-4 py-4">
         <div className="flex items-center mb-4">
           <button

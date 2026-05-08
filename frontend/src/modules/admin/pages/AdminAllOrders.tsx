@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Input } from "../../../components/ui/input";
 import {
   getAllOrders,
   type Order,
@@ -20,7 +21,10 @@ type SortDirection = "asc" | "desc";
 export default function AdminAllOrders() {
   const { isAuthenticated, token } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [dateRange, setDateRange] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const fromDateRef = useRef<HTMLInputElement>(null);
+  const toDateRef = useRef<HTMLInputElement>(null);
   const [seller, setSeller] = useState("All Sellers");
   const [status, setStatus] = useState("All Status");
   const [entriesPerPage, setEntriesPerPage] = useState("10");
@@ -56,20 +60,10 @@ export default function AdminAllOrders() {
           params.search = searchQuery;
         }
 
-        // Parse date range if provided
-        if (dateRange && dateRange.includes(" - ")) {
-          const [dateFrom, dateTo] = dateRange.split(" - ").map((d) => {
-            // Convert MM/DD/YYYY to YYYY-MM-DD
-            const parts = d.trim().split("/");
-            if (parts.length === 3) {
-              return `${parts[2]}-${parts[0].padStart(
-                2,
-                "0"
-              )}-${parts[1].padStart(2, "0")}`;
-            }
-            return d.trim();
-          });
+        if (dateFrom) {
           params.dateFrom = dateFrom;
+        }
+        if (dateTo) {
           params.dateTo = dateTo;
         }
 
@@ -96,11 +90,13 @@ export default function AdminAllOrders() {
     entriesPerPage,
     status,
     searchQuery,
-    dateRange,
+    dateFrom,
+    dateTo,
   ]);
 
   const handleClearDate = () => {
-    setDateRange("");
+    setDateFrom("");
+    setDateTo("");
     setCurrentPage(1);
   };
 
@@ -239,7 +235,7 @@ export default function AdminAllOrders() {
         return "bg-purple-100 text-purple-800";
       case "Shipped":
         return "bg-indigo-100 text-indigo-800";
-      case "Out For Delivery":
+      case "Out for Delivery":
         return "bg-orange-100 text-orange-800";
       case "Delivered":
         return "bg-green-100 text-green-800";
@@ -301,42 +297,83 @@ export default function AdminAllOrders() {
               {/* Date Range Filter */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full lg:w-auto">
                 <label className="text-xs sm:text-sm font-medium text-neutral-700 whitespace-nowrap">
-                  From - To Order Date
+                  From:
                 </label>
-                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 w-full sm:w-auto">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-neutral-500 flex-shrink-0">
-                    <path
-                      d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={dateRange}
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 py-1 w-full sm:w-auto">
+                  <button 
+                    onClick={() => fromDateRef.current?.showPicker?.() || fromDateRef.current?.focus()}
+                    className="p-1 hover:bg-neutral-100 rounded transition-colors"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="text-neutral-500 flex-shrink-0">
+                      <path
+                        d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <Input
+                    type="date"
+                    ref={fromDateRef}
+                    value={dateFrom}
                     onChange={(e) => {
-                      setDateRange(e.target.value);
+                      setDateFrom(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="flex-1 sm:w-48 text-xs sm:text-sm text-neutral-600 bg-transparent focus:outline-none placeholder:text-neutral-400"
-                    placeholder="MM/DD/YYYY - MM/DD/YYYY"
+                    className="border-none focus-visible:ring-0 h-8 text-xs w-32 p-0"
                   />
-                  {dateRange && (
-                    <button
-                      onClick={handleClearDate}
-                      className="ml-2 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors flex-shrink-0">
-                      Clear
-                    </button>
-                  )}
                 </div>
+
+                <label className="text-xs sm:text-sm font-medium text-neutral-700 whitespace-nowrap ml-0 sm:ml-2">
+                  To:
+                </label>
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 py-1 w-full sm:w-auto">
+                  <button 
+                    onClick={() => toDateRef.current?.showPicker?.() || toDateRef.current?.focus()}
+                    className="p-1 hover:bg-neutral-100 rounded transition-colors"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="text-neutral-500 flex-shrink-0">
+                      <path
+                        d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <Input
+                    type="date"
+                    ref={toDateRef}
+                    value={dateTo}
+                    onChange={(e) => {
+                      setDateTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="border-none focus-visible:ring-0 h-8 text-xs w-32 p-0"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={handleClearDate}
+                    className="px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors">
+                    Clear
+                  </button>
+                )}
               </div>
 
               {/* Sellers Filter */}
@@ -774,14 +811,12 @@ export default function AdminAllOrders() {
                       </td>
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
                         {order.estimatedDeliveryDate
-                          ? new Date(
-                              order.estimatedDeliveryDate
-                            ).toLocaleDateString()
+                          ? new Date(order.estimatedDeliveryDate).toLocaleDateString("en-GB")
                           : "-"}
                       </td>
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
                         {order.orderDate
-                          ? new Date(order.orderDate).toLocaleDateString()
+                          ? new Date(order.orderDate).toLocaleDateString("en-GB")
                           : "-"}
                       </td>
                       <td className="px-4 sm:px-6 py-3">

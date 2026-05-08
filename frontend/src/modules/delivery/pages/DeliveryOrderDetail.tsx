@@ -824,6 +824,16 @@ export default function DeliveryOrderDetail() {
                         <span className="font-semibold text-neutral-700">Total Amount</span>
                         <span className="text-xl font-bold text-neutral-900">₹{order.totalAmount}</span>
                     </div>
+
+                    {order.riderEarning !== undefined && (
+                        <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-between items-center bg-orange-50/50 p-3 rounded-xl border border-orange-100/40">
+                            <div className="flex flex-col">
+                                <span className="font-bold text-orange-800 text-xs sm:text-sm uppercase tracking-wider">Your Earning</span>
+                                <span className="text-[10px] text-orange-700/80 mt-0.5 leading-tight font-medium">Credited on delivery</span>
+                            </div>
+                            <span className="text-xl font-extrabold text-orange-600">₹{order.riderEarning.toFixed(2)}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Order Info */}

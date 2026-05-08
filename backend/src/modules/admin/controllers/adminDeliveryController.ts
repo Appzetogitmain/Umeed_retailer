@@ -54,10 +54,15 @@ export const createDeliveryBoy = asyncHandler(
       status: "Inactive", // New delivery boys start as inactive
     });
 
+    const deliveryBoyObj = {
+      ...deliveryBoy.toObject(),
+      available: deliveryBoy.isOnline ? "Available" : "Not Available"
+    };
+
     return res.status(201).json({
       success: true,
       message: "Delivery boy created successfully",
-      data: deliveryBoy,
+      data: deliveryBoyObj,
     });
   }
 );
@@ -80,7 +85,9 @@ export const getAllDeliveryBoys = asyncHandler(
     const query: any = {};
 
     if (status) query.status = status;
-    if (available) query.available = available;
+    if (available) {
+      query.isOnline = available === "Available";
+    }
     if (search) {
       query.$or = [
         { name: { $regex: search as string, $options: "i" } },
@@ -131,7 +138,8 @@ export const getAllDeliveryBoys = asyncHandler(
       return {
         ...dbObj,
         totalSubmitted: stats.totalSubmitted,
-        lastCollectionDate: stats.lastCollectionDate
+        lastCollectionDate: stats.lastCollectionDate,
+        available: db.isOnline ? "Available" : "Not Available"
       };
     });
 
@@ -165,10 +173,15 @@ export const getDeliveryBoyById = asyncHandler(
       });
     }
 
+    const deliveryBoyObj = {
+      ...deliveryBoy.toObject(),
+      available: deliveryBoy.isOnline ? "Available" : "Not Available"
+    };
+
     return res.status(200).json({
       success: true,
       message: "Delivery boy fetched successfully",
-      data: deliveryBoy,
+      data: deliveryBoyObj,
     });
   }
 );
@@ -196,10 +209,15 @@ export const updateDeliveryBoy = asyncHandler(
       });
     }
 
+    const deliveryBoyObj = {
+      ...deliveryBoy.toObject(),
+      available: deliveryBoy.isOnline ? "Available" : "Not Available"
+    };
+
     return res.status(200).json({
       success: true,
       message: "Delivery boy updated successfully",
-      data: deliveryBoy,
+      data: deliveryBoyObj,
     });
   }
 );
@@ -277,10 +295,15 @@ export const updateDeliveryStatus = asyncHandler(
       });
     }
 
+    const deliveryBoyObj = {
+      ...deliveryBoy.toObject(),
+      available: deliveryBoy.isOnline ? "Available" : "Not Available"
+    };
+
     return res.status(200).json({
       success: true,
       message: "Delivery boy status updated successfully",
-      data: deliveryBoy,
+      data: deliveryBoyObj,
     });
   }
 );
@@ -300,9 +323,11 @@ export const updateDeliveryBoyAvailability = asyncHandler(
       });
     }
 
+    const isOnline = available === "Available";
+
     const deliveryBoy = await Delivery.findByIdAndUpdate(
       id,
-      { available },
+      { isOnline },
       { new: true, runValidators: true }
     ).select("-password");
 
@@ -313,10 +338,15 @@ export const updateDeliveryBoyAvailability = asyncHandler(
       });
     }
 
+    const deliveryBoyObj = {
+      ...deliveryBoy.toObject(),
+      available: deliveryBoy.isOnline ? "Available" : "Not Available"
+    };
+
     return res.status(200).json({
       success: true,
       message: "Delivery boy availability updated successfully",
-      data: deliveryBoy,
+      data: deliveryBoyObj,
     });
   }
 );

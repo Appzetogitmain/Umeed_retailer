@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import DeliveryHeader from '../components/DeliveryHeader';
+import { useNavigate } from 'react-router-dom';
 import { getNotifications, markNotificationRead } from '../../../services/api/delivery/deliveryService';
 
 export default function DeliveryNotifications() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -78,9 +79,24 @@ export default function DeliveryNotifications() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
-      <DeliveryHeader />
       <div className="px-4 py-4">
-        <h2 className="text-neutral-900 text-xl font-semibold mb-4">Notifications</h2>
+        <div className="flex items-center mb-4">
+          <button
+            onClick={() => navigate('/delivery')}
+            className="mr-3 p-2 hover:bg-neutral-200 rounded-full transition-colors text-neutral-800"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M15 18L9 12L15 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <h2 className="text-neutral-900 text-xl font-semibold">Notifications</h2>
+        </div>
         {loading ? (
           <p className="text-center text-neutral-500">Loading...</p>
         ) : notifications.length > 0 ? (

@@ -132,10 +132,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Load cart on auth change
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user?.userType === 'Customer') {
       fetchCart();
     } else {
-      // Guest cart is already in 'items' from localStorage if it existed
+      setItems([]);
       setLoading(false);
     }
   }, [isAuthenticated, user?.userType, location?.latitude, location?.longitude]);
@@ -159,6 +159,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, estimatedFee, platformFee, freeDeliveryThreshold]);
 
   const addToCart = async (product: Product, sourceElement?: HTMLElement | null) => {
+    if (!isAuthenticated || user?.userType !== 'Customer') {
+      showToast('Please login to add products to cart', 'info');
+      return;
+    }
+
     // Get consistent product ID - MongoDB returns _id, frontend expects id
     const productId = String(product._id || product.id || '');
 
@@ -343,6 +348,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = async (productId: string, quantity: number, variantId?: string, variantTitle?: string) => {
+    if (!isAuthenticated || user?.userType !== 'Customer') {
+      showToast('Please login to modify cart items', 'info');
+      return;
+    }
+
     if (quantity <= 0) {
       removeFromCart(productId, variantId, variantTitle);
       return;

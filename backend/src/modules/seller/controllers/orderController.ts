@@ -93,7 +93,7 @@ export const getOrders = asyncHandler(
         ? order.estimatedDeliveryDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
         : order.orderDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
       orderDate: order.orderDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
-      status: order.status === 'On the way' ? 'On the way' : order.status,
+      status: (order.status === 'Out for Delivery' || order.status === 'Out For Delivery') ? 'On the way' : order.status,
       amount: order.total,
       customerName: (order.customer as any)?.name || order.customerName || '',
       customerPhone: (order.customer as any)?.phone || order.customerPhone || '',
@@ -208,7 +208,7 @@ export const getOrderById = asyncHandler(
       orderDate: order.orderDate ? order.orderDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       deliveryDate: order.estimatedDeliveryDate ? order.estimatedDeliveryDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       timeSlot: order.timeSlot || 'N/A',
-      status: order.status === 'On the way' ? 'Out For Delivery' : order.status,
+      status: (order.status === 'Out for Delivery' || order.status === 'Out For Delivery') ? 'On the way' : order.status,
       customerName: (order.customer as any)?.name || order.customerName || '',
       customerEmail: (order.customer as any)?.email || order.customerEmail || '',
       customerPhone: (order.customer as any)?.phone || order.customerPhone || '',
@@ -268,8 +268,14 @@ export const updateOrderStatus = asyncHandler(
       });
     }
 
+    // Map status from frontend ('On the way') to backend schema enum ('Out for Delivery')
+    let mappedStatus = status;
+    if (status === 'On the way') {
+        mappedStatus = 'Out for Delivery';
+    }
+
     // Check if status is already the same
-    if (order.status === status) {
+    if (order.status === mappedStatus) {
       return res.status(400).json({
         success: false,
         message: `Order is already ${status}`,
@@ -277,7 +283,7 @@ export const updateOrderStatus = asyncHandler(
     }
 
     const previousStatus = order.status;
-    order.status = status;
+    order.status = mappedStatus;
     await order.save();
 
     // Trigger delivery notification if seller accepts the order
@@ -307,31 +313,12 @@ export const updateOrderStatus = asyncHandler(
         }
     }
 
-    // If order is delivered, credit seller's balance
-    if (status === 'Delivered' && previousStatus !== 'Delivered') {
-      const seller = await Seller.findById(sellerId);
-      if (seller) {
-        // Calculate net earning (sale amount - commission)
-        // Commission is stored in seller model
-        const commissionRate = (seller.commission || 0) / 100;
-        const commissionAmount = order.grandTotal * commissionRate;
-        const netEarning = order.grandTotal - commissionAmount;
-
-        seller.balance = (seller.balance || 0) + netEarning;
-        await seller.save();
-
-        // Log transaction
-        await WalletTransaction.create({
-          userId: sellerId,
-          userType: 'SELLER',
-          amount: netEarning,
-          type: 'Credit',
-          description: `Earnings from Order #${order.orderNumber}`,
-          reference: `ORD-${order.orderNumber}-${Date.now()}`,
-          status: 'Completed',
-          relatedOrder: order._id
-        });
-      }
+    // Trigger processOrderStatusTransition for full commission distribution, inventory updates, etc.
+    try {
+        const { processOrderStatusTransition } = await import("../../../services/orderService");
+        await processOrderStatusTransition(id, mappedStatus, previousStatus);
+    } catch (transitionError: any) {
+        console.error('Error processing order status transition in seller updateOrderStatus:', transitionError);
     }
 
     return res.status(200).json({

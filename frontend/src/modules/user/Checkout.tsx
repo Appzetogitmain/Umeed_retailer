@@ -92,7 +92,6 @@ export default function Checkout() {
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "Online">("Online");
-  const [deliveryInstructions, setDeliveryInstructions] = useState<string>("");
 
   // Profile completion modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -499,7 +498,6 @@ export default function Checkout() {
       gstin: gstin || undefined,
       couponCode: selectedCoupon?.code || undefined,
       giftPackaging: giftPackaging,
-      deliveryInstructions: deliveryInstructions || undefined,
     };
 
     try {
@@ -537,26 +535,19 @@ export default function Checkout() {
     if (!selectedAddress?.id || !mapLocation) return;
     setIsUpdatingLocation(true);
     try {
-      // Prepare update payload
+      // Prepare update payload with existing details as fallback to prevent data loss or undefined values
       const updatePayload: any = {
         latitude: mapLocation.lat,
         longitude: mapLocation.lng,
+        fullName: selectedAddress.name,
+        phone: selectedAddress.phone,
+        city: mapLocation.address?.city || selectedAddress.city,
+        state: mapLocation.address?.state || selectedAddress.state,
+        pincode: mapLocation.address?.pincode || selectedAddress.pincode,
+        landmark: mapLocation.address?.landmark || selectedAddress.landmark,
+        type: (selectedAddress as any).type || 'Home',
+        address: mapLocation.address?.street || selectedAddress.street,
       };
-
-      // If address details are available from map, update them too
-      if (mapLocation.address) {
-        if (mapLocation.address.street)
-          updatePayload.address = mapLocation.address.street;
-        if (mapLocation.address.city)
-          updatePayload.city = mapLocation.address.city;
-        if (mapLocation.address.state)
-          updatePayload.state = mapLocation.address.state;
-        if (mapLocation.address.pincode)
-          updatePayload.pincode = mapLocation.address.pincode;
-        if (mapLocation.address.pincode)
-          updatePayload.pincode = mapLocation.address.pincode;
-      }
-
 
       // Update the address in backend
       await updateAddress(selectedAddress.id, updatePayload);
@@ -1128,20 +1119,6 @@ export default function Checkout() {
         </div>
       )}
 
-      {/* Delivery Instructions */}
-      <div className="px-4 md:px-6 lg:px-8 py-2 md:py-3 border-b border-neutral-200">
-        <h3 className="text-xs font-semibold text-neutral-900 mb-1.5">
-          Delivery Instructions
-        </h3>
-        <textarea
-          value={deliveryInstructions}
-          onChange={(e) => setDeliveryInstructions(e.target.value)}
-          placeholder="e.g. Leave at the gate, Ring the bell, etc."
-          className="w-full px-3 py-2 text-xs border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 transition-all resize-none"
-          style={{ borderColor: "#E5E5E5" }}
-          rows={2}
-        />
-      </div>
 
       {/* Main Product Card */}
       <div className="px-4 md:px-6 lg:px-8 py-2 md:py-3 bg-white border-b border-neutral-200">

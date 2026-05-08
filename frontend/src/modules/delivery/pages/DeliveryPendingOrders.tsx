@@ -60,8 +60,6 @@ export default function DeliveryPendingOrders() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
-      {/* Header */}
-      <DeliveryHeader />
 
       <div className="px-4 py-4">
         <div className="flex items-center mb-4">

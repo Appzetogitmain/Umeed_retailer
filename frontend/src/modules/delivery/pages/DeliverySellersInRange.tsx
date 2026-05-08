@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import DeliveryHeader from '../components/DeliveryHeader';
 import DeliveryBottomNav from '../components/DeliveryBottomNav';
 import { getSellersInRadius } from '../../../services/api/delivery/deliveryService';
 import { useDeliveryStatus } from '../context/DeliveryStatusContext';
@@ -42,7 +41,6 @@ export default function DeliverySellersInRange() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
-      <DeliveryHeader />
 
       <div className="px-4 py-4">
         <div className="flex items-center mb-6">

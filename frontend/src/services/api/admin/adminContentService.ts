@@ -10,6 +10,7 @@ export interface FAQ {
   category?: string;
   isActive: boolean;
   order: number;
+  userType?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -20,6 +21,7 @@ export interface CreateFAQData {
   category?: string;
   isActive?: boolean;
   order?: number;
+  userType?: string;
 }
 
 export interface UpdateFAQData {
@@ -28,6 +30,7 @@ export interface UpdateFAQData {
   category?: string;
   isActive?: boolean;
   order?: number;
+  userType?: string;
 }
 
 export interface Policy {
@@ -62,6 +65,7 @@ export interface GetContentParams {
   search?: string;
   isActive?: boolean;
   type?: string;
+  userType?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }

@@ -440,6 +440,15 @@ export default function AdminDashboard() {
     );
   }
 
+  // Dynamic titles and scales
+  const currentMonthShort = new Date().toLocaleString('default', { month: 'short' });
+  const currentYear = new Date().getFullYear();
+  
+  // Calculate a dynamic max value for the gauge (roughly 1.5x the current average, rounded up to nearest 100)
+  const dynamicGaugeMax = stats.avgCompletedOrderValue > 0 
+    ? Math.ceil((stats.avgCompletedOrderValue * 1.5) / 100) * 100 
+    : 1000;
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* KPI Cards Grid - 2 columns on mobile, 4 on desktop */}
@@ -572,7 +581,7 @@ export default function AdminDashboard() {
             </h3>
             <GaugeChart
               value={stats.avgCompletedOrderValue}
-              maxValue={521}
+              maxValue={dynamicGaugeMax}
               label="Average Order Value"
             />
           </div>
@@ -583,7 +592,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <ErrorBoundary fallback={<div className="text-sm text-red-600 p-4">Chart failed to load</div>}>
           <OrderChart
-            title="Order - Dec 2025"
+            title={`Order - ${currentMonthShort} ${currentYear}`}
             data={orderDataDec2025}
             maxValue={3}
             height={400}
@@ -591,7 +600,7 @@ export default function AdminDashboard() {
         </ErrorBoundary>
         <ErrorBoundary fallback={<div className="text-sm text-red-600 p-4">Chart failed to load</div>}>
           <OrderChart
-            title="Order - 2025"
+            title={`Order - ${currentYear}`}
             data={orderData2025}
             maxValue={80}
             height={400}
@@ -735,7 +744,7 @@ export default function AdminDashboard() {
                         {order.customerName}
                       </td>
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
-                        {new Date(order.orderDate).toLocaleDateString()}
+                        {new Date(order.orderDate).toLocaleDateString("en-GB")}
                       </td>
                       <td className="px-4 sm:px-6 py-3">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-neutral-600 bg-neutral-50">

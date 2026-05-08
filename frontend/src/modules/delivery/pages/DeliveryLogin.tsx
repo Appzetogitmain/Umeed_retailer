@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   sendOTP,
   verifyOTP,
@@ -265,6 +265,18 @@ export default function DeliveryLogin() {
             </button>
           </div>
         </div>
+
+        {/* Footer Text */}
+        <p className="mt-8 text-xs text-white/50 text-center max-w-md">
+          By continuing, you agree to Speedoo's{' '}
+          <Link to="/delivery/terms-and-conditions" className="text-[#f57c00] font-bold hover:underline">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link to="/delivery/privacy-policy" className="text-[#f57c00] font-bold hover:underline">
+            Privacy Policy
+          </Link>
+        </p>
       </main>
 
       {/* Decorative Corner Element */}

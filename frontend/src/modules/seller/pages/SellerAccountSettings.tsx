@@ -16,6 +16,7 @@ const SellerAccountSettings = () => {
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Initial state with empty values
   const [sellerData, setSellerData] = useState({
@@ -108,10 +109,68 @@ const SellerAccountSettings = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setSellerData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (["sellerName", "storeName", "city", "taxName"].includes(name)) {
+      setSellerData(prev => ({
+        ...prev,
+        [name]: value.replace(/[0-9]/g, ""),
+      }));
+    } else if (["panCard", "ifsc", "taxNumber"].includes(name)) {
+      setSellerData(prev => ({
+        ...prev,
+        [name]: value.toUpperCase(),
+      }));
+    } else if (name === "accountNumber") {
+      setSellerData(prev => ({
+        ...prev,
+        [name]: value.replace(/\D/g, ""),
+      }));
+    } else {
+      setSellerData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateField = (name: string, value: any) => {
+    let err = "";
+    if (name === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/;
+      if (!value) err = "Email is required";
+      else if (!emailRegex.test(value)) err = "Invalid email format";
+    } else if (name === "mobile") {
+      if (!value) err = "Mobile number is required";
+      else if (value.length !== 10) err = "Mobile number must be 10 digits";
+    } else if (name === "sellerName") {
+      if (!value) err = "Seller name is required";
+    } else if (name === "storeName") {
+      if (!value) err = "Store name is required";
+    } else if (name === "city") {
+      if (!value) err = "City is required";
+    } else if (name === "panCard") {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (value && !panRegex.test(value)) err = "Invalid PAN format (e.g. ABCDE1234F)";
+    } else if (name === "taxNumber") {
+      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (value && !gstRegex.test(value)) err = "Invalid GST format (e.g. 22AAAAA0000A1Z5)";
+    } else if (name === "ifsc") {
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (value && !ifscRegex.test(value)) err = "Invalid IFSC format (e.g. SBIN0001234)";
+    } else if (name === "accountNumber") {
+      if (value && !/^\d{9,18}$/.test(value)) err = "Invalid account number (9-18 digits)";
+    }
+
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
+    return err;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,9 +179,33 @@ const SellerAccountSettings = () => {
       setSaveLoading(true);
       setError('');
 
+      // Validate all fields
+      const sellerNameErr = validateField("sellerName", sellerData.sellerName);
+      const emailErr = validateField("email", sellerData.email);
+      const mobileErr = validateField("mobile", sellerData.mobile);
+      const storeNameErr = validateField("storeName", sellerData.storeName);
+      const cityErr = validateField("city", sellerData.city);
+      const panErr = validateField("panCard", sellerData.panCard);
+      const taxNumberErr = validateField("taxNumber", sellerData.taxNumber);
+      const ifscErr = validateField("ifsc", sellerData.ifsc);
+      const accNumberErr = validateField("accountNumber", sellerData.accountNumber);
+
+      if (sellerNameErr || emailErr || mobileErr || storeNameErr || cityErr || panErr || taxNumberErr || ifscErr || accNumberErr) {
+        setError("Please fix the errors in the form");
+        setSaveLoading(false);
+        return;
+      }
+
       // Validate location if address is being updated
       if (sellerData.searchLocation && (!sellerData.latitude || !sellerData.longitude)) {
         setError('Please select a valid location using the map picker');
+        setSaveLoading(false);
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/;
+      if (!emailRegex.test(sellerData.email)) {
+        setError("Please enter a valid email address");
         setSaveLoading(false);
         return;
       }
@@ -356,9 +439,9 @@ const SellerAccountSettings = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <InputGroup label="Full Name" name="sellerName" value={sellerData.sellerName} onChange={handleInputChange} disabled={!isEditing} autoComplete="name" />
-                          <InputGroup label="Email Address" name="email" value={sellerData.email} onChange={handleInputChange} disabled={!isEditing} type="email" autoComplete="email" />
-                          <InputGroup label="Mobile Number" name="mobile" value={sellerData.mobile} onChange={handleInputChange} disabled={!isEditing} type="tel" autoComplete="tel" />
+                          <InputGroup label="Full Name" name="sellerName" value={sellerData.sellerName} onChange={handleInputChange} onBlur={() => validateField("sellerName", sellerData.sellerName)} error={fieldErrors.sellerName} disabled={!isEditing} autoComplete="name" />
+                          <InputGroup label="Email Address" name="email" value={sellerData.email} onChange={handleInputChange} onBlur={() => validateField("email", sellerData.email)} error={fieldErrors.email} disabled={!isEditing} type="email" autoComplete="email" />
+                          <InputGroup label="Mobile Number" name="mobile" value={sellerData.mobile} onChange={handleInputChange} onBlur={() => validateField("mobile", sellerData.mobile)} error={fieldErrors.mobile} disabled={!isEditing} type="tel" autoComplete="tel" />
 
                           <div className="space-y-1.5">
                             <label className="text-sm font-semibold text-gray-700 ml-1">Password</label>
@@ -405,7 +488,7 @@ const SellerAccountSettings = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <InputGroup label="Store Name" name="storeName" value={sellerData.storeName} onChange={handleInputChange} disabled={!isEditing} />
+                          <InputGroup label="Store Name" name="storeName" value={sellerData.storeName} onChange={handleInputChange} onBlur={() => validateField("storeName", sellerData.storeName)} error={fieldErrors.storeName} disabled={!isEditing} />
 
                           <div className="space-y-1.5">
                             <label className="text-sm font-semibold text-gray-700 ml-1">Store Category</label>
@@ -481,7 +564,7 @@ const SellerAccountSettings = () => {
                             )}
                           </div>
 
-                          <InputGroup label="City" name="city" value={sellerData.city} onChange={handleInputChange} disabled={!isEditing} />
+                          <InputGroup label="City" name="city" value={sellerData.city} onChange={handleInputChange} onBlur={() => validateField("city", sellerData.city)} error={fieldErrors.city} disabled={!isEditing} />
 
                           <div className="space-y-1.5">
                             <label className="text-sm font-semibold text-gray-700 ml-1">
@@ -561,10 +644,11 @@ const SellerAccountSettings = () => {
                             <h4 className="text-lg font-bold text-gray-900">Bank Details</h4>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-50/50 p-6 rounded-xl border border-gray-100">
-                            <InputGroup label="Account Holder Name" name="accountName" value={sellerData.accountName} onChange={handleInputChange} disabled={!isEditing} />
-                            <InputGroup label="Bank Name" name="bankName" value={sellerData.bankName} onChange={handleInputChange} disabled={!isEditing} />
-                            <InputGroup label="Account Number" name="accountNumber" value={sellerData.accountNumber} onChange={handleInputChange} disabled={!isEditing} />
-                            <InputGroup label="IFSC Code" name="ifsc" value={sellerData.ifsc} onChange={handleInputChange} disabled={!isEditing} />
+                            <InputGroup label="Account Holder Name" name="accountName" value={sellerData.accountName} onChange={handleInputChange} onBlur={() => validateField("accountName", sellerData.accountName)} error={fieldErrors.accountName} disabled={!isEditing} />
+                            <InputGroup label="Bank Name" name="bankName" value={sellerData.bankName} onChange={handleInputChange} onBlur={() => validateField("bankName", sellerData.bankName)} error={fieldErrors.bankName} disabled={!isEditing} />
+                            <InputGroup label="Branch Name" name="branch" value={sellerData.branch} onChange={handleInputChange} onBlur={() => validateField("branch", sellerData.branch)} error={fieldErrors.branch} disabled={!isEditing} />
+                            <InputGroup label="Account Number" name="accountNumber" value={sellerData.accountNumber} onChange={handleInputChange} onBlur={() => validateField("accountNumber", sellerData.accountNumber)} error={fieldErrors.accountNumber} disabled={!isEditing} />
+                            <InputGroup label="IFSC Code" name="ifsc" value={sellerData.ifsc} onChange={handleInputChange} onBlur={() => validateField("ifsc", sellerData.ifsc)} error={fieldErrors.ifsc} disabled={!isEditing} placeholder="e.g. SBIN0001234" />
                           </div>
                         </section>
 
@@ -576,8 +660,9 @@ const SellerAccountSettings = () => {
                             <h4 className="text-lg font-bold text-gray-900">Tax Information</h4>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-50/50 p-6 rounded-xl border border-gray-100">
-                            <InputGroup label="PAN Card Number" name="panCard" value={sellerData.panCard} onChange={handleInputChange} disabled={!isEditing} />
-                            <InputGroup label="Tax Number (GST)" name="taxNumber" value={sellerData.taxNumber} onChange={handleInputChange} disabled={!isEditing} />
+                            <InputGroup label="PAN Card Number" name="panCard" value={sellerData.panCard} onChange={handleInputChange} onBlur={() => validateField("panCard", sellerData.panCard)} error={fieldErrors.panCard} disabled={!isEditing} placeholder="e.g. ABCDE1234F" />
+                            <InputGroup label="Tax Name" name="taxName" value={sellerData.taxName} onChange={handleInputChange} onBlur={() => validateField("taxName", sellerData.taxName)} error={fieldErrors.taxName} disabled={!isEditing} placeholder="e.g. GST" />
+                            <InputGroup label="Tax Number (GST)" name="taxNumber" value={sellerData.taxNumber} onChange={handleInputChange} onBlur={() => validateField("taxNumber", sellerData.taxNumber)} error={fieldErrors.taxNumber} disabled={!isEditing} placeholder="e.g. 22AAAAA0000A1Z5" />
                           </div>
                         </section>
                       </div>
@@ -670,7 +755,7 @@ const SellerAccountSettings = () => {
   );
 };
 
-const InputGroup = ({ label, name, value, onChange, disabled, type = "text", placeholder = "", autoComplete }: any) => (
+const InputGroup = ({ label, name, value, onChange, onBlur, disabled, type = "text", placeholder = "", autoComplete, error }: any) => (
 
   <div className="space-y-1.5">
     <label className="text-sm font-semibold text-gray-700 ml-1">{label}</label>
@@ -679,13 +764,17 @@ const InputGroup = ({ label, name, value, onChange, disabled, type = "text", pla
       name={name}
       value={value || ''}
       onChange={onChange}
+      onBlur={onBlur}
       disabled={disabled}
       placeholder={placeholder}
       autoComplete={autoComplete}
-      className={`w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all ${disabled ? 'bg-gray-50/50 text-gray-500 cursor-default' : 'bg-white'
-
-        }`}
+      className={`w-full px-4 py-2.5 rounded-lg border focus:ring-2 outline-none transition-all ${
+        disabled ? 'bg-gray-50/50 text-gray-500 cursor-default border-gray-300' : 
+        error ? 'border-red-500 focus:ring-red-500/20 focus:border-red-500' : 
+        'bg-white border-gray-300 focus:ring-teal-500/20 focus:border-teal-500'
+      }`}
     />
+    {error && <p className="text-xs text-red-500 ml-1 mt-0.5">{error}</p>}
   </div>
 );
 

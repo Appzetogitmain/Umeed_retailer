@@ -14,6 +14,8 @@ export default function AdminFAQ() {
   const { isAuthenticated, token } = useAuth();
   const [faqQuestion, setFaqQuestion] = useState("");
   const [faqAnswer, setFaqAnswer] = useState("");
+  const [faqUserType, setFaqUserType] = useState("All");
+  const [userTypeFilter, setUserTypeFilter] = useState("");
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -42,6 +44,7 @@ export default function AdminFAQ() {
           limit: rowsPerPage,
           sortBy: sortColumn || undefined,
           sortOrder: sortDirection,
+          userType: userTypeFilter || undefined,
         });
 
         if (response.success) {
@@ -69,6 +72,7 @@ export default function AdminFAQ() {
     rowsPerPage,
     sortColumn,
     sortDirection,
+    userTypeFilter,
   ]);
 
   // Note: Filtering is done server-side, so we just use the faqs as is
@@ -108,6 +112,7 @@ export default function AdminFAQ() {
         const updateData: UpdateFAQData = {
           question: faqQuestion.trim(),
           answer: faqAnswer.trim(),
+          userType: faqUserType,
         };
 
         const response = await updateFAQ(editingFAQ._id, updateData);
@@ -121,6 +126,7 @@ export default function AdminFAQ() {
                   ...faq,
                   question: faqQuestion.trim(),
                   answer: faqAnswer.trim(),
+                  userType: faqUserType,
                 }
                 : faq
             )
@@ -137,6 +143,7 @@ export default function AdminFAQ() {
         const faqData: CreateFAQData = {
           question: faqQuestion.trim(),
           answer: faqAnswer.trim(),
+          userType: faqUserType,
           isActive: true,
         };
 
@@ -154,6 +161,7 @@ export default function AdminFAQ() {
       // Reset form
       setFaqQuestion("");
       setFaqAnswer("");
+      setFaqUserType("All");
     } catch (err: any) {
       console.error("Error saving FAQ:", err);
       alert(
@@ -168,6 +176,7 @@ export default function AdminFAQ() {
   const handleEdit = (faq: FAQ) => {
     setFaqQuestion(faq.question);
     setFaqAnswer(faq.answer);
+    setFaqUserType(faq.userType || "All");
     setEditingFAQ(faq);
   };
 
@@ -190,6 +199,7 @@ export default function AdminFAQ() {
           setEditingFAQ(null);
           setFaqQuestion("");
           setFaqAnswer("");
+          setFaqUserType("All");
         }
       } else {
         alert("Failed to delete FAQ: " + (response.message || "Unknown error"));
@@ -279,6 +289,21 @@ export default function AdminFAQ() {
                     className="w-full px-3 py-2 border border-neutral-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Target Audience / User Type
+                  </label>
+                  <select
+                    value={faqUserType}
+                    onChange={(e) => setFaqUserType(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white cursor-pointer text-sm"
+                  >
+                    <option value="All">All Users</option>
+                    <option value="Customer">Customer</option>
+                    <option value="Seller">Seller</option>
+                    <option value="Delivery Partner">Delivery Partner</option>
+                  </select>
+                </div>
               </div>
               <div className="mt-6">
                 <button
@@ -302,6 +327,7 @@ export default function AdminFAQ() {
                       setEditingFAQ(null);
                       setFaqQuestion("");
                       setFaqAnswer("");
+                      setFaqUserType("All");
                     }}
                     className="w-full mt-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-medium transition-colors">
                     Cancel
@@ -319,20 +345,37 @@ export default function AdminFAQ() {
 
             {/* Controls */}
             <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-neutral-100">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-600">Show</span>
-                <select
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-neutral-300 rounded py-1.5 px-3 text-sm focus:ring-1 focus:ring-teal-500 focus:outline-none cursor-pointer">
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-600">Show</span>
+                  <select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="bg-white border border-neutral-300 rounded py-1.5 px-3 text-sm focus:ring-1 focus:ring-teal-500 focus:outline-none cursor-pointer">
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-600">Audience</span>
+                  <select
+                    value={userTypeFilter}
+                    onChange={(e) => {
+                      setUserTypeFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="bg-white border border-neutral-300 rounded py-1.5 px-3 text-sm focus:ring-1 focus:ring-teal-500 focus:outline-none cursor-pointer">
+                    <option value="">All</option>
+                    <option value="Customer">Customer</option>
+                    <option value="Seller">Seller</option>
+                    <option value="Delivery Partner">Delivery Partner</option>
+                  </select>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -396,13 +439,20 @@ export default function AdminFAQ() {
                         FAQ Answer <SortIcon column="answer" />
                       </div>
                     </th>
+                    <th
+                      className="p-4 border border-neutral-200 cursor-pointer hover:bg-neutral-100 transition-colors"
+                      onClick={() => handleSort("userType")}>
+                      <div className="flex items-center justify-between">
+                        User Type <SortIcon column="userType" />
+                      </div>
+                    </th>
                     <th className="p-4 border border-neutral-200">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center">
+                      <td colSpan={5} className="p-8 text-center">
                         <div className="flex items-center justify-center">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600 mr-2"></div>
                           Loading FAQs...
@@ -411,14 +461,14 @@ export default function AdminFAQ() {
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-red-600">
+                      <td colSpan={5} className="p-8 text-center text-red-600">
                         {error}
                       </td>
                     </tr>
                   ) : displayedFAQs.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="p-8 text-center text-neutral-400 border border-neutral-200">
                         No FAQs found.
                       </td>
@@ -436,6 +486,16 @@ export default function AdminFAQ() {
                         </td>
                         <td className="p-4 align-middle border border-neutral-200">
                           {faq.answer}
+                        </td>
+                        <td className="p-4 align-middle border border-neutral-200">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            faq.userType === 'Customer' ? 'bg-blue-100 text-blue-800' :
+                            faq.userType === 'Seller' ? 'bg-amber-100 text-amber-800' :
+                            faq.userType === 'Delivery Partner' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {faq.userType || 'All'}
+                          </span>
                         </td>
                         <td className="p-4 align-middle border border-neutral-200">
                           <div className="flex items-center gap-2">

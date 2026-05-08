@@ -90,6 +90,15 @@ const DeliveryProfile = lazy(
 const AdminWithdrawals = lazy(
   () => import("./modules/admin/pages/AdminWithdrawals"),
 );
+const DeliveryPrivacyPolicy = lazy(
+  () => import("./modules/delivery/pages/DeliveryPrivacyPolicy"),
+);
+const DeliveryTermsAndConditions = lazy(
+  () => import("./modules/delivery/pages/DeliveryTermsAndConditions"),
+);
+const DeliveryEarnings = lazy(
+  () => import("./modules/delivery/pages/DeliveryEarnings"),
+);
 const DeliverySettings = lazy(
   () => import("./modules/delivery/pages/DeliverySettings"),
 );
@@ -406,6 +415,22 @@ function AppContent() {
                           element={
                             <Suspense fallback={<IconLoader forceShow />}>
                               <SellerTermsAndConditions />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/delivery/privacy-policy"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <DeliveryPrivacyPolicy />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/delivery/terms-and-conditions"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <DeliveryTermsAndConditions />
                             </Suspense>
                           }
                         />

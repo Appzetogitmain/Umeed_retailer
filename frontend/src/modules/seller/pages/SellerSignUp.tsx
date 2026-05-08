@@ -44,6 +44,7 @@ export default function SellerSignUp() {
   const [showOTP, setShowOTP] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<HeaderCategory[]>([]);
 
   useEffect(() => {
@@ -81,12 +82,71 @@ export default function SellerSignUp() {
         ...prev,
         [name]: finalValue,
       }));
+    } else if (["sellerName", "storeName", "city", "taxName"].includes(name)) {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value.replace(/[0-9]/g, ""),
+      }));
+    } else if (["panCard", "ifsc", "taxNumber"].includes(name)) {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value.toUpperCase(),
+      }));
+    } else if (name === "accountNumber") {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value.replace(/\D/g, ""),
+      }));
     } else {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
       }));
     }
+
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateField = (name: string, value: any) => {
+    let err = "";
+    if (name === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/;
+      if (!value) err = "Email is required";
+      else if (!emailRegex.test(value))
+        err = "Invalid email format (e.g. name@domain.com)";
+    } else if (name === "mobile") {
+      if (!value) err = "Mobile number is required";
+      else if (value.length !== 10) err = "Mobile number must be 10 digits";
+    } else if (name === "sellerName") {
+      if (!value) err = "Seller name is required";
+    } else if (name === "storeName") {
+      if (!value) err = "Store name is required";
+    } else if (name === "city") {
+      if (!value) err = "City is required";
+    } else if (name === "categories") {
+      if (!value || value.length === 0) err = "Select at least one category";
+    } else if (name === "panCard") {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (value && !panRegex.test(value)) err = "Invalid PAN format (e.g. ABCDE1234F)";
+    } else if (name === "taxNumber") {
+      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (value && !gstRegex.test(value)) err = "Invalid GST format (e.g. 22AAAAA0000A1Z5)";
+    } else if (name === "ifsc") {
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (value && !ifscRegex.test(value)) err = "Invalid IFSC format (e.g. SBIN0001234)";
+    } else if (name === "accountNumber") {
+      if (value && !/^\d{9,18}$/.test(value)) err = "Invalid account number (9-18 digits)";
+    }
+
+    setFieldErrors((prev) => ({ ...prev, [name]: err }));
+    return err;
   };
 
   const toggleCategory = (cat: string) => {
@@ -106,38 +166,21 @@ export default function SellerSignUp() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields (password removed - not needed during signup)
-    if (!formData.sellerName) {
-      setError("Please enter your name");
-      return;
-    }
-    if (!formData.mobile) {
-      setError("Please enter your mobile number");
-      return;
-    }
-    if (!formData.email) {
-      setError("Please enter your email address");
-      return;
-    }
-    if (!formData.storeName) {
-      setError("Please enter your store name");
-      return;
-    }
-    if (formData.categories.length === 0) {
-      setError("Please select at least one category");
-      return;
-    }
-    if (!formData.address && !formData.searchLocation) {
-      setError("Please select your store location");
-      return;
-    }
-    if (!formData.city) {
-      setError("Please enter your city");
-      return;
-    }
+    // Validate all fields
+    const errors: Record<string, string> = {};
+    const sellerNameErr = validateField("sellerName", formData.sellerName);
+    const mobileErr = validateField("mobile", formData.mobile);
+    const emailErr = validateField("email", formData.email);
+    const storeNameErr = validateField("storeName", formData.storeName);
+    const cityErr = validateField("city", formData.city);
+    const categoriesErr = validateField("categories", formData.categories);
+    const panErr = validateField("panCard", formData.panCard);
+    const taxNumberErr = validateField("taxNumber", formData.taxNumber);
+    const ifscErr = validateField("ifsc", formData.ifsc);
+    const accNumberErr = validateField("accountNumber", formData.accountNumber);
 
-    if (formData.mobile.length !== 10) {
-      setError("Please enter a valid 10-digit mobile number");
+    if (sellerNameErr || mobileErr || emailErr || storeNameErr || cityErr || categoriesErr || panErr || taxNumberErr || ifscErr || accNumberErr) {
+      setError("Please fix the errors in the form");
       return;
     }
 
@@ -307,18 +350,31 @@ export default function SellerSignUp() {
                     name="sellerName"
                     value={formData.sellerName}
                     onChange={handleInputChange}
+                    onBlur={() => validateField("sellerName", formData.sellerName)}
                     placeholder="Enter your name"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.sellerName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.sellerName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.sellerName}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Mobile Number <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center bg-white border border-neutral-300 rounded-lg overflow-hidden focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-200">
+                  <div
+                    className={`flex items-center bg-white border rounded-lg overflow-hidden focus-within:ring-2 ${
+                      fieldErrors.mobile
+                        ? "border-red-500 focus-within:border-red-500 focus-within:ring-red-200"
+                        : "border-neutral-300 focus-within:border-purple-500 focus-within:ring-purple-200"
+                    }`}>
                     <div className="px-3 py-2.5 text-sm font-medium text-neutral-600 border-r border-neutral-300 bg-neutral-50">
                       +91
                     </div>
@@ -327,6 +383,7 @@ export default function SellerSignUp() {
                       name="mobile"
                       value={formData.mobile}
                       onChange={handleInputChange}
+                      onBlur={() => validateField("mobile", formData.mobile)}
                       placeholder="Enter mobile number"
                       required
                       maxLength={10}
@@ -334,6 +391,9 @@ export default function SellerSignUp() {
                       disabled={loading}
                     />
                   </div>
+                  {fieldErrors.mobile && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.mobile}</p>
+                  )}
                 </div>
 
                 <div>
@@ -345,11 +405,19 @@ export default function SellerSignUp() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
+                    onBlur={() => validateField("email", formData.email)}
                     placeholder="Enter email address"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.email
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -361,11 +429,19 @@ export default function SellerSignUp() {
                     name="storeName"
                     value={formData.storeName}
                     onChange={handleInputChange}
+                    onBlur={() => validateField("storeName", formData.storeName)}
                     placeholder="Enter store name"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.storeName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.storeName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.storeName}</p>
+                  )}
                 </div>
 
                 <div>
@@ -387,7 +463,16 @@ export default function SellerSignUp() {
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() => toggleCategory(cat.name)}
+                              onChange={() => {
+                                toggleCategory(cat.name);
+                                if (fieldErrors.categories) {
+                                  setFieldErrors(prev => {
+                                    const next = {...prev};
+                                    delete next.categories;
+                                    return next;
+                                  });
+                                }
+                              }}
                               disabled={loading}
                               className="h-4 w-4 text-purple-600 border-neutral-300 rounded focus:ring-purple-500"
                             />
@@ -397,12 +482,11 @@ export default function SellerSignUp() {
                       })}
                     </div>
                   )}
-                  {formData.categories.length === 0 &&
-                    categories.length > 0 && (
-                      <p className="text-xs text-red-600 mt-1">
-                        Select at least one category
-                      </p>
-                    )}
+                  {fieldErrors.categories && (
+                    <p className="text-xs text-red-500 mt-1">
+                      {fieldErrors.categories}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -559,11 +643,19 @@ export default function SellerSignUp() {
                     name="city"
                     value={formData.city}
                     onChange={handleInputChange}
+                    onBlur={() => validateField("city", formData.city)}
                     placeholder="Enter city"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.city
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.city && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.city}</p>
+                  )}
                 </div>
 
                 {/* Hidden fields for coordinates */}
@@ -585,7 +677,10 @@ export default function SellerSignUp() {
                   Optional Information
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Tax Information Group */}
+                <div className="space-y-4">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Tax Information</p>
+                  
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-2">
                       PAN Card
@@ -595,10 +690,18 @@ export default function SellerSignUp() {
                       name="panCard"
                       value={formData.panCard}
                       onChange={handleInputChange}
-                      placeholder="PAN Card Number"
-                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      onBlur={() => validateField("panCard", formData.panCard)}
+                      placeholder="e.g. ABCDE1234F"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors.panCard
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                      }`}
                       disabled={loading}
                     />
+                    {fieldErrors.panCard && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.panCard}</p>
+                    )}
                   </div>
 
                   <div>
@@ -610,10 +713,14 @@ export default function SellerSignUp() {
                       name="taxName"
                       value={formData.taxName}
                       onChange={handleInputChange}
-                      placeholder="Tax Name"
+                      onBlur={() => validateField("taxName", formData.taxName)}
+                      placeholder="Tax Name (e.g. GST)"
                       className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                       disabled={loading}
                     />
+                    {fieldErrors.taxName && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.taxName}</p>
+                    )}
                   </div>
 
                   <div>
@@ -625,10 +732,103 @@ export default function SellerSignUp() {
                       name="taxNumber"
                       value={formData.taxNumber}
                       onChange={handleInputChange}
-                      placeholder="Tax Number"
+                      onBlur={() => validateField("taxNumber", formData.taxNumber)}
+                      placeholder="e.g. 22AAAAA0000A1Z5"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors.taxNumber
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                      }`}
+                      disabled={loading}
+                    />
+                    {fieldErrors.taxNumber && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.taxNumber}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bank Information Group */}
+                <div className="space-y-4 pt-4 border-t border-dashed">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Bank Details</p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Account Holder Name
+                    </label>
+                    <input
+                      type="text"
+                      name="accountName"
+                      value={formData.accountName}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField("accountName", formData.accountName)}
+                      placeholder="Name as per bank records"
                       className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                       disabled={loading}
                     />
+                    {fieldErrors.accountName && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.accountName}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Bank Name
+                    </label>
+                    <input
+                      type="text"
+                      name="bankName"
+                      value={formData.bankName}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField("bankName", formData.bankName)}
+                      placeholder="Enter bank name"
+                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      disabled={loading}
+                    />
+                    {fieldErrors.bankName && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.bankName}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Branch Name
+                    </label>
+                    <input
+                      type="text"
+                      name="branch"
+                      value={formData.branch}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField("branch", formData.branch)}
+                      placeholder="Enter branch name"
+                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      disabled={loading}
+                    />
+                    {fieldErrors.branch && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.branch}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      name="accountNumber"
+                      value={formData.accountNumber}
+                      onChange={handleInputChange}
+                      onBlur={() => validateField("accountNumber", formData.accountNumber)}
+                      placeholder="Enter account number"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors.accountNumber
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                      }`}
+                      disabled={loading}
+                    />
+                    {fieldErrors.accountNumber && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.accountNumber}</p>
+                    )}
                   </div>
 
                   <div>
@@ -640,10 +840,18 @@ export default function SellerSignUp() {
                       name="ifsc"
                       value={formData.ifsc}
                       onChange={handleInputChange}
-                      placeholder="IFSC Code"
-                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      onBlur={() => validateField("ifsc", formData.ifsc)}
+                      placeholder="e.g. SBIN0001234"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                        fieldErrors.ifsc
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                      }`}
                       disabled={loading}
                     />
+                    {fieldErrors.ifsc && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.ifsc}</p>
+                    )}
                   </div>
                 </div>
               </div>

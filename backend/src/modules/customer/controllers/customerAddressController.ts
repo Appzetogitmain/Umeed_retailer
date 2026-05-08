@@ -9,10 +9,10 @@ export const addAddress = async (req: Request, res: Response) => {
 
         const finalName = fullName || name;
 
-        if (!finalName || !phone || !flat || !street || !city || !pincode) {
+        if (!finalName || !phone || !street || !city || !pincode) {
             return res.status(400).json({
                 success: false,
-                message: "All fields are required (name, phone, flat, street, city, pincode)",
+                message: "All required fields must be provided (name, phone, street, city, pincode)",
             });
         }
 
@@ -20,7 +20,7 @@ export const addAddress = async (req: Request, res: Response) => {
         // or we could change schema. For now, we store them combined or rely on schema update.
         // Looking at the schema, it has 'address', 'city', 'pincode'.
         // We will store "Flat, Street" in 'address'.
-        const fullAddress = `${flat}, ${street}`;
+        const fullAddress = flat ? `${flat}, ${street}` : street;
 
         if (isDefault) {
             // If this is default, unsettle others
@@ -38,6 +38,9 @@ export const addAddress = async (req: Request, res: Response) => {
             existingAddress.city = city;
             existingAddress.state = state;
             existingAddress.pincode = pincode;
+            existingAddress.landmark = landmark;
+            existingAddress.latitude = latitude;
+            existingAddress.longitude = longitude;
             existingAddress.isDefault = isDefault || false;
 
             await existingAddress.save();

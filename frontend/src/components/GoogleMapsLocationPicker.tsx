@@ -78,7 +78,8 @@ export default function GoogleMapsLocationPicker({
                     geocoder.geocode({ location: { lat, lng } }, (results, status) => {
                         if (status === 'OK' && results && results[0]) {
                             const addressComponents = results[0].address_components;
-                            let street = '';
+                            const formattedAddress = results[0].formatted_address || '';
+                            let streetComponents: string[] = [];
                             let city = '';
                             let state = '';
                             let pincode = '';
@@ -88,10 +89,16 @@ export default function GoogleMapsLocationPicker({
                             addressComponents.forEach(component => {
                                 const types = component.types;
                                 if (types.includes('street_number')) {
-                                    street = component.long_name + ' ' + street;
+                                    streetComponents.push(component.long_name);
                                 }
                                 if (types.includes('route')) {
-                                    street += component.long_name;
+                                    streetComponents.push(component.long_name);
+                                }
+                                if (types.includes('sublocality_level_1') || types.includes('sublocality') || types.includes('neighborhood')) {
+                                    streetComponents.push(component.long_name);
+                                }
+                                if (types.includes('sublocality_level_2')) {
+                                    streetComponents.push(component.long_name);
                                 }
                                 if (types.includes('locality')) {
                                     city = component.long_name;
@@ -104,6 +111,17 @@ export default function GoogleMapsLocationPicker({
                                 }
                             });
 
+                            // Deduplicate and join street components
+                            let street = Array.from(new Set(streetComponents))
+                                .filter(Boolean)
+                                .join(', ');
+
+                            // Fallback if street is empty
+                            if (!street && formattedAddress) {
+                                const parts = formattedAddress.split(',');
+                                // Take first 2 components as the street/area description
+                                street = parts.slice(0, Math.max(1, parts.length - 3)).join(',').trim();
+                            }
 
                             onLocationSelect(lat, lng, {
                                 street: street.trim(),

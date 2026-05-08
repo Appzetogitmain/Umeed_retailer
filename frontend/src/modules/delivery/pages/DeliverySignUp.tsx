@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
   register,
   sendOTP,
@@ -719,19 +719,19 @@ export default function DeliverySignUp() {
       {/* Footer Text */}
       <p className="mt-6 text-xs text-neutral-500 text-center max-w-md">
         By continuing, you agree to Speedoo's{" "}
-        <button 
-          onClick={() => navigate("/terms")} 
-          className="text-purple-600 hover:underline font-medium"
+        <Link 
+          to="/delivery/terms-and-conditions" 
+          className="text-purple-600 hover:underline font-bold"
         >
           Terms of Service
-        </button>{" "}
+        </Link>{" "}
         and{" "}
-        <button 
-          onClick={() => navigate("/privacy-policy")} 
-          className="text-purple-600 hover:underline font-medium"
+        <Link 
+          to="/delivery/privacy-policy" 
+          className="text-purple-600 hover:underline font-bold"
         >
           Privacy Policy
-        </button>
+        </Link>
       </p>
     </div>
   );

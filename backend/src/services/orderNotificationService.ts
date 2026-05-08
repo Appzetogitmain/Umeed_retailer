@@ -306,6 +306,44 @@ export async function notifyDeliveryBoysOfNewOrder(
         }
         // ---------------------------------
 
+        // Calculate rider earning dynamically based on distance or percentage configuration
+        let riderEarning = 0;
+        try {
+            const AppSettings = require('../models/AppSettings').default;
+            const settings = await AppSettings.findOne();
+            let commissionRate = 0;
+            let usedDistanceBased = false;
+
+            if (
+                settings &&
+                settings.deliveryConfig?.isDistanceBased === true &&
+                settings.deliveryConfig?.deliveryBoyKmRate &&
+                order.deliveryDistanceKm &&
+                order.deliveryDistanceKm > 0
+            ) {
+                commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
+                riderEarning = order.deliveryDistanceKm * commissionRate;
+                usedDistanceBased = true;
+            }
+
+            if (!usedDistanceBased) {
+                // Percentage based fallback (standard 5% or settings default)
+                const rate = 5;
+                riderEarning = (order.subtotal * rate) / 100;
+            }
+        } catch (err) {
+            console.error("Error calculating rider earning for notification:", err);
+            riderEarning = (order.subtotal * 5) / 100;
+        }
+
+        // Ensure we always have a positive earning (at least shipping fee or a standard minimum payout like 40)
+        if (!riderEarning || riderEarning <= 0) {
+            riderEarning = order.shipping || 40;
+        }
+
+        // Round rider earning to 2 decimal places
+        riderEarning = Math.round(riderEarning * 100) / 100;
+
         // Prepare order data for notification
         const orderData = {
             orderId: order._id.toString(),
@@ -322,6 +360,7 @@ export async function notifyDeliveryBoysOfNewOrder(
             subtotal: order.subtotal,
             shipping: order.shipping,
             createdAt: order.createdAt,
+            riderEarning: riderEarning, // Added rider earning
         };
 
         // Initialize notification state

@@ -488,13 +488,11 @@ export default function OrderDetail() {
 
   // Modal states
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   const [showItemsModal, setShowItemsModal] = useState(false);
   const [showSpecialRequestsModal, setShowSpecialRequestsModal] =
     useState(false);
 
   // Form states
-  const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
   const [selectedTip, setSelectedTip] = useState<number | "other" | null>(null);
@@ -601,7 +599,6 @@ export default function OrderDetail() {
   // Sync instructions from order
   useEffect(() => {
     if (order) {
-      if (order.deliveryInstructions) setDeliveryInstructions(order.deliveryInstructions);
       if (order.specialRequests) setSpecialRequests(order.specialRequests);
     }
   }, [order]);
@@ -707,18 +704,6 @@ export default function OrderDetail() {
     }
   };
 
-  const handleSaveInstructions = async () => {
-    try {
-      if (!id) return;
-      await updateOrderNotes(id, { deliveryInstructions });
-      setShowInstructionsModal(false);
-      // alert("Delivery instructions saved!");
-      handleRefresh();
-    } catch (error) {
-      console.error("Failed to save instructions:", error);
-      alert("Failed to save instructions");
-    }
-  };
 
   const handleSaveSpecialRequests = async () => {
     try {
@@ -828,6 +813,154 @@ export default function OrderDetail() {
   };
 
   const currentStatus = statusConfig[orderStatus] || statusConfig["Received"];
+
+  if (orderStatus === "Cancelled") {
+    const isOnlinePayment = order.paymentMethod === "Online" || order.paymentMethod?.toLowerCase() === "online" || order.paymentMethod?.toLowerCase()?.includes("card") || order.paymentMethod?.toLowerCase()?.includes("upi");
+    
+    return (
+      <div className="min-h-screen bg-neutral-50 flex flex-col pb-12">
+        {/* Navigation bar */}
+        <div 
+          className="sticky top-0 z-40 text-white flex items-center justify-between px-4 py-3"
+          style={{ backgroundColor: "#7A3E8E" }} // Premium Purple Header to match footer
+        >
+          <Link to="/orders">
+            <motion.button
+              className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+              whileTap={{ scale: 0.9 }}>
+              <ArrowLeftIcon className="w-6 h-6" />
+            </motion.button>
+          </Link>
+          <h2 className="font-semibold text-lg">Order Cancelled</h2>
+          <motion.button
+            className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+            whileTap={{ scale: 0.9 }}
+            onClick={handleShare}>
+            <Share2Icon className="w-5 h-5" />
+          </motion.button>
+        </div>
+
+        {/* Cancelled Icon & Status Banner Card */}
+        <div className="px-4 pt-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100 text-center flex flex-col items-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4 text-red-500 shadow-inner">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-extrabold text-neutral-900 tracking-tight">This Order was Cancelled</h1>
+            <p className="text-sm text-neutral-500 mt-1 max-w-xs mx-auto">
+              Order #{order.orderNumber || order.id?.split("-").slice(-1)[0]}
+            </p>
+            
+            {order.cancellationReason && (
+              <div className="mt-4 px-4 py-3 bg-red-50/50 rounded-xl border border-red-100/50 text-left w-full max-w-sm">
+                <p className="text-xs font-semibold text-red-800 uppercase tracking-wider">Cancellation Reason</p>
+                <p className="text-sm text-red-900 mt-0.5 font-medium">{order.cancellationReason}</p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Refund / Settlement Information */}
+        <div className="px-4 mt-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100"
+          >
+            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Refund & Payment Info</h3>
+            <div className="flex justify-between items-center py-2 border-b border-neutral-50">
+              <span className="text-sm text-neutral-500 font-medium">Payment Mode</span>
+              <span className="text-sm font-bold text-neutral-800 bg-neutral-100 px-2.5 py-1 rounded-lg uppercase tracking-wide">
+                {order.paymentMethod || "COD"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2.5 border-b border-neutral-50">
+              <span className="text-sm text-neutral-500 font-medium">Refund Amount</span>
+              <span className="text-base font-extrabold text-neutral-900">
+                ₹{order.total?.toFixed(0) || order.totalAmount?.toFixed(0) || "0"}
+              </span>
+            </div>
+            <div className="mt-3 flex gap-2.5 items-start bg-blue-50/40 p-3 rounded-xl border border-blue-100/40">
+              <span className="text-blue-600 text-base mt-0.5">ℹ️</span>
+              <p className="text-xs text-blue-800 leading-relaxed font-medium">
+                {isOnlinePayment 
+                  ? "Refund has been initiated successfully. The amount will reflect back in your account within 3 to 5 business days."
+                  : "This order was set for Cash on Delivery. No payment was collected or needs to be refunded."}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Cancelled Items Summary */}
+        <div className="px-4 mt-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100"
+          >
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Cancelled Items ({order.items?.length || 0})</h3>
+              <span className="text-xs text-neutral-500 font-semibold">Total: ₹{order.total?.toFixed(0) || order.totalAmount?.toFixed(0) || "0"}</span>
+            </div>
+            <div className="space-y-3 divide-y divide-neutral-100">
+              {order.items?.map((item: any, index: number) => (
+                <div key={index} className="flex gap-3 pt-3 first:pt-0 items-center">
+                  <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center flex-shrink-0 border border-neutral-200/50">
+                    {item.product?.mainImage ? (
+                      <img
+                        src={item.product.mainImage}
+                        alt={item.product?.name || item.productName || "Product"}
+                        className="w-full h-full object-cover rounded-xl filter grayscale"
+                      />
+                    ) : (
+                      <span className="text-xl grayscale">📦</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-neutral-700 truncate line-through">
+                      {item.product?.name || item.productName || "Product"}
+                    </p>
+                    <p className="text-xs text-neutral-400 font-medium">
+                      Quantity: {item.quantity}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-neutral-400 line-through">
+                      ₹{(item.total || item.unitPrice * item.quantity).toFixed(0)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Buttons / Actions */}
+        <div className="px-4 mt-6 space-y-3">
+          <Link to="/orders" className="block w-full">
+            <Button className="w-full py-3.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm uppercase tracking-wide rounded-xl shadow-lg shadow-neutral-950/10">
+              All Orders
+            </Button>
+          </Link>
+          <Link to="/" className="block w-full">
+            <Button variant="outline" className="w-full py-3.5 border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-bold text-sm uppercase tracking-wide rounded-xl">
+              Back to Home
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1063,12 +1196,6 @@ export default function OrderDetail() {
               order.deliveryAddress?.address || order.address?.address || "Address Unavailable"
             }
           />
-          <SectionItem
-            icon={MessageSquareIcon}
-            title={order.deliveryInstructions || "Add delivery instructions"}
-            subtitle={order.deliveryInstructions ? "Tap to edit" : "Share details to help partner"}
-            onClick={() => setShowInstructionsModal(true)}
-          />
         </motion.div>
 
         {/* Store Section */}
@@ -1244,55 +1371,6 @@ export default function OrderDetail() {
         )}
       </AnimatePresence>
 
-      {/* Delivery Instructions Modal */}
-      <AnimatePresence>
-        {showInstructionsModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-            onClick={() => setShowInstructionsModal(false)}>
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl p-6 max-w-md w-full">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Add Delivery Instructions
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Share details to help the delivery partner find you
-              </p>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-600"
-                rows={4}
-                maxLength={200}
-                placeholder="e.g., Ring the bell, Leave at door, etc."
-                value={deliveryInstructions}
-                onChange={(e) => setDeliveryInstructions(e.target.value)}
-              />
-              <p className="text-xs text-gray-500 mb-4">
-                {deliveryInstructions.length}/200
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowInstructionsModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                  onClick={handleSaveInstructions}>
-                  Save
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Order Items Detail Modal */}
       <AnimatePresence>

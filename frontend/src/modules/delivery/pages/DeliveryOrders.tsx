@@ -64,9 +64,24 @@ export default function DeliveryOrders() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
-      <DeliveryHeader />
       <div className="px-4 py-4">
-        <h2 className="text-neutral-900 text-xl font-semibold mb-4">Orders</h2>
+        <div className="flex items-center mb-4">
+          <button
+            onClick={() => navigate('/delivery')}
+            className="mr-3 p-2 hover:bg-neutral-200 rounded-full transition-colors text-neutral-800"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M15 18L9 12L15 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <h2 className="text-neutral-900 text-xl font-semibold">Orders</h2>
+        </div>
         {orders.length > 0 ? (
           <div className="space-y-3">
             {orders.map((order) => (

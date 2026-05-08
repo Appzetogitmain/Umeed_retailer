@@ -16,6 +16,7 @@ export interface OrderNotificationData {
     subtotal: number;
     shipping: number;
     createdAt: string;
+    riderEarning?: number;
 }
 
 export interface AcceptOrderResponse {

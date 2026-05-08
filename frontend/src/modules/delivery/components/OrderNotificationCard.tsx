@@ -285,6 +285,20 @@ export default function OrderNotificationCard({
                         <p className="text-xs sm:text-sm text-neutral-600">Order Amount</p>
                         <p className="text-lg sm:text-xl font-bold text-teal-600">₹{notification.total.toFixed(2)}</p>
                     </div>
+
+                    {notification.riderEarning !== undefined && (
+                        <div className="bg-orange-50 border border-orange-200/60 rounded-xl p-3.5 mt-2 shadow-sm">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">Your Earning</p>
+                                    <p className="text-xs text-orange-700/80 mt-0.5 font-medium leading-tight">On successful completion</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xl sm:text-2xl font-black text-orange-600 font-sans">₹{notification.riderEarning.toFixed(2)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Action Buttons */}
