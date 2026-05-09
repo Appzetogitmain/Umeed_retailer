@@ -610,9 +610,8 @@ export default function AdminCategory() {
 
       {/* Footer */}
       <div className="text-center py-4 text-xs sm:text-sm text-neutral-600">
-        Copyright © 2025. Developed By{" "}
-        <a href="#" className="text-blue-600 hover:text-blue-700">
-          Speedoo - 10 Minute App
+        Copyright © 2026. Developed By{" "}
+        <a href="#" className="text-blue-600 hover:text-blue-700">Speedoo - Your Order Our Priority
         </a>
       </div>
 

@@ -37,11 +37,6 @@ export const getProducts = async (req: Request, res: Response) => {
     const userLat = latitude ? parseFloat(latitude as string) : null;
     const userLng = longitude ? parseFloat(longitude as string) : null;
 
-    let nearbySellerIds: mongoose.Types.ObjectId[] = [];
-    if (userLat && userLng && !isNaN(userLat) && !isNaN(userLng)) {
-      nearbySellerIds = await findSellersWithinRange(userLat, userLng);
-    }
-
     // If no location provided, return empty (location required to see products)
     if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) {
       return res.status(200).json({
@@ -57,7 +52,10 @@ export const getProducts = async (req: Request, res: Response) => {
       });
     }
 
-    // Do not filter by seller here: show all matching products and mark isAvailable by radius
+    const nearbySellerIds = await findSellersWithinRange(userLat, userLng);
+
+    // Filter by seller strictly here: show only products from sellers within range
+    query.seller = { $in: nearbySellerIds };
 
     // Helper to resolve category/subcategory ID from slug or ID
     const resolveId = async (
@@ -159,8 +157,18 @@ export const getProducts = async (req: Request, res: Response) => {
     }
 
     if (search) {
-      // Use text search for broad matching
-      query.$text = { $search: search as string };
+      const searchStr = (search as string).trim();
+      // Escape special regex characters
+      const escapedSearch = searchStr.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const searchRegex = new RegExp(escapedSearch, "i");
+      
+      // Perform case-insensitive substring/regex search on multiple fields
+      query.$or = [
+        { productName: { $regex: searchRegex } },
+        { smallDescription: { $regex: searchRegex } },
+        { tags: { $regex: searchRegex } },
+        { pack: { $regex: searchRegex } }
+      ];
     }
 
     // Calculate skip for pagination

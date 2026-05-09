@@ -176,10 +176,15 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 md:py-16 text-neutral-500">
-                  <p className="text-lg md:text-xl mb-2">No products found</p>
-                  <p className="text-sm md:text-base">
-                    Try selecting a different category
+                <div className="px-4 md:px-6 lg:px-8 py-16 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-neutral-100 shadow-sm">
+                  <div className="w-16 h-16 bg-neutral-50 border border-neutral-100 rounded-full flex items-center justify-center mb-3 shadow-inner animate-pulse">
+                    <span className="text-2xl">🛍️</span>
+                  </div>
+                  <p className="text-neutral-800 font-semibold md:text-lg">
+                    No products available in this category for your area
+                  </p>
+                  <p className="text-neutral-500 text-sm mt-1 max-w-xs">
+                    Sellers delivering to your location don't have these items in stock right now. Try a different category!
                   </p>
                 </div>
               )}

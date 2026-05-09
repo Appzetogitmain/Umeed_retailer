@@ -43,3 +43,6 @@ temp/
 
 # Security
 *.pem
+
+# Local Development Scripts
+src/scripts/

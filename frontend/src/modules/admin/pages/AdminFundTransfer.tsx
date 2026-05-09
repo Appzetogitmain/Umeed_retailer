@@ -486,8 +486,7 @@ export default function AdminFundTransfer() {
       {/* Footer */}
       <div className="text-center text-sm text-neutral-500 py-4">
         Copyright © 2026. Developed By{' '}
-        <a href="#" className="text-teal-600 hover:text-teal-700 font-medium">
-          Speedoo - Quick Commerce
+        <a href="#" className="text-teal-600 hover:text-teal-700 font-medium">Speedoo - Your Order Our Priority
         </a>
       </div>
     </div>

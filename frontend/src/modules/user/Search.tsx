@@ -11,6 +11,12 @@ export default function Search() {
   const [searchParams] = useSearchParams();
   const { location } = useLocation();
   const searchQuery = searchParams.get('q') || '';
+
+  // Sanitize query to ignore leading/trailing and redundant internal spaces
+  const sanitizedQuery = useMemo(() => {
+    return searchQuery.trim().replace(/\s+/g, ' ');
+  }, [searchQuery]);
+
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [trendingItems, setTrendingItems] = useState<any[]>([]);
   const [cookingIdeas, setCookingIdeas] = useState<any[]>([]);
@@ -20,14 +26,14 @@ export default function Search() {
   // Fetch products based on search query
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!searchQuery.trim()) {
+      if (!sanitizedQuery) {
         setSearchResults([]);
         return;
       }
 
       setLoading(true);
       try {
-        const params: any = { search: searchQuery };
+        const params: any = { search: sanitizedQuery };
         // Include user location for seller service radius filtering
         if (location?.latitude && location?.longitude) {
           params.latitude = location.latitude;
@@ -44,7 +50,7 @@ export default function Search() {
     };
 
     fetchProducts();
-  }, [searchQuery, location]);
+  }, [sanitizedQuery, location]);
 
   // Fetch trending/home content for initial view
   useEffect(() => {
@@ -66,23 +72,23 @@ export default function Search() {
       }
     };
 
-    if (!searchQuery.trim()) {
+    if (!sanitizedQuery) {
       fetchInitialContent();
     }
-  }, [searchQuery, location?.latitude, location?.longitude]);
+  }, [sanitizedQuery, location?.latitude, location?.longitude]);
 
   return (
     <div className="pb-24 md:pb-8 bg-white min-h-screen">
 
       {/* Search Results */}
-      {searchQuery.trim() && (
+      {sanitizedQuery && (
         <div className="px-4 md:px-6 lg:px-8 py-4 md:py-6">
           <h2 className="text-lg md:text-2xl font-semibold text-neutral-900 mb-3 md:mb-6">
             Search Results {searchResults.length > 0 && `(${searchResults.length})`}
           </h2>
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#7A3E8E]"></div>
             </div>
           ) : searchResults.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
@@ -98,20 +104,27 @@ export default function Search() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 md:py-16 text-neutral-500">
-              <p className="text-lg md:text-xl mb-2">No products found</p>
-              <p className="text-sm md:text-base">Try a different search term</p>
+            <div className="px-4 md:px-6 lg:px-8 py-16 text-center flex flex-col items-center justify-center">
+              <div className="w-16 h-16 bg-neutral-50 border border-neutral-100 rounded-full flex items-center justify-center mb-3 shadow-inner animate-pulse">
+                <span className="text-2xl">🔍</span>
+              </div>
+              <p className="text-neutral-800 font-semibold md:text-lg">
+                No products found in your area
+              </p>
+              <p className="text-neutral-500 text-sm mt-1 max-w-xs">
+                We couldn't find "{sanitizedQuery}" delivering close to you. Try a different search term or check your location.
+              </p>
             </div>
           )}
         </div>
       )}
 
       {/* Trending in your city */}
-      {!searchQuery.trim() && (
+      {!sanitizedQuery && (
         <>
           {contentLoading && (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#7A3E8E]"></div>
             </div>
           )}
 
@@ -122,7 +135,7 @@ export default function Search() {
                 {trendingItems.map((item) => (
                   <div
                     key={item.id || item._id}
-                    className="bg-white rounded-lg border-2 border-green-600 p-3 cursor-pointer hover:shadow-md transition-shadow"
+                    className="bg-white rounded-xl border border-neutral-200 hover:border-[#7A3E8E] hover:border-2 p-3.5 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
                     onClick={() => navigate(item.type === 'category' ? `/category/${item.id || item._id}` : `/product/${item.id || item._id}`)}
                   >
                     <div className="w-full h-24 rounded-lg mb-2 overflow-hidden bg-neutral-50 flex items-center justify-center">

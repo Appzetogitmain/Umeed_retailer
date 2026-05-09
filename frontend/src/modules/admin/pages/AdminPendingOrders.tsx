@@ -1,9 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Input } from "../../../components/ui/input";
+import { jsPDF } from "jspdf";
 import {
   getOrdersByStatus,
   type Order,
 } from "../../../services/api/admin/adminOrderService";
+import { getAllSellers, type Seller } from "../../../services/api/sellerService";
 import { useAuth } from "../../../context/AuthContext";
 import AssignDeliveryBoyModal from "../components/AssignDeliveryBoyModal";
 
@@ -21,7 +24,10 @@ type SortDirection = "asc" | "desc";
 export default function AdminPendingOrders() {
   const { isAuthenticated, token } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [dateRange, setDateRange] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const fromDateRef = useRef<HTMLInputElement>(null);
+  const toDateRef = useRef<HTMLInputElement>(null);
   const [seller, setSeller] = useState("All Sellers");
   const [status, setStatus] = useState("Pending");
   const [entriesPerPage, setEntriesPerPage] = useState("10");
@@ -33,6 +39,28 @@ export default function AdminPendingOrders() {
   const [error, setError] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+
+  // Fetch sellers on component mount
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    const fetchSellers = async () => {
+      try {
+        const response = await getAllSellers();
+        if (response.success) {
+          setSellers(response.data);
+        }
+      } catch (err) {
+        console.error("Error fetching sellers:", err);
+      }
+    };
+
+    fetchSellers();
+  }, [isAuthenticated, token]);
 
   // Fetch orders on component mount
   useEffect(() => {
@@ -56,25 +84,27 @@ export default function AdminPendingOrders() {
         }
 
         // Parse date range if provided
-        if (dateRange && dateRange.includes(" - ")) {
-          const [dateFrom, dateTo] = dateRange.split(" - ").map((d) => {
-            // Convert MM/DD/YYYY to YYYY-MM-DD
-            const parts = d.trim().split("/");
-            if (parts.length === 3) {
-              return `${parts[2]}-${parts[0].padStart(
-                2,
-                "0"
-              )}-${parts[1].padStart(2, "0")}`;
-            }
-            return d.trim();
-          });
+        if (dateFrom) {
           params.dateFrom = dateFrom;
+        }
+        if (dateTo) {
           params.dateTo = dateTo;
+        }
+
+        if (seller !== "All Sellers") {
+          params.seller = seller;
         }
 
         const response = await getOrdersByStatus("Pending", params);
         if (response.success) {
           setOrders(response.data);
+          if (response.pagination) {
+            setTotalPages(response.pagination.pages || 1);
+            setTotalEntries(response.pagination.total || 0);
+          } else {
+            setTotalPages(1);
+            setTotalEntries(response.data.length);
+          }
         }
       } catch (err) {
         console.error("Error fetching orders:", err);
@@ -101,11 +131,14 @@ export default function AdminPendingOrders() {
     currentPage,
     entriesPerPage,
     searchQuery,
-    dateRange,
+    dateFrom,
+    dateTo,
+    seller,
   ]);
 
   const handleClearDate = () => {
-    setDateRange("");
+    setDateFrom("");
+    setDateTo("");
     setCurrentPage(1);
   };
 
@@ -123,7 +156,6 @@ export default function AdminPendingOrders() {
       "O. Id",
       "Customer Details",
       "Address",
-      "D. Date",
       "O. Date",
       "Status",
       "Delivery Boy Assign Status",
@@ -136,9 +168,6 @@ export default function AdminPendingOrders() {
           order.orderNumber || "",
           order.customerName || "",
           order.deliveryAddress?.address || "",
-          order.estimatedDeliveryDate
-            ? new Date(order.estimatedDeliveryDate).toLocaleDateString()
-            : "",
           order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "",
           order.status || "",
           order.deliveryBoyStatus || "Not Assigned",
@@ -159,6 +188,97 @@ export default function AdminPendingOrders() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    const headers = [
+      "O. Id",
+      "Customer Details",
+      "Address",
+      "O. Date",
+      "Status",
+      "Delivery Boy Assign Status",
+      "Amount",
+    ];
+    const csvContent = [
+      headers.join(","),
+      ...filteredAndSortedOrders.map((order) =>
+        [
+          order.orderNumber || "",
+          order.customerName || "",
+          order.deliveryAddress?.address || "",
+          order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "",
+          order.status || "",
+          order.deliveryBoyStatus || "Not Assigned",
+          `₹${order.total?.toFixed(2) || "0.00"}`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `pending_orders_${new Date().toISOString().split("T")[0]}.xls`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica");
+    doc.setFontSize(16);
+    doc.text("Speedoo - Pending Orders Export", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
+
+    let y = 30;
+    const cols = ["O. Id", "Customer", "Address", "Date", "Status", "Amount"];
+    doc.setFont("helvetica", "bold");
+    let x = 14;
+    cols.forEach((col, idx) => {
+      let width = 25;
+      if (idx === 1) width = 35;
+      if (idx === 2) width = 50;
+      doc.text(col, x, y);
+      x += width;
+    });
+
+    y += 8;
+    doc.line(14, y - 4, 195, y - 4);
+
+    doc.setFont("helvetica", "normal");
+    filteredAndSortedOrders.forEach(order => {
+      if (y > 280) {
+        doc.addPage();
+        y = 15;
+      }
+      let x = 14;
+      
+      const orderIdStr = String(order.orderNumber || "");
+      const customerStr = String(order.customerName || "").substring(0, 18);
+      const addressStr = String(order.deliveryAddress?.address || "-").substring(0, 25);
+      const dateStr = order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "-";
+      const statusStr = String(order.status || "");
+      const amountStr = `Rs.${order.total?.toFixed(2) || "0.00"}`;
+
+      const row = [orderIdStr, customerStr, addressStr, dateStr, statusStr, amountStr];
+      row.forEach((cell, idx) => {
+        let width = 25;
+        if (idx === 1) width = 35;
+        if (idx === 2) width = 50;
+        doc.text(cell, x, y);
+        x += width;
+      });
+      y += 8;
+    });
+
+    doc.save(`pending_orders_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const filteredAndSortedOrders = useMemo(() => {
@@ -223,12 +343,9 @@ export default function AdminPendingOrders() {
     return filtered;
   }, [orders, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(
-    filteredAndSortedOrders.length / parseInt(entriesPerPage)
-  );
   const startIndex = (currentPage - 1) * parseInt(entriesPerPage);
   const endIndex = startIndex + parseInt(entriesPerPage);
-  const paginatedOrders = filteredAndSortedOrders.slice(startIndex, endIndex);
+  const paginatedOrders = filteredAndSortedOrders;
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(1, prev - 1));
@@ -310,40 +427,80 @@ export default function AdminPendingOrders() {
                 <label className="text-xs sm:text-sm font-medium text-neutral-700 whitespace-nowrap">
                   From - To Order Date
                 </label>
-                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 w-full sm:w-auto">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-neutral-500 flex-shrink-0">
-                    <path
-                      d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={dateRange}
-                    onChange={(e) => {
-                      setDateRange(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="flex-1 sm:w-48 text-xs sm:text-sm text-neutral-600 bg-transparent focus:outline-none placeholder:text-neutral-400"
-                    placeholder="MM/DD/YYYY - MM/DD/YYYY"
-                  />
-                  {dateRange && (
-                    <button
-                      onClick={handleClearDate}
-                      className="ml-2 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors flex-shrink-0">
-                      Clear
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 sm:px-3 py-1 sm:py-1.5 w-full sm:w-auto">
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => fromDateRef.current?.showPicker?.() || fromDateRef.current?.focus()}
+                      className="p-1 hover:bg-neutral-100 rounded transition-colors"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="text-neutral-500 flex-shrink-0">
+                        <path
+                          d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
                     </button>
-                  )}
+                    <Input
+                      type="date"
+                      ref={fromDateRef}
+                      value={dateFrom}
+                      onChange={(e) => {
+                        setDateFrom(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0"
+                    />
+                  </div>
+                  <span className="text-neutral-400 font-medium text-xs sm:text-sm">-</span>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => toDateRef.current?.showPicker?.() || toDateRef.current?.focus()}
+                      className="p-1 hover:bg-neutral-100 rounded transition-colors"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="text-neutral-500 flex-shrink-0">
+                        <path
+                          d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <Input
+                      type="date"
+                      ref={toDateRef}
+                      value={dateTo}
+                      onChange={(e) => {
+                        setDateTo(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0"
+                    />
+                  </div>
                 </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={handleClearDate}
+                    className="px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors">
+                    Clear
+                  </button>
+                )}
               </div>
 
               {/* Sellers Filter */}
@@ -358,10 +515,12 @@ export default function AdminPendingOrders() {
                     setCurrentPage(1);
                   }}
                   className="w-full sm:w-auto px-3 py-2 border border-neutral-300 rounded text-xs sm:text-sm text-neutral-900 bg-white focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500">
-                  <option>All Sellers</option>
-                  <option>Seller 1</option>
-                  <option>Seller 2</option>
-                  <option>Seller 3</option>
+                  <option value="All Sellers">All Sellers</option>
+                  {sellers.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.storeName || s.sellerName}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -408,7 +567,7 @@ export default function AdminPendingOrders() {
               <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
                 <div className="relative">
                   <button
-                    onClick={handleExport}
+                    onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                     className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto">
                     <svg
                       width="16"
@@ -441,6 +600,56 @@ export default function AdminPendingOrders() {
                       />
                     </svg>
                   </button>
+
+                  {isExportDropdownOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setIsExportDropdownOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 py-1 z-20">
+                        <button
+                          onClick={() => {
+                            handleExport();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs sm:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-green-600">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Export as CSV
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleExportExcel();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs sm:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-emerald-600">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Export as Excel
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleExportPDF();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs sm:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-600">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Export as PDF
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -567,39 +776,7 @@ export default function AdminPendingOrders() {
                       )}
                     </div>
                   </th>
-                  <th
-                    onClick={() => handleSort("deliveryDate")}
-                    className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100">
-                    <div className="flex items-center gap-1">
-                      D. Date
-                      {sortField === "deliveryDate" && (
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg">
-                          {sortDirection === "asc" ? (
-                            <path
-                              d="M7 14L12 9L17 14"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          ) : (
-                            <path
-                              d="M17 10L12 15L7 10"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          )}
-                        </svg>
-                      )}
-                    </div>
-                  </th>
+
                   <th
                     onClick={() => handleSort("orderDate")}
                     className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer hover:bg-neutral-100">
@@ -741,7 +918,7 @@ export default function AdminPendingOrders() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={8}
                       className="px-4 sm:px-6 py-8 text-center text-sm text-neutral-500">
                       Loading orders...
                     </td>
@@ -749,7 +926,7 @@ export default function AdminPendingOrders() {
                 ) : error ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={8}
                       className="px-4 sm:px-6 py-8 text-center text-sm text-red-600">
                       {error}
                     </td>
@@ -757,7 +934,7 @@ export default function AdminPendingOrders() {
                 ) : paginatedOrders.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={8}
                       className="px-4 sm:px-6 py-8 text-center text-sm text-neutral-500">
                       No data available in table
                     </td>
@@ -777,13 +954,7 @@ export default function AdminPendingOrders() {
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
                         {order.deliveryAddress?.address || "-"}
                       </td>
-                      <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
-                        {order.estimatedDeliveryDate
-                          ? new Date(
-                              order.estimatedDeliveryDate
-                            ).toLocaleDateString()
-                          : "-"}
-                      </td>
+
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-600">
                         {order.orderDate
                           ? new Date(order.orderDate).toLocaleDateString()
@@ -871,9 +1042,9 @@ export default function AdminPendingOrders() {
           <div className="px-4 sm:px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="text-xs sm:text-sm text-neutral-700">
               Showing{" "}
-              {filteredAndSortedOrders.length === 0 ? 0 : startIndex + 1} to{" "}
-              {Math.min(endIndex, filteredAndSortedOrders.length)} of{" "}
-              {filteredAndSortedOrders.length} entries
+              {totalEntries === 0 ? 0 : startIndex + 1} to{" "}
+              {Math.min(endIndex, totalEntries)} of{" "}
+              {totalEntries} entries
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -923,9 +1094,8 @@ export default function AdminPendingOrders() {
 
       {/* Footer */}
       <div className="text-center py-4 text-xs sm:text-sm text-neutral-600">
-        Copyright © 2025. Developed By{" "}
-        <Link to="/" className="text-blue-600 hover:text-blue-700">
-          Speedoo - 10 Minute App
+        Copyright © 2026. Developed By{" "}
+        <Link to="/" className="text-blue-600 hover:text-blue-700">Speedoo - Your Order Our Priority
         </Link>
       </div>
 

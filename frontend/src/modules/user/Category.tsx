@@ -494,9 +494,15 @@ export default function CategoryPage() {
               </div>
             </div>
           ) : (
-            <div className="px-4 md:px-6 lg:px-8 py-8 md:py-12 text-center">
-              <p className="text-neutral-500 md:text-lg">
-                No products found in this category.
+            <div className="px-4 md:px-6 lg:px-8 py-16 text-center flex flex-col items-center justify-center">
+              <div className="w-16 h-16 bg-neutral-50 border border-neutral-100 rounded-full flex items-center justify-center mb-3 shadow-inner animate-pulse">
+                <span className="text-2xl">📍</span>
+              </div>
+              <p className="text-neutral-800 font-semibold md:text-lg">
+                No products available in this category for your area
+              </p>
+              <p className="text-neutral-500 text-sm mt-1 max-w-xs">
+                We couldn't find any sellers delivering {category?.name || "these items"} to your location right now.
               </p>
             </div>
           )}

@@ -22,6 +22,7 @@ import adminWithdrawalRoutes from "./adminWithdrawalRoutes";
 import deliveryWalletRoutes from "./deliveryWalletRoutes";
 import sellerWalletRoutes from "./sellerWalletRoutes";
 import taxRoutes from "./taxRoutes";
+import sellerNotificationRoutes from "./sellerNotificationRoutes";
 import customerProductRoutes from "./customerProductRoutes";
 import customerCategoryRoutes from "./customerCategoryRoutes";
 import customerCouponRoutes from "./customerCouponRoutes";
@@ -155,6 +156,9 @@ router.use("/seller/reports", reportRoutes);
 
 // Wallet routes (protected, seller only)
 router.use("/seller/wallet", sellerWalletRoutes);
+
+// Notification routes (protected, seller only)
+router.use("/seller/notifications", sellerNotificationRoutes);
 
 // Tax routes (protected, seller/admin)
 router.use("/seller/taxes", taxRoutes);

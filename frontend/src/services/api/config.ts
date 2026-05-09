@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { apiCache } from "../../utils/apiCache";
 
 // Base API URL - adjust based on your backend URL
 const API_BASE_URL =
@@ -32,6 +33,81 @@ const api: AxiosInstance = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Save original default adapter as any to bypass callable checks in TS
+const defaultAdapter = api.defaults.adapter as any;
+
+// Helper to execute request using appropriate adapter without compiler warnings
+const executeRequest = async (adapter: any, config: any) => {
+  if (typeof adapter === "function") {
+    return adapter(config);
+  }
+  // Fallback to standard Axios fetch if custom adapter isn't configured/callable
+  const actualConfig = { ...config, adapter: undefined };
+  return axios(actualConfig);
+};
+
+// Attach custom caching and deduplicating adapter
+api.defaults.adapter = async (config) => {
+  const isGet = config.method?.toLowerCase() === "get";
+
+  // For write/mutation operations, invalidate the full cache immediately to ensure fresh data
+  if (!isGet) {
+    apiCache.clear();
+    return executeRequest(defaultAdapter, config);
+  }
+
+  const url = config.url || "";
+
+  // Only cache client-facing public reads (not admin, seller, or driver routes)
+  const isCacheable =
+    !url.includes("/admin") &&
+    !url.includes("/seller") &&
+    !url.includes("/delivery");
+
+  if (!isCacheable) {
+    return executeRequest(defaultAdapter, config);
+  }
+
+  // Determine caching TTL based on endpoint structure
+  let ttl = 5000; // 5 seconds default for guest reads
+  if (url.includes("/categories") || url.includes("/subcategories")) {
+    ttl = 30000; // 30 seconds for categories tree
+  } else if (url.includes("/home") || url.includes("/trending")) {
+    ttl = 15000; // 15 seconds for dashboard content
+  }
+
+  // Build a unique query cache key (including authentication token to isolate sessions)
+  const token = localStorage.getItem("authToken") || "";
+  const key = `api-cache:${url}:${JSON.stringify(config.params)}:${token}`;
+
+  try {
+    const responseData = await apiCache.getOrFetch(
+      key,
+      async () => {
+        const res = await executeRequest(defaultAdapter, config);
+        return {
+          data: res.data,
+          status: res.status,
+          statusText: res.statusText,
+          headers: res.headers,
+        };
+      },
+      ttl
+    );
+
+    // Return formatted AxiosResponse
+    return {
+      data: responseData.data,
+      status: responseData.status,
+      statusText: responseData.statusText,
+      headers: responseData.headers,
+      config,
+    };
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Request interceptor - Add token to requests
 api.interceptors.request.use(

@@ -145,12 +145,14 @@ export const getAllOrders = async (
  */
 export const getOrdersByStatus = async (
   status: string,
-  params?: { page?: number; limit?: number }
+  params?: GetOrdersParams
 ): Promise<ApiResponse<Order[]>> => {
-  const response = await api.get<ApiResponse<Order[]>>(
-    `/admin/orders/status/${status}`,
-    { params }
-  );
+  const response = await api.get<ApiResponse<Order[]>>("/admin/orders", {
+    params: {
+      ...params,
+      status,
+    },
+  });
   return response.data;
 };
 

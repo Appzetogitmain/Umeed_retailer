@@ -370,8 +370,7 @@ export default function SellerSalesReport() {
             {/* Footer */}
             <footer className="px-4 sm:px-6 py-4 text-center bg-white border-t border-neutral-200">
                 <p className="text-xs sm:text-sm text-neutral-600">
-                    Copyright © 2025. Developed By{' '}
-                    <span className="font-semibold text-teal-600">Speedoo - 10 Minute App</span>
+                    Copyright © 2026. Developed By{" "}<span className="font-semibold text-teal-600">Speedoo - Your Order Our Priority</span>
                 </p>
             </footer>
         </div>

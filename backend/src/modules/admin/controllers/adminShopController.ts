@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Shop from "../../../models/Shop";
+import Product from "../../../models/Product";
 
 /**
  * Create a new shop
@@ -40,6 +41,14 @@ export const createShop = asyncHandler(async (req: Request, res: Response) => {
         order: order !== undefined ? order : 0,
         isActive: isActive !== undefined ? isActive : true,
     });
+
+    // Sync newly assigned products
+    if (products && products.length > 0) {
+        await Product.updateMany(
+            { _id: { $in: products } },
+            { $set: { shopId: shop._id, isShopByStoreOnly: true } }
+        );
+    }
 
     return res.status(201).json({
         success: true,
@@ -139,6 +148,16 @@ export const updateShop = asyncHandler(async (req: Request, res: Response) => {
         updateData.storeId = storeId;
     }
 
+    // Fetch the existing shop state to retrieve previously linked products
+    const oldShop = await Shop.findById(id).select("products");
+    if (!oldShop) {
+        return res.status(404).json({
+            success: false,
+            message: "Shop not found",
+        });
+    }
+    const oldProductIds = oldShop.products.map(p => p.toString());
+
     const shop = await Shop.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
@@ -154,6 +173,28 @@ export const updateShop = asyncHandler(async (req: Request, res: Response) => {
             success: false,
             message: "Shop not found",
         });
+    }
+
+    // Synchronize product relations in the products collection
+    if (updateData.products) {
+        const newProductIds = updateData.products.map((p: any) => p.toString());
+
+        const newlyAdded = newProductIds.filter((p: string) => !oldProductIds.includes(p));
+        const removed = oldProductIds.filter((p: string) => !newProductIds.includes(p));
+
+        if (newlyAdded.length > 0) {
+            await Product.updateMany(
+                { _id: { $in: newlyAdded } },
+                { $set: { shopId: id, isShopByStoreOnly: true } }
+            );
+        }
+
+        if (removed.length > 0) {
+            await Product.updateMany(
+                { _id: { $in: removed }, shopId: id },
+                { $set: { shopId: null, isShopByStoreOnly: false } }
+            );
+        }
     }
 
     return res.status(200).json({
@@ -177,6 +218,12 @@ export const deleteShop = asyncHandler(async (req: Request, res: Response) => {
       message: "Shop not found",
     });
   }
+
+  // Clear links for all products linked to this deleted shop
+  await Product.updateMany(
+    { shopId: id },
+    { $set: { shopId: null, isShopByStoreOnly: false } }
+  );
 
   return res.status(200).json({
     success: true,

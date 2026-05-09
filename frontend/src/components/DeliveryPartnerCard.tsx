@@ -16,6 +16,7 @@ interface DeliveryPartnerCardProps {
     deliveryOtp?: string
     onCall?: () => void
     onMessage?: () => void
+    orderStatus?: string
 }
 
 export default function DeliveryPartnerCard({
@@ -25,7 +26,8 @@ export default function DeliveryPartnerCard({
     isTracking,
     deliveryOtp,
     onCall,
-    onMessage
+    onMessage,
+    orderStatus
 }: DeliveryPartnerCardProps) {
     const [isCopied, setIsCopied] = useState(false)
 
@@ -69,7 +71,7 @@ export default function DeliveryPartnerCard({
             <div className="p-4">
                 <div className="flex items-center gap-3">
                     {/* Profile Image */}
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center overflow-hidden">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#7A3E8E] to-[#552B63] flex items-center justify-center overflow-hidden">
                         {partner?.profileImage ? (
                             <img
                                 src={partner.profileImage}
@@ -91,29 +93,35 @@ export default function DeliveryPartnerCard({
                                 🏍️ {partner.vehicleNumber}
                             </p>
                         )}
-                        {isTracking && (
+                        {orderStatus === "Delivered" ? (
+                            <div className="flex items-center gap-1 mt-1">
+                                <span className="text-xs text-[#7A3E8E] font-bold bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
+                                    ✓ Delivered
+                                </span>
+                            </div>
+                        ) : isTracking ? (
                             <div className="flex items-center gap-1 mt-1">
                                 <motion.div
-                                    className="w-2 h-2 rounded-full bg-green-500"
+                                    className="w-2 h-2 rounded-full bg-[#7A3E8E]"
                                     animate={{ opacity: [1, 0.3, 1] }}
                                     transition={{ duration: 2, repeat: Infinity }}
                                 />
-                                <span className="text-xs text-green-600 font-medium">
+                                <span className="text-xs text-[#7A3E8E] font-medium">
                                     On the way
                                 </span>
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
                     {/* Call Button */}
                     {partner?.phone && onCall && (
                         <motion.button
-                            className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center hover:bg-green-200"
+                            className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center hover:bg-purple-200"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={onCall}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7A3E8E" strokeWidth="2">
                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                             </svg>
                         </motion.button>
@@ -157,7 +165,7 @@ export default function DeliveryPartnerCard({
                 <div className="px-4 pb-4">
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <motion.div
-                            className="h-full bg-gradient-to-r from-green-400 to-green-600"
+                            className="h-full bg-gradient-to-r from-[#7A3E8E] to-[#552B63]"
                             initial={{ width: '0%' }}
                             animate={{ width: `${Math.max(10, Math.min(90, 100 - (distance / 50)))}%` }}
                             transition={{ duration: 0.5 }}
@@ -178,7 +186,7 @@ export default function DeliveryPartnerCard({
 
                     <div className="flex items-center gap-3">
                         <div className="flex-1 bg-white px-4 py-2.5 rounded-lg border border-neutral-100 shadow-sm flex items-center justify-between group">
-                            <span className="text-2xl font-black tracking-[0.25em] text-green-700">{deliveryOtp}</span>
+                            <span className="text-2xl font-black tracking-[0.25em] text-[#7A3E8E]">{deliveryOtp}</span>
                             <motion.button
                                 onClick={handleCopyOtp}
                                 className="p-1.5 hover:bg-neutral-50 rounded-md transition-colors relative"
@@ -191,7 +199,7 @@ export default function DeliveryPartnerCard({
                                             initial={{ opacity: 0, scale: 0.5 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0, scale: 0.5 }}
-                                            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3"
+                                            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A3E8E" strokeWidth="3"
                                         >
                                             <polyline points="20 6 9 17 4 12"></polyline>
                                         </motion.svg>

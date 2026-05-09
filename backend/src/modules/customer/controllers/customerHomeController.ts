@@ -101,12 +101,11 @@ async function fetchSectionData(
         ],
       };
 
-      // We fetch these irrespective of location radius to show preview images on home page
-      // Location validation still happens at cart/order level
+      // STRICT FILTER: Only show products from sellers within range
       if (nearbySellerIds && nearbySellerIds.length > 0) {
-        // If we have nearby sellers, we can still filter by them if we want to prioritize
-        // But the user requested to show them irrespective of location radius
-        // For now, let's keep it simple and show all active products for the section
+        query.seller = { $in: nearbySellerIds };
+      } else {
+        query.seller = { $in: [] }; // No nearby sellers, so no products can be shown
       }
 
       if (categories && categories.length > 0) {
@@ -138,14 +137,6 @@ async function fetchSectionData(
         .lean();
 
       return products.map((p: any) => {
-        // Check if the product's seller is within range
-        const isAvailable =
-          nearbySellerIds && nearbySellerIds.length > 0 && p.seller
-            ? nearbySellerIds.some(
-              (id) => id.toString() === p.seller.toString(),
-            )
-            : false;
-
         return {
           id: p._id.toString(),
           productId: p._id.toString(),
@@ -165,7 +156,7 @@ async function fetchSectionData(
           reviews: p.reviewsCount || 0,
           pack: p.pack || "",
           type: "product",
-          isAvailable,
+          isAvailable: true,
           seller: p.seller,
         };
       });
@@ -358,6 +349,10 @@ export const getHomeContent = async (req: Request, res: Response) => {
             )
             : false;
 
+        if (!isAvailable) {
+          return null; // Hide completely if not in range
+        }
+
         return {
           id: product._id.toString(),
           _id: product._id.toString(),
@@ -376,7 +371,7 @@ export const getHomeContent = async (req: Request, res: Response) => {
           subcategory: product.subcategory?.toString() || "",
           status: product.status,
           publish: product.publish,
-          isAvailable,
+          isAvailable: true,
           seller: product.seller,
         };
       })).then(results => results.filter(item => item !== null));
@@ -645,19 +640,21 @@ export const getHomeContent = async (req: Request, res: Response) => {
 
       promoStrip = promoStripDoc;
 
-      // If we have promoStrip, add availability flag to featured products
+      // If we have promoStrip, filter featured products to only include in-range ones
       if (promoStrip && (promoStrip as any).featuredProducts) {
         (promoStrip as any).featuredProducts = (
           promoStrip as any
-        ).featuredProducts.map((p: any) => {
-          const isAvailable =
-            nearbySellerIds && nearbySellerIds.length > 0 && p.seller
-              ? nearbySellerIds.some(
-                (id) => id.toString() === p.seller.toString(),
-              )
-              : false;
-          return { ...p, isAvailable };
-        });
+        ).featuredProducts
+          .filter((p: any) => {
+            const isAvailable =
+              nearbySellerIds && nearbySellerIds.length > 0 && p.seller
+                ? nearbySellerIds.some(
+                  (id) => id.toString() === p.seller.toString(),
+                )
+                : false;
+            return isAvailable;
+          })
+          .map((p: any) => ({ ...p, isAvailable: true }));
       }
 
       // Cache for 3 minutes (PromoStrip data doesn't change frequently)
@@ -834,11 +831,11 @@ export const getStoreProducts = async (req: Request, res: Response) => {
 
       // If shop has specific products assigned, use those
       if (productIds.length > 0) {
+        // Clear isShopByStoreOnly constraint so any handpicked product can be shown
+        delete query.isShopByStoreOnly;
         query._id = { $in: productIds };
-        // Also filter by shopId to ensure products belong to this shop
-        query.shopId = shopId;
         console.log(
-          `[getStoreProducts] Filtering by product IDs: ${productIds.length} products and shopId: ${shopId}`,
+          `[getStoreProducts] Filtering by product IDs: ${productIds.length} products (excluding shopId/isShopByStoreOnly restrictions)`,
         );
       }
       // Otherwise, filter by shopId and category/subcategory

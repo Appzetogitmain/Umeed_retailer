@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import OrderItem from '../models/OrderItem';
 import mongoose from 'mongoose';
+import { sendNotification } from './notificationService';
 
 /**
  * Notify all sellers involved in an order about a new order or status change
@@ -25,7 +26,7 @@ export async function notifySellersOfOrderUpdate(
             orderItems = await OrderItem.find({ order: order._id });
         }
 
-        const sellerIds = [...new Set(orderItems.map((item: any) => item.seller.toString()))];
+        const sellerIds = [...new Set<string>(orderItems.map((item: any) => item.seller.toString()))];
 
         console.log(`🔔 Notifying ${sellerIds.length} sellers about ${type} for order ${order.orderNumber}`);
 
@@ -59,6 +60,37 @@ export async function notifySellersOfOrderUpdate(
             // Emit to seller-specific room
             io.to(`seller-${sellerId}`).emit('seller-notification', notificationData);
             console.log(`📤 Emitted notification to seller-${sellerId}`);
+
+            // Also save notification in the database for history
+            try {
+                let title = "New Order Received";
+                let message = `You have received a new order #${order.orderNumber} for ₹${notificationData.totalAmount.toFixed(2)}.`;
+                let notifType: "Order" | "System" = "Order";
+
+                if (type === 'STATUS_UPDATE') {
+                    title = "Order Status Updated";
+                    message = `Order #${order.orderNumber} status has been updated to ${order.status}.`;
+                } else if (type === 'ORDER_CANCELLED') {
+                    title = "Order Cancelled";
+                    message = `Order #${order.orderNumber} has been cancelled.`;
+                    notifType = "System";
+                }
+
+                await sendNotification(
+                    "Seller",
+                    sellerId,
+                    title,
+                    message,
+                    {
+                        type: notifType,
+                        link: `/seller/orders/${order._id}`,
+                        priority: "High"
+                    }
+                );
+                console.log(`💾 Saved notification for seller-${sellerId} to DB`);
+            } catch (dbErr) {
+                console.error(`❌ Failed to save seller notification to DB:`, dbErr);
+            }
         }
     } catch (error) {
         console.error('Error in notifySellersOfOrderUpdate:', error);

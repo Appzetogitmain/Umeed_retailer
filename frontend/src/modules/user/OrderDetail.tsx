@@ -1065,7 +1065,7 @@ export default function OrderDetail() {
 
       {/* Map Section */}
       {!showConfirmation &&
-        !["Delivered", "Cancelled", "Returned"].includes(order?.status) && (
+        !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
           <GoogleMapsTracking
             sellerLocations={sellerLocations.map((s) => ({
               lat: s.latitude,
@@ -1087,9 +1087,9 @@ export default function OrderDetail() {
             showRoute={
               isConnected &&
               !!deliveryLocation &&
-              order?.status !== "Delivered" &&
-              order?.status !== "Cancelled" &&
-              order?.status !== "Returned"
+              (orderStatus as string) !== "Delivered" &&
+              (orderStatus as string) !== "Cancelled" &&
+              (orderStatus as string) !== "Returned"
             }
             routeOrigin={deliveryLocation || undefined}
             routeDestination={{
@@ -1103,8 +1103,8 @@ export default function OrderDetail() {
                 0,
             }}
             routeWaypoints={
-              order?.status === "Picked up" ||
-                order?.status === "Out for Delivery"
+              (orderStatus as string) === "Picked up" ||
+                (orderStatus as string) === "Out for Delivery"
                 ? []
                 : sellerLocations.map((s) => ({
                   lat: s.latitude,
@@ -1112,10 +1112,10 @@ export default function OrderDetail() {
                 }))
             }
             destinationName={
-              order?.status === "Picked up" ||
-                order?.status === "Out for Delivery"
-                ? order?.deliveryAddress?.address?.split(",")[0] ||
-                order?.address?.split(",")[0] ||
+              (orderStatus as string) === "Picked up" ||
+                (orderStatus as string) === "Out for Delivery"
+                ? (typeof order?.deliveryAddress === "string" ? order?.deliveryAddress?.split(",")[0] : order?.deliveryAddress?.address?.split(",")[0]) ||
+                (typeof order?.address === "string" ? order?.address?.split(",")[0] : order?.address?.address?.split(",")[0]) ||
                 "Delivery Address"
                 : sellerLocations.length > 0
                   ? "Sellers & Delivery Address"
@@ -1145,8 +1145,9 @@ export default function OrderDetail() {
           }}
           eta={routeInfo ? Math.ceil(routeInfo.durationValue / 60) : eta}
           distance={routeInfo ? routeInfo.distanceValue : distance}
-          isTracking={isConnected && !!deliveryLocation}
-          deliveryOtp={order?.deliveryOtp}
+          isTracking={isConnected && !!deliveryLocation && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string)}
+          deliveryOtp={!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) ? order?.deliveryOtp : undefined}
+          orderStatus={orderStatus}
           onCall={() => {
             const phone = order?.deliveryPartner?.phone || "1234567890";
             window.location.href = `tel:${phone}`;
@@ -1215,10 +1216,10 @@ export default function OrderDetail() {
               </p>
             </div>
             <motion.button
-              className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center"
+              className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center"
               whileTap={{ scale: 0.9 }}
               onClick={handleCallStore}>
-              <PhoneIcon className="w-5 h-5 text-green-700" />
+              <PhoneIcon className="w-5 h-5 text-[#7A3E8E]" />
             </motion.button>
           </div>
 
@@ -1238,8 +1239,8 @@ export default function OrderDetail() {
                     <div
                       key={index}
                       className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="w-4 h-4 rounded border border-green-600 flex items-center justify-center">
-                        <span className="w-2 h-2 rounded-full bg-green-600" />
+                      <span className="w-4 h-4 rounded border border-[#7A3E8E] flex items-center justify-center">
+                        <span className="w-2 h-2 rounded-full bg-[#7A3E8E]" />
                       </span>
                       <span>
                         {item.quantity} x{" "}
@@ -1253,12 +1254,14 @@ export default function OrderDetail() {
             </div>
           </div>
 
-          <SectionItem
-            icon={ChefHatIcon}
-            title={order.specialRequests || "Add special requests"}
-            subtitle={order.specialRequests ? "Tap to edit" : "Add preferences for store"}
-            onClick={() => setShowSpecialRequestsModal(true)}
-          />
+          {!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
+            <SectionItem
+              icon={ChefHatIcon}
+              title={order.specialRequests || "Add special requests"}
+              subtitle={order.specialRequests ? "Tap to edit" : "Add preferences for store"}
+              onClick={() => setShowSpecialRequestsModal(true)}
+            />
+          )}
         </motion.div>
 
         {/* Help Section */}
@@ -1267,11 +1270,10 @@ export default function OrderDetail() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}>
-          <div
-            className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200"
-            onClick={() => window.open("/help", "_blank")}
-            style={{ cursor: "pointer" }}>
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+          <Link
+            to="/faq"
+            className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200 w-full hover:bg-neutral-50 transition-colors text-left">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
               <HelpCircleIcon className="w-5 h-5 text-red-600" />
             </div>
             <div className="flex-1">
@@ -1280,8 +1282,8 @@ export default function OrderDetail() {
               </p>
               <p className="text-sm text-gray-500">Get help & support</p>
             </div>
-            <ChevronRightIcon className="w-5 h-5 text-gray-400" />
-          </div>
+            <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          </Link>
           {(orderStatus === "Placed" ||
             orderStatus === "Received" ||
             orderStatus === "Pending") && (
@@ -1300,9 +1302,9 @@ export default function OrderDetail() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.85 }}>
-          {order?.invoiceEnabled ? (
+          {order?.invoiceEnabled || orderStatus === "Delivered" ? (
             <Link to={`/orders/${id}/invoice`} className="flex-1">
-              <Button className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white">
+              <Button className="w-full bg-gradient-to-r from-[#7A3E8E] to-[#603070] hover:from-[#6D377F] hover:to-[#552B63] text-white">
                 View Invoice
               </Button>
             </Link>
