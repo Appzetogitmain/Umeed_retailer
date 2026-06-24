@@ -347,7 +347,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           )}
 
           {/* Scrollable Main Content */}
-          <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-24 md:pb-8">
+          <main ref={mainRef} className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-24 md:pb-8 ${location.pathname !== '/' ? 'pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(1.5rem,env(safe-area-inset-top))]' : ''}`}>
             <AnimatePresence>
               <motion.div
                 key={location.pathname}

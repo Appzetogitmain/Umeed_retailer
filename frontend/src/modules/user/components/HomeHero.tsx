@@ -376,7 +376,7 @@ export default function HomeHero({
       <div>
         <div
           ref={topSectionRef}
-          className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-2 md:pt-3 pb-0">
+          className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-14 md:pt-16 pb-0">
           <div className="flex items-center justify-between mb-2 md:mb-3">
             {/* Left side: Logo */}
             <div className="flex-shrink-0">
