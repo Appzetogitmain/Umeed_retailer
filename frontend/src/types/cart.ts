@@ -13,5 +13,6 @@ export interface Cart {
   estimatedDeliveryFee?: number;
   platformFee?: number;
   freeDeliveryThreshold?: number;
+  estimatedDeliveryTime?: string;
 }
 

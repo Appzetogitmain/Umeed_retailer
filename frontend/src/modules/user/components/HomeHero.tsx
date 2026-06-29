@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import SpeedooLogo from "@assets/Speedoo_logo.png";
+import LocationPermissionRequest from "../../../components/LocationPermissionRequest";
 import { useLayoutEffect, useRef, useState, useEffect, useMemo } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -81,13 +82,14 @@ export default function HomeHero({
     fetchHeaderCategories();
   }, []);
   const navigate = useNavigate();
-  const { location: userLocation } = useLocation();
+  const { location: userLocation, estimatedDeliveryTime } = useLocation();
   const heroRef = useRef<HTMLDivElement>(null);
   const topSectionRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [showLocationChangeModal, setShowLocationChangeModal] = useState(false);
   const [, setIsSticky] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -391,11 +393,13 @@ export default function HomeHero({
             <div className="flex flex-col items-end text-right">
               {/* Delivery time - large, bold, dark grey/black */}
               <div className="text-neutral-900 font-extrabold text-2xl md:text-3xl mb-0 leading-tight">
-                {appConfig.estimatedDeliveryTime}
+                {estimatedDeliveryTime || appConfig.estimatedDeliveryTime}
               </div>
-              {/* Location with dropdown indicator - only show if location is provided */}
               {locationDisplayText && (
-                <div className="text-neutral-700 text-[10px] md:text-xs flex items-center justify-end gap-0.5 leading-tight opacity-90">
+                <div 
+                  className="text-neutral-700 text-[10px] md:text-xs flex items-center justify-end gap-0.5 leading-tight opacity-90 cursor-pointer hover:opacity-100 transition-opacity"
+                  onClick={() => setShowLocationChangeModal(true)}
+                >
                   <span className="line-clamp-1 max-w-[150px] md:max-w-[200px]" title={locationDisplayText}>
                     {locationDisplayText}
                   </span>
@@ -502,43 +506,7 @@ export default function HomeHero({
                 );
               })}
             </div>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="flex-shrink-0 md:w-4 md:h-4">
-              <path
-                d="M12 1C13.1 1 14 1.9 14 3C14 4.1 13.1 5 12 5C10.9 5 10 4.1 10 3C10 1.9 10.9 1 12 1Z"
-                fill={scrollProgress > 0.5 ? "#9ca3af" : "#6b7280"}
-              />
-              <path
-                d="M19 10V17C19 18.1 18.1 19 17 19H7C5.9 19 5 18.1 5 17V10"
-                stroke={scrollProgress > 0.5 ? "#9ca3af" : "#6b7280"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12 11V17"
-                stroke={scrollProgress > 0.5 ? "#9ca3af" : "#6b7280"}
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M8 11V17"
-                stroke={scrollProgress > 0.5 ? "#9ca3af" : "#6b7280"}
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M16 11V17"
-                stroke={scrollProgress > 0.5 ? "#9ca3af" : "#6b7280"}
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
+
           </div>
         </div>
 
@@ -548,7 +516,7 @@ export default function HomeHero({
           style={{ paddingBottom: 0 }}>
           <div
             ref={tabsContainerRef}
-            className="relative flex gap-2 md:gap-3 overflow-x-auto scrollbar-hide -mx-4 md:mx-0 px-4 md:px-6 lg:px-8 md:justify-center scroll-smooth"
+            className={`relative flex gap-2 md:gap-3 overflow-x-auto scrollbar-hide -mx-4 md:mx-0 px-4 md:px-6 lg:px-8 scroll-smooth ${tabs.length <= 7 ? "justify-between" : "md:justify-center"}`}
             style={{ paddingBottom: "12px" }}
             data-padding-bottom="md:8px">
             {/* Sliding Indicator */}
@@ -612,6 +580,16 @@ export default function HomeHero({
         </div>
         </div>
       </div>
+
+      {showLocationChangeModal && (
+        <LocationPermissionRequest
+          onLocationGranted={() => setShowLocationChangeModal(false)}
+          skipable={true}
+          isChangeMode={true}
+          title="Change Location"
+          description="We need your location to show you products available near you and enable delivery services. Update your location below."
+        />
+      )}
     </div>
   );
 }

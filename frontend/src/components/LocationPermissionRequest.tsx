@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "../hooks/useLocation";
 import GoogleMapsAutocomplete from "./GoogleMapsAutocomplete";
 
@@ -97,7 +98,7 @@ export default function LocationPermissionRequest({
     return null;
   }
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" aria-modal="true" role="dialog">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
         <div className="text-center mb-6">
@@ -235,4 +236,6 @@ export default function LocationPermissionRequest({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

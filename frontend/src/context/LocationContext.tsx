@@ -65,6 +65,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationPermissionStatus, setLocationPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'session_granted'>('prompt');
   const [hasSellersInRange, setHasSellersInRange] = useState<boolean | null>(null);
+  const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState<string | null>(null);
   const [isServiceAreaLoading, setIsServiceAreaLoading] = useState(false);
   const lastServiceAreaCoordsRef = useRef<string | null>(null);
 
@@ -129,6 +130,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     const lng = location?.longitude;
     if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
       setHasSellersInRange(null);
+      setEstimatedDeliveryTime(null);
       lastServiceAreaCoordsRef.current = null;
       return;
     }
@@ -143,11 +145,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       .then((res) => {
         if (!cancelled && res.success) {
           setHasSellersInRange(res.hasSellersInRange);
+          if (res.estimatedDeliveryTime) {
+             setEstimatedDeliveryTime(res.estimatedDeliveryTime);
+          }
         }
       })
       .catch(() => {
         if (!cancelled) {
           setHasSellersInRange(null);
+          setEstimatedDeliveryTime(null);
         }
       })
       .finally(() => {
@@ -627,6 +633,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     setIsLocationEnabled(false);
     setLocationPermissionStatus('prompt');
     setHasSellersInRange(null);
+    setEstimatedDeliveryTime(null);
     lastServiceAreaCoordsRef.current = null;
     localStorage.removeItem(LOCATION_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_PERMISSION_KEY);
@@ -651,6 +658,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         locationError,
         locationPermissionStatus,
         hasSellersInRange,
+        estimatedDeliveryTime,
         isServiceAreaLoading,
         requestLocation,
         updateLocation,

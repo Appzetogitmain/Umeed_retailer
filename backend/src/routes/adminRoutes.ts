@@ -13,6 +13,9 @@ import * as orderController from "../modules/admin/controllers/adminOrderControl
 // Customer Controllers
 import * as customerController from "../modules/admin/controllers/adminCustomerController";
 
+// Review Controllers
+import * as reviewController from "../modules/admin/controllers/adminReviewController";
+
 // Delivery Controllers
 import * as deliveryController from "../modules/admin/controllers/adminDeliveryController";
 
@@ -167,6 +170,11 @@ router.get("/customers", customerController.getAllCustomers);
 router.get("/customers/:id", customerController.getCustomerById);
 router.patch("/customers/:id/status", customerController.updateCustomerStatus);
 router.get("/customers/:id/orders", customerController.getCustomerOrders);
+
+// ==================== Review Routes ====================
+router.get("/reviews", reviewController.getAllReviews);
+router.patch("/reviews/:id/status", reviewController.updateReviewStatus);
+router.delete("/reviews/:id", reviewController.deleteReview);
 
 // ==================== Delivery Routes ====================
 router.post("/delivery", deliveryController.createDeliveryBoy);

@@ -451,6 +451,7 @@ export default function AdminAllOrders() {
                         setDateFrom(e.target.value);
                         setCurrentPage(1);
                       }}
+                      max={dateTo || undefined}
                       className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0"
                     />
                   </div>
@@ -484,6 +485,7 @@ export default function AdminAllOrders() {
                         setDateTo(e.target.value);
                         setCurrentPage(1);
                       }}
+                      min={dateFrom || undefined}
                       className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0"
                     />
                   </div>

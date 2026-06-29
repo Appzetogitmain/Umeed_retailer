@@ -19,6 +19,17 @@ export default function DeliveryLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isNotRegistered, setIsNotRegistered] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (showOTP && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showOTP, resendTimer]);
 
   // Clear any existing token on mount to prevent role conflicts
   useEffect(() => {
@@ -38,6 +49,7 @@ export default function DeliveryLogin() {
       if (response.success && response.sessionId) {
         setSessionId(response.sessionId);
         setShowOTP(true);
+        setResendTimer(30);
       } else {
         setError(response.message || "Failed to initiate OTP");
       }
@@ -239,10 +251,14 @@ export default function DeliveryLogin() {
                 </button>
                 <button
                   onClick={() => handleMobileLogin()}
-                  disabled={loading}
-                  className="flex-1 py-4 rounded-xl font-headline font-bold text-sm bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors border border-outline-variant/20"
+                  disabled={loading || resendTimer > 0}
+                  className={`flex-1 py-4 rounded-xl font-headline font-bold text-sm transition-colors border ${
+                    resendTimer > 0 
+                      ? "bg-surface-container text-on-surface-variant/50 border-outline-variant/10 cursor-not-allowed" 
+                      : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest border-outline-variant/20"
+                  }`}
                 >
-                  {loading ? "..." : "Resend"}
+                  {loading ? "..." : resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend"}
                 </button>
               </div>
             </div>

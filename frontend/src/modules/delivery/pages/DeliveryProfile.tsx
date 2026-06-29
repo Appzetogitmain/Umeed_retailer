@@ -15,12 +15,33 @@ export default function DeliveryProfile() {
     phone: '',
     email: '',
     address: '',
+    pincode: '',
+    city: '',
+    dateOfBirth: '',
     vehicleNumber: '',
     vehicleType: 'Bike',
     joinDate: '',
     totalDeliveries: 0,
     rating: 0,
+    accountName: '',
+    bankName: '',
+    accountNumber: '',
+    ifscCode: '',
   });
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateAge = (dob: string) => {
+    if (!dob) return false;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 18;
+  };
 
   // Fetch profile data on mount
   useEffect(() => {
@@ -28,15 +49,22 @@ export default function DeliveryProfile() {
       try {
         const data = await getDeliveryProfile();
         setProfileData({
-          name: data.name,
-          phone: data.mobile,
-          email: data.email,
-          address: data.address,
+          name: data.name || '',
+          phone: data.mobile || '',
+          email: data.email || '',
+          address: data.address || '',
+          pincode: data.pincode || '',
+          city: data.city || '',
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
           vehicleNumber: data.vehicleNumber || '',
           vehicleType: data.vehicleType || 'Bike',
           joinDate: new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
           totalDeliveries: data.totalDeliveredCount || 0, // Assuming backend sends this or we need to fetch dashboard stats
           rating: 4.8, // Mock for now
+          accountName: data.accountName || '',
+          bankName: data.bankName || '',
+          accountNumber: data.accountNumber || '',
+          ifscCode: data.ifscCode || '',
         });
         setUserName(data.name);
       } catch (error) {
@@ -61,8 +89,15 @@ export default function DeliveryProfile() {
         name: profileData.name,
         email: profileData.email,
         address: profileData.address,
+        pincode: profileData.pincode,
+        city: profileData.city,
+        dateOfBirth: profileData.dateOfBirth,
         vehicleNumber: profileData.vehicleNumber,
-        vehicleType: profileData.vehicleType
+        vehicleType: profileData.vehicleType,
+        accountName: profileData.accountName,
+        bankName: profileData.bankName,
+        accountNumber: profileData.accountNumber,
+        ifscCode: profileData.ifscCode,
       });
       setUserName(profileData.name);
       setIsEditing(false);
@@ -74,9 +109,79 @@ export default function DeliveryProfile() {
   };
 
   const handleInputChange = (field: string, value: string) => {
+    let newValue = value;
+    let errorMsg = '';
+
+    switch (field) {
+      case "phone":
+        newValue = value.replace(/\D/g, "").slice(0, 10);
+        if (value && !/^\d*$/.test(value)) {
+          errorMsg = "Mobile number can only contain numbers";
+        }
+        break;
+      case "name":
+      case "accountName":
+      case "bankName":
+        if (/[^a-zA-Z\s]/.test(value)) {
+          errorMsg = "Only alphabetic characters are allowed";
+        }
+        newValue = value.replace(/[^a-zA-Z\s]/g, "");
+        break;
+      case "city":
+        if (/[0-9]/.test(value)) {
+          errorMsg = "City name cannot contain numbers";
+        }
+        newValue = value.replace(/[0-9]/g, "");
+        break;
+      case "accountNumber":
+        if (/[^0-9]/.test(value)) {
+          errorMsg = "Account number can only contain numbers";
+        }
+        newValue = value.replace(/[^0-9]/g, "");
+        break;
+      case "ifscCode":
+        newValue = value.toUpperCase();
+        if (newValue && !/^[A-Z]{0,4}0?[A-Z0-9]{0,6}$/.test(newValue)) {
+          errorMsg = "Invalid IFSC Code format";
+        }
+        break;
+      case "vehicleNumber":
+        newValue = value.toUpperCase();
+        if (/[^A-Z0-9\s-]/g.test(newValue)) {
+          errorMsg = "Vehicle number can only contain letters, numbers, spaces, and hyphens";
+        }
+        newValue = newValue.replace(/[^A-Z0-9\s-]/g, "");
+        break;
+      case "pincode":
+        if (/[^0-9]/.test(value)) {
+          errorMsg = "Pincode can only contain numbers";
+        }
+        newValue = value.replace(/[^0-9]/g, "").slice(0, 6);
+        break;
+      case "address":
+        if (/[^a-zA-Z0-9\s,.\-/#]/.test(value)) {
+          errorMsg = "Address contains invalid special characters";
+        }
+        newValue = value.replace(/[^a-zA-Z0-9\s,.\-/#]/g, "");
+        break;
+      case "dateOfBirth":
+        newValue = value;
+        if (newValue && !validateAge(newValue)) {
+          errorMsg = "You must be at least 18 years old";
+        }
+        break;
+      default:
+        newValue = value;
+    }
+
     setProfileData((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: newValue,
+    }));
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      [field]: errorMsg,
     }));
   };
 
@@ -110,20 +215,34 @@ export default function DeliveryProfile() {
               </span>
             </div>
             {isEditing ? (
-              <div className="w-full max-w-xs">
-                <input
-                  type="text"
-                  value={profileData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full text-center text-neutral-900 text-xl font-semibold mb-2 px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <input
-                  type="tel"
-                  value={profileData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full text-center text-neutral-600 text-sm px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className={`w-full text-center text-neutral-900 text-xl font-semibold mb-2 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.name
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.name && (
+                    <p className="text-xs text-red-500 text-center mb-2">{fieldErrors.name}</p>
+                  )}
+                  <input
+                    type="tel"
+                    value={profileData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    className={`w-full text-center text-neutral-600 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.phone
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.phone && (
+                    <p className="text-xs text-red-500 text-center mt-1">{fieldErrors.phone}</p>
+                  )}
+                </div>
             ) : (
               <>
                 <h3 className="text-neutral-900 text-xl font-semibold mb-1">{profileData.name}</h3>
@@ -162,27 +281,111 @@ export default function DeliveryProfile() {
               )}
             </div>
             <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">Date of Birth</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="date"
+                    value={profileData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.dateOfBirth
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.dateOfBirth && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.dateOfBirth}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.dateOfBirth}</p>
+              )}
+            </div>
+            <div className="p-4">
               <p className="text-neutral-500 text-xs mb-1">Address</p>
               {isEditing ? (
-                <textarea
-                  value={profileData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  rows={2}
-                  className="w-full text-neutral-900 text-sm px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                />
+                <div>
+                  <textarea
+                    value={profileData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    rows={2}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 resize-none ${
+                      fieldErrors.address
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.address && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.address}</p>
+                  )}
+                </div>
               ) : (
                 <p className="text-neutral-900 text-sm">{profileData.address}</p>
               )}
             </div>
             <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">City</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.city}
+                    onChange={(e) => handleInputChange('city', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.city
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.city && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.city}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.city}</p>
+              )}
+            </div>
+            <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">Pincode</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.pincode}
+                    onChange={(e) => handleInputChange('pincode', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.pincode
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.pincode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.pincode}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.pincode}</p>
+              )}
+            </div>
+            <div className="p-4">
               <p className="text-neutral-500 text-xs mb-1">Vehicle Number</p>
               {isEditing ? (
-                <input
-                  type="text"
-                  value={profileData.vehicleNumber}
-                  onChange={(e) => handleInputChange('vehicleNumber', e.target.value)}
-                  className="w-full text-neutral-900 text-sm px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.vehicleNumber}
+                    onChange={(e) => handleInputChange('vehicleNumber', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.vehicleNumber
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.vehicleNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.vehicleNumber}</p>
+                  )}
+                </div>
               ) : (
                 <p className="text-neutral-900 text-sm">{profileData.vehicleNumber}</p>
               )}
@@ -202,6 +405,103 @@ export default function DeliveryProfile() {
                 </select>
               ) : (
                 <p className="text-neutral-900 text-sm">{profileData.vehicleType}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Information */}
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden mt-4">
+          <div className="p-4 border-b border-neutral-200">
+            <h3 className="text-neutral-900 font-semibold">Bank Information</h3>
+          </div>
+          <div className="divide-y divide-neutral-200">
+            <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">Account Name</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.accountName}
+                    onChange={(e) => handleInputChange('accountName', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.accountName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.accountName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountName}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.accountName || "Not provided"}</p>
+              )}
+            </div>
+            <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">Bank Name</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.bankName}
+                    onChange={(e) => handleInputChange('bankName', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.bankName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.bankName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.bankName}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.bankName || "Not provided"}</p>
+              )}
+            </div>
+            <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">Account Number</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.accountNumber}
+                    onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.accountNumber
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.accountNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountNumber}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.accountNumber || "Not provided"}</p>
+              )}
+            </div>
+            <div className="p-4">
+              <p className="text-neutral-500 text-xs mb-1">IFSC Code</p>
+              {isEditing ? (
+                <div>
+                  <input
+                    type="text"
+                    value={profileData.ifscCode}
+                    onChange={(e) => handleInputChange('ifscCode', e.target.value)}
+                    className={`w-full text-neutral-900 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.ifscCode
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:ring-orange-500"
+                    }`}
+                  />
+                  {fieldErrors.ifscCode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.ifscCode}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-900 text-sm">{profileData.ifscCode || "Not provided"}</p>
               )}
             </div>
           </div>

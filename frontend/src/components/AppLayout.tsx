@@ -381,7 +381,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {showLocationRequest && (
             <LocationPermissionRequest
               onLocationGranted={() => setShowLocationRequest(false)}
-              skipable={false}
+              skipable={true}
               title="Location Access Required"
               description="We need your location to show you products available near you and enable delivery services. Location access is required to continue."
             />

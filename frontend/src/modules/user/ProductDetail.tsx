@@ -122,7 +122,7 @@ export default function ProductDetail() {
         );
         const res = await getProductReviews(productId);
         if (res.success) {
-          setReviews(res.data);
+          setReviews(res.data.reviews);
         }
       } catch (err) {
         console.error("Failed to fetch reviews", err);
@@ -1001,10 +1001,10 @@ export default function ProductDetail() {
             <h3 className="text-lg font-bold text-neutral-900">
               Ratings & Reviews
             </h3>
-            {reviews.length > 0 && (
+            {(product.reviewsCount > 0 || reviews.length > 0) && (
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-neutral-900">
-                  {product.rating || "4.5"}
+                  {product.rating || "5.0"}
                 </span>
                 <div className="flex text-yellow-500">
                   <svg
@@ -1016,7 +1016,7 @@ export default function ProductDetail() {
                   </svg>
                 </div>
                 <span className="text-xs text-neutral-500">
-                  ({reviews.length} reviews)
+                  ({product.reviewsCount || reviews.length} ratings)
                 </span>
               </div>
             )}

@@ -18,8 +18,6 @@ export default function Account() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showGstModal, setShowGstModal] = useState(false);
-  const [gstNumber, setGstNumber] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteOtpModal, setShowDeleteOtpModal] = useState(false);
   const [deleteSessionId, setDeleteSessionId] = useState("");
@@ -61,6 +59,36 @@ export default function Account() {
     }
   }, [user, navigate, authLogout]);
 
+  // Lock body scroll when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = showEditModal || showDeleteModal || showDeleteOtpModal;
+    if (isAnyModalOpen) {
+      // Lock body and html
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      // Lock the AppLayout main scroll container
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.style.overflow = 'hidden';
+      }
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.style.overflow = '';
+      }
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.style.overflow = '';
+      }
+    };
+  }, [showEditModal, showDeleteModal, showDeleteOtpModal]);
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Not set";
     const date = new Date(dateString);
@@ -84,11 +112,6 @@ export default function Account() {
   const handleLogout = () => {
     authLogout();
     navigate("/login");
-  };
-
-  const handleGstSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowGstModal(false);
   };
 
   const handleDeleteRequest = async () => {
@@ -148,6 +171,38 @@ export default function Account() {
     e.preventDefault();
     setIsUpdating(true);
     setUpdateError("");
+    
+    // Validate name (only alphabets and spaces)
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    if (!nameRegex.test(editName)) {
+      setUpdateError("Name should only contain alphabets and spaces");
+      setIsUpdating(false);
+      return;
+    }
+
+    // Validate email stricter
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editEmail)) {
+      setUpdateError("Please enter a valid email address");
+      setIsUpdating(false);
+      return;
+    }
+
+    // Validate age (min 18)
+    if (editDob) {
+      const today = new Date();
+      const birthDate = new Date(editDob);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        setUpdateError("You must be at least 18 years old");
+        setIsUpdating(false);
+        return;
+      }
+    }
     try {
       const response = await updateProfile({
         name: editName,
@@ -364,9 +419,6 @@ export default function Account() {
               { id: 'wishlist', label: 'Your Wishlist', icon: (
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               ), onClick: () => navigate("/wishlist") },
-              { id: 'gst', label: 'GST Details', icon: (
-                <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><polyline points="14 2 14 8 20 8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></>
-              ), onClick: () => setShowGstModal(true) },
               { id: 'about', label: 'About Us', icon: (
                 <><circle cx="12" cy="12" r="10" strokeWidth="2" /><line x1="12" y1="16" x2="12" y2="12" strokeWidth="2" /><line x1="12" y1="8" x2="12.01" y2="8" strokeWidth="2" /></>
               ), onClick: () => navigate("/about-us") },
@@ -428,74 +480,6 @@ export default function Account() {
           </div>
         </div>
       </div>
-
-      {showGstModal && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300"
-            onClick={() => setShowGstModal(false)}
-          />
-          <div className="fixed inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom duration-500 ease-out">
-            <div className="bg-white rounded-t-[32px] shadow-2xl max-w-lg mx-auto p-6 pt-10 relative">
-              <button
-                onClick={() => setShowGstModal(false)}
-                className="absolute -top-12 right-4 w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center text-white">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M18 6L6 18M6 6L18 18"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <div className="text-center">
-                <div className="mx-auto mb-6 w-20 h-20 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-center">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-10 h-10 text-neutral-400"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5">
-                    <rect x="5" y="3" width="14" height="18" rx="2" ry="2" />
-                    <line x1="9" y1="7" x2="15" y2="7" />
-                    <line x1="9" y1="11" x2="15" y2="11" />
-                    <line x1="9" y1="15" x2="13" y2="15" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-neutral-900 mb-2">
-                  Add GST Details
-                </h3>
-                <p className="text-[13px] text-neutral-500 mb-8 px-4">
-                  Identify your business to get a GST invoice on your business
-                  purchases.
-                </p>
-                <form onSubmit={handleGstSubmit} className="space-y-4">
-                  <input
-                    type="text"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value)}
-                    placeholder="Enter GST Number"
-                    className="w-full rounded-xl border border-neutral-200 px-4 py-3.5 text-sm focus:outline-none focus:ring-purple-500/20 focus:border-purple-500 transition-all"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!gstNumber.trim()}
-                    className="w-full rounded-full bg-gradient-to-r from-[#FFC107] to-[#B95F15] text-white font-bold py-4 hover:opacity-95 disabled:opacity-50 transition-all shadow-lg shadow-orange-500/20 uppercase tracking-widest text-sm">
-                    Save Details
-                  </button>
-                </form>
-                <p className="mt-6 text-[11px] text-neutral-400">
-                  By continuing, you agree to our{" "}
-                  <span onClick={() => navigate("/terms")} className="underline cursor-pointer hover:text-neutral-600 transition-colors">Terms & Conditions</span>
-                </p>
-
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Delete Account Warning Modal */}
       {showDeleteModal && (
@@ -671,7 +655,7 @@ export default function Account() {
                       value={editDob}
                       onChange={(e) => setEditDob(e.target.value)}
                       className="w-full bg-neutral-50 border border-neutral-100 rounded-2xl px-5 py-4 text-sm font-bold text-neutral-900 focus:outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all"
-                      max={new Date().toISOString().split('T')[0]}
+                      max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                     />
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   sendOTP,
@@ -16,6 +16,17 @@ export default function AdminLogin() {
   const [showOTP, setShowOTP] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (showOTP && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showOTP, resendTimer]);
 
   const handleMobileLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -27,6 +38,7 @@ export default function AdminLogin() {
     try {
       await sendOTP(mobileNumber);
       setShowOTP(true);
+      setResendTimer(30);
     } catch (err: any) {
       setError(
         err.response?.data?.message || "Failed to send OTP. Please try again."
@@ -204,10 +216,14 @@ export default function AdminLogin() {
                 </button>
                 <button
                   onClick={() => handleMobileLogin()}
-                  disabled={loading}
-                  className="flex-1 py-4 rounded-full font-headline font-bold text-sm bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 transition-colors"
+                  disabled={loading || resendTimer > 0}
+                  className={`flex-1 py-4 rounded-full font-headline font-bold text-sm transition-colors ${
+                    resendTimer > 0
+                      ? "bg-secondary-container/50 text-on-secondary-container/50 cursor-not-allowed"
+                      : "bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80"
+                  }`}
                 >
-                  {loading ? "..." : "Resend"}
+                  {loading ? "..." : resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend"}
                 </button>
               </div>
             </div>

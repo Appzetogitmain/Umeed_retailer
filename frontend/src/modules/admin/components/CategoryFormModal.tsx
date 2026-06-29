@@ -179,6 +179,25 @@ export default function CategoryFormModal({
     }
   }, [isOpen, mode, category, parentCategory]);
 
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    const handleScrollPrevent = (e: Event) => {
+      e.preventDefault();
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("wheel", handleScrollPrevent, { passive: false });
+      window.addEventListener("touchmove", handleScrollPrevent, { passive: false });
+    }
+    
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("wheel", handleScrollPrevent);
+      window.removeEventListener("touchmove", handleScrollPrevent);
+    };
+  }, [isOpen]);
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -393,7 +412,7 @@ export default function CategoryFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50"
+        className="fixed inset-0 bg-black/50 backdrop-blur-md"
         onClick={onClose}></div>
 
       {/* Modal */}

@@ -14,6 +14,11 @@ import {
   Shop,
 } from "../../../services/api/productService";
 import {
+  updateProduct as adminUpdateProduct,
+  getProductById as adminGetProductById,
+  getBrands as adminGetBrands,
+} from "../../../services/api/admin/adminProductService";
+import {
   getCategories,
   getSubcategories,
   getSubSubCategories,
@@ -31,6 +36,7 @@ import {
 export default function SellerAddProduct() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const isAdmin = window.location.pathname.includes('/admin');
   const [formData, setFormData] = useState({
     productName: "",
     headerCategory: "",
@@ -95,11 +101,12 @@ export default function SellerAddProduct() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const fetchBrandsFn = isAdmin ? adminGetBrands : getBrands;
         // Use Promise.allSettled to ensure one failing API doesn't break all others
         const results = await Promise.allSettled([
           getCategories(),
           getActiveTaxes(),
-          getBrands(),
+          fetchBrandsFn(),
           getHeaderCategoriesPublic(),
           getShops(),
         ]);
@@ -152,14 +159,17 @@ export default function SellerAddProduct() {
     if (id) {
       const fetchProduct = async () => {
         try {
-          const response = await getProductById(id);
+          const fetchFn = isAdmin ? adminGetProductById : getProductById;
+          const response = await fetchFn(id);
           if (response.success && response.data) {
-            const product = response.data;
+            const product = response.data as any;
             setFormData({
               productName: product.productName,
               headerCategory:
                 (product.headerCategoryId as any)?._id ||
                 (product as any).headerCategoryId ||
+                (product.headerCategory as any)?._id ||
+                product.headerCategory ||
                 "",
               category:
                 (product.category as any)?._id || product.categoryId || "",
@@ -502,7 +512,8 @@ export default function SellerAddProduct() {
       // Create or Update product via API
       let response;
       if (id) {
-        response = await updateProduct(id as string, productData);
+        const updateFn = isAdmin ? adminUpdateProduct : updateProduct;
+        response = await updateFn(id as string, productData as any);
       } else {
         response = await createProduct(productData);
       }

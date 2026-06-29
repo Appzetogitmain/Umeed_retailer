@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import Cart from '../../../models/Cart';
 import CartItem from '../../../models/CartItem';
 import Product from '../../../models/Product';
-import { findSellersWithinRange } from '../../../utils/locationHelper';
+import { findSellersWithinRange, calculateDistance, calculateEstimatedDeliveryTime } from '../../../utils/locationHelper';
 import mongoose from 'mongoose';
 
 import Seller from '../../../models/Seller';
@@ -67,6 +67,10 @@ const calculateDeliveryStuff = async (total: number, items: any[], userLat: numb
     let estimatedDeliveryFee = 0;
     let platformFee = 0;
     let freeDeliveryThreshold = 0;
+    let estimatedDeliveryTime = "12-15 mins"; // default
+    
+    // Track maximum distance to calculate ETA
+    let maxSellerDistance = 0;
 
     try {
         const settings = await AppSettings.getSettings();
@@ -119,8 +123,15 @@ const calculateDeliveryStuff = async (total: number, items: any[], userLat: numb
 
                             if (distances && distances.length > 0) {
                                 const maxDistance = Math.max(...distances);
+                                maxSellerDistance = maxDistance;
                                 const extraKm = Math.max(0, maxDistance - config.baseDistance);
                                 estimatedDeliveryFee = Math.ceil(config.baseCharge + (extraKm * config.kmRate));
+                            } else {
+                                // Fallback to haversine if API fails
+                                sellerLocations.forEach(loc => {
+                                    const dist = calculateDistance(userLat, userLng, loc.lat, loc.lng);
+                                    if (dist > maxSellerDistance) maxSellerDistance = dist;
+                                });
                             }
                         }
                     }
@@ -128,15 +139,50 @@ const calculateDeliveryStuff = async (total: number, items: any[], userLat: numb
             } else {
                 // Fixed charge
                 estimatedDeliveryFee = settings.deliveryCharges || 0;
+                
+                // Calculate max distance for ETA even if delivery is fixed charge
+                if (userLat && userLng) {
+                     const sellerIds = new Set<string>();
+                     items.forEach((item: any) => {
+                         const sId = item.product?.seller?._id || item.product?.seller;
+                         if (sId) sellerIds.add(sId.toString());
+                     });
+                     if (sellerIds.size > 0) {
+                         const uniqueSellerIds = Array.from(sellerIds).map(id => new mongoose.Types.ObjectId(id));
+                         const sellers = await Seller.find({ _id: { $in: uniqueSellerIds } }).select('location latitude longitude');
+                         
+                         sellers.forEach(seller => {
+                             let lat, lng;
+                             if (seller.location?.coordinates?.length === 2) {
+                                 lng = seller.location.coordinates[0];
+                                 lat = seller.location.coordinates[1];
+                             } else if (seller.latitude && seller.longitude) {
+                                 lat = parseFloat(seller.latitude);
+                                 lng = parseFloat(seller.longitude);
+                             }
+                             if (lat && lng) {
+                                 const dist = calculateDistance(userLat, userLng, lat, lng);
+                                 if (dist > maxSellerDistance) maxSellerDistance = dist;
+                             }
+                         });
+                     }
+                }
             }
         }
+        
+        // Compute dynamic ETA if we found a valid distance
+        if (maxSellerDistance > 0) {
+             estimatedDeliveryTime = calculateEstimatedDeliveryTime(maxSellerDistance);
+        }
+        
     } catch (err) {
         console.error("Error calculating delivery stuff:", err);
     }
     return {
         estimatedDeliveryFee,
         platformFee,
-        freeDeliveryThreshold
+        freeDeliveryThreshold,
+        estimatedDeliveryTime
     };
 };
 

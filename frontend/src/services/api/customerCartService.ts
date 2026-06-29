@@ -21,6 +21,7 @@ export interface Cart {
     estimatedDeliveryFee?: number;
     platformFee?: number;
     freeDeliveryThreshold?: number;
+    estimatedDeliveryTime?: string;
 }
 
 export interface CartResponse {

@@ -4,6 +4,9 @@ import {
   validateImageFile,
   createImagePreview,
 } from "../../../utils/imageUpload";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   getSubCategories,
   createSubCategory,
@@ -242,8 +245,56 @@ export default function AdminSubCategory() {
     }
   };
 
-  const handleExport = () => {
-    alert("Export functionality will be implemented here");
+  const handleExport = (format: "csv" | "excel" | "pdf") => {
+    if (subCategories.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    const exportData = subCategories.map((subCategory) => {
+      const categoryName = subCategory.category && typeof subCategory.category === "object"
+        ? subCategory.category.name
+        : categories.find((c) => c._id === subCategory.category)?.name || "Unknown";
+
+      return {
+        ID: subCategory._id.slice(-6),
+        "Category Name": categoryName,
+        "Subcategory Name": subCategory.name,
+        "Total Product": subCategory.totalProduct || 0,
+      };
+    });
+
+    if (format === "csv") {
+      const headers = Object.keys(exportData[0]).join(",");
+      const rows = exportData.map((row) => Object.values(row).join(",")).join("\n");
+      const csvContent = `${headers}\n${rows}`;
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", "subcategories.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (format === "excel") {
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "SubCategories");
+      XLSX.writeFile(workbook, "subcategories.xlsx");
+    } else if (format === "pdf") {
+      const doc = new jsPDF();
+      doc.text("SubCategories Report", 14, 15);
+      
+      const headers = [Object.keys(exportData[0])];
+      const data = exportData.map((row) => Object.values(row));
+      
+      (doc as any).autoTable({
+        head: headers,
+        body: data,
+        startY: 20,
+      });
+      
+      doc.save("subcategories.pdf");
+    }
   };
 
   return (
@@ -426,7 +477,7 @@ export default function AdminSubCategory() {
 
           {/* Controls */}
           <div className="p-4 sm:p-6 border-b border-neutral-200">
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
               {/* Entries Per Page */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-neutral-700">Show</span>
@@ -445,36 +496,42 @@ export default function AdminSubCategory() {
                 <span className="text-sm text-neutral-700">entries</span>
               </div>
 
-              {/* Export Button */}
-              <button
-                onClick={handleExport}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
+              {/* Export Dropdown */}
+              <div className="relative group z-10">
+                <button
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Export
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-36 bg-white rounded-md shadow-lg border border-neutral-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <div className="py-1">
+                    <button
+                      onClick={() => handleExport("csv")}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors">
+                      Export as CSV
+                    </button>
+                    <button
+                      onClick={() => handleExport("excel")}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors">
+                      Export as Excel
+                    </button>
+                    <button
+                      onClick={() => handleExport("pdf")}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors">
+                      Export as PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               {/* Search */}
               <div className="flex items-center gap-2">
@@ -618,7 +675,7 @@ export default function AdminSubCategory() {
                 ) : (
                   displayedSubCategories.map((subCategory) => {
                     const categoryName =
-                      typeof subCategory.category === "object"
+                      subCategory.category && typeof subCategory.category === "object"
                         ? subCategory.category.name
                         : categories.find((c) => c._id === subCategory.category)
                           ?.name || "Unknown";

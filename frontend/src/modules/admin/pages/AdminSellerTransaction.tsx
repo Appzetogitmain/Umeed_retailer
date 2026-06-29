@@ -158,7 +158,13 @@ export default function AdminSellerTransaction() {
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-8 rounded-3xl shadow-sm border border-neutral-100">
         <div>
-          <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Seller Settlement</h1>
+          
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="p-1 sm:p-2 text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors" aria-label="Go back">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+            </button>
+            <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">Seller Settlement</h1>
+          </div>
           <p className="text-neutral-500 font-medium mt-1">COD based payout management system</p>
         </div>
 

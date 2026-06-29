@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   getProducts,
   getCategories,
@@ -24,10 +24,11 @@ interface ProductVariation {
 }
 
 const STATUS_OPTIONS = ["All Products", "Published", "Unpublished"];
-const STOCK_OPTIONS = ["All Products", "In Stock", "Out of Stock", "Unlimited"];
+const STOCK_OPTIONS = ["All Products", "In Stock", "Out of Stock", "Low Stock", "Unlimited"];
 
 export default function AdminStockManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, token } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -42,7 +43,7 @@ export default function AdminStockManagement() {
   const [filterCategory, setFilterCategory] = useState("All Category");
   const [filterSeller, setFilterSeller] = useState("All Sellers");
   const [filterStatus, setFilterStatus] = useState("All Products");
-  const [filterStock, setFilterStock] = useState("All Products");
+  const [filterStock, setFilterStock] = useState(location.state?.filterStock || "All Products");
 
   // Fetch products and categories
   const fetchData = async () => {
@@ -242,7 +243,12 @@ export default function AdminStockManagement() {
         (filterStock === "Out of Stock" &&
           product.stock !== "Unlimited" &&
           typeof product.stock === "number" &&
-          product.stock === 0);
+          product.stock === 0) ||
+        (filterStock === "Low Stock" &&
+          product.stock !== "Unlimited" &&
+          typeof product.stock === "number" &&
+          product.stock > 0 &&
+          product.stock <= 5);
       const matchesSearch =
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.seller.toLowerCase().includes(searchTerm.toLowerCase());

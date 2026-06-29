@@ -206,7 +206,7 @@ export default function DeliveryDashboard() {
             title="Today's Pending Order"
             value={stats?.pendingOrders || 0}
             accentColor="#16a34a"
-            onClick={() => navigate('/delivery/orders/all')} // Should probably link to pending
+            onClick={() => navigate('/delivery/orders/pending')}
           />
           <DashboardCard
             icon={allOrderIcon}
@@ -227,6 +227,7 @@ export default function DeliveryDashboard() {
             title="Total return item have"
             value={stats?.returnItems || 0}
             accentColor="#3b82f6"
+            onClick={() => navigate('/delivery/orders/return')}
           />
         </div>
 

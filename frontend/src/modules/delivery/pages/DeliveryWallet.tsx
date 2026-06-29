@@ -45,6 +45,34 @@ export default function DeliveryWallet() {
         fetchWalletData();
     }, []);
 
+    // Lock background scroll when any modal is open
+    useEffect(() => {
+        const isModalOpen = showWithdrawModal || showPayoutModal;
+        if (isModalOpen) {
+            const scrollY = window.scrollY;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.overflow = 'hidden';
+        } else {
+            const scrollY = document.body.style.top;
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.overflow = '';
+            window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        }
+        return () => {
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.overflow = '';
+        };
+    }, [showWithdrawModal, showPayoutModal]);
+
     const fetchWalletData = async () => {
         try {
             setLoading(true);
@@ -508,7 +536,10 @@ export default function DeliveryWallet() {
 
             {/* Withdrawal Modal */}
             {showWithdrawModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    onTouchMove={(e) => e.preventDefault()}
+                    style={{ overscrollBehavior: 'contain' }}>
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -570,7 +601,10 @@ export default function DeliveryWallet() {
             )}
             {/* Admin Payout Modal */}
             {showPayoutModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+                    onTouchMove={(e) => e.preventDefault()}
+                    style={{ overscrollBehavior: 'contain' }}>
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}

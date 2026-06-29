@@ -1,4 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   getAllCustomers,
   getCustomerById,
@@ -21,13 +24,16 @@ type SortDirection = "asc" | "desc";
 export default function AdminManageCustomer() {
   const { isAuthenticated, token } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [dateRange, setDateRange] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Active" | "Inactive" | undefined>(
     undefined
   );
   const [entriesPerPage, setEntriesPerPage] = useState("10");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEntries, setTotalEntries] = useState(0);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [loading, setLoading] = useState(true);
@@ -36,6 +42,40 @@ export default function AdminManageCustomer() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const fromDateRef = useRef<HTMLInputElement>(null);
+  const toDateRef = useRef<HTMLInputElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    const handleScrollPrevent = (e: Event) => {
+      e.preventDefault();
+    };
+
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("wheel", handleScrollPrevent, { passive: false });
+      window.addEventListener("touchmove", handleScrollPrevent, { passive: false });
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("wheel", handleScrollPrevent);
+      window.removeEventListener("touchmove", handleScrollPrevent);
+    };
+  }, [isModalOpen]);
 
   // Fetch customers on component mount
   useEffect(() => {
@@ -49,15 +89,12 @@ export default function AdminManageCustomer() {
         setLoading(true);
         setError(null);
 
-        const params: {
-          page: number;
-          limit: number;
-          status?: "Active" | "Inactive";
-          search?: string;
-        } = {
+        const params: any = {
           page: currentPage,
           limit: parseInt(entriesPerPage),
         };
+        if (dateFrom) params.startDate = dateFrom;
+        if (dateTo) params.endDate = dateTo;
 
         if (statusFilter) {
           params.status = statusFilter;
@@ -70,6 +107,13 @@ export default function AdminManageCustomer() {
         const response = await getAllCustomers(params);
         if (response.success) {
           setCustomers(response.data);
+          if (response.pagination) {
+            setTotalPages(response.pagination.pages);
+            setTotalEntries(response.pagination.total);
+          } else {
+            setTotalPages(Math.ceil(response.data.length / parseInt(entriesPerPage)));
+            setTotalEntries(response.data.length);
+          }
         }
       } catch (err) {
         console.error("Error fetching customers:", err);
@@ -203,60 +247,59 @@ export default function AdminManageCustomer() {
     return filtered;
   }, [customers, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(
-    filteredAndSortedCustomers.length / Number(entriesPerPage)
-  );
   const startIndex = (currentPage - 1) * Number(entriesPerPage);
-  const endIndex = startIndex + Number(entriesPerPage);
-  const displayedCustomers = filteredAndSortedCustomers.slice(
-    startIndex,
-    endIndex
-  );
+  const displayedCustomers = filteredAndSortedCustomers;
 
-  const handleExport = () => {
-    const headers = [
-      "ID",
-      "Name",
-      "Email",
-      "Phone",
-      "Registration Date",
-      "Status",
-      "Ref Code",
-      "Wallet Amount",
-      "Total Orders",
-      "Total Spent",
-    ];
-    const csvContent = [
-      headers.join(","),
-      ...filteredAndSortedCustomers.map((customer) =>
-        [
-          customer._id.slice(-6),
-          customer.name,
-          customer.email,
-          customer.phone,
-          customer.registrationDate
-            ? new Date(customer.registrationDate).toLocaleString()
-            : "",
-          customer.status,
-          customer.refCode,
-          customer.totalOrders,
-          customer.totalSpent.toFixed(2),
-        ].join(",")
-      ),
-    ].join("\n");
+  const formatCustomerForExport = (customer: Customer) => ({
+    "ID": customer._id.slice(-6),
+    "Name": customer.name,
+    "Email": customer.email,
+    "Phone": customer.phone,
+    "Registration Date": customer.registrationDate ? new Date(customer.registrationDate).toLocaleDateString() : "-",
+    "Status": customer.status,
+    "Ref Code": customer.refCode,
+    "Total Orders": customer.totalOrders,
+    "Total Spent": customer.totalSpent.toFixed(2)
+  });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const handleExportCSV = () => {
+    const data = filteredAndSortedCustomers.map(formatCustomerForExport);
+    const headers = Object.keys(data[0] || {}).join(",");
+    const rows = data.map(obj => Object.values(obj).join(",")).join("\n");
+    const blob = new Blob([headers + "\n" + rows], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `customers_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    link.style.visibility = "hidden";
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `customers_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setIsExportDropdownOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    const data = filteredAndSortedCustomers.map(formatCustomerForExport);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+    XLSX.writeFile(workbook, `customers_${new Date().toISOString().split("T")[0]}.xlsx`);
+    setIsExportDropdownOpen(false);
+  };
+
+  const handleExportPDF = () => {
+    const data = filteredAndSortedCustomers.map(formatCustomerForExport);
+    const headers = Object.keys(data[0] || {});
+    const rows = data.map(obj => Object.values(obj));
+    const doc = new jsPDF();
+    doc.text("Customers List", 14, 15);
+    (doc as any).autoTable({
+      head: [headers],
+      body: rows,
+      startY: 20,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [13, 148, 136] }
+    });
+    doc.save(`customers_${new Date().toISOString().split("T")[0]}.pdf`);
+    setIsExportDropdownOpen(false);
   };
 
   const SortIcon = ({ field }: { field: SortField }) => (
@@ -283,22 +326,46 @@ export default function AdminManageCustomer() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-50">
+      <div className={`flex-1 p-4 sm:p-6 bg-neutral-50 ${isModalOpen ? "overflow-hidden" : "overflow-y-auto"}`}>
         <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
           {/* Filters */}
           <div className="p-4 sm:p-6 border-b border-neutral-200 bg-neutral-50">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-xs font-medium text-neutral-700 mb-1">
-                  Date Range
+                  From Date
                 </label>
-                <input
-                  type="text"
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  placeholder="MM/DD/YYYY - MM/DD/YYYY"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 py-1.5 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500 transition-shadow">
+                  <input
+                    type="date"
+                    ref={fromDateRef}
+                    value={dateFrom}
+                    onChange={(e) => {
+                      setDateFrom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    max={dateTo || undefined}
+                    className="w-full text-sm border-none bg-transparent focus:outline-none text-neutral-700 p-0"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-700 mb-1">
+                  To Date
+                </label>
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 py-1.5 focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500 transition-shadow">
+                  <input
+                    type="date"
+                    ref={toDateRef}
+                    value={dateTo}
+                    onChange={(e) => {
+                      setDateTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    min={dateFrom || undefined}
+                    className="w-full text-sm border-none bg-transparent focus:outline-none text-neutral-700 p-0"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-neutral-700 mb-1">
@@ -334,21 +401,29 @@ export default function AdminManageCustomer() {
                   <option value="100">100</option>
                 </select>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end relative" ref={exportRef}>
                 <button
-                  onClick={handleExport}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                  onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
                   Export
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isExportDropdownOpen ? "rotate-180" : ""}`}>
                     <polyline points="6 9 12 15 18 9"></polyline>
                   </svg>
                 </button>
+                {isExportDropdownOpen && (
+                  <div className="absolute top-full mt-1 right-0 w-40 bg-white border border-neutral-200 rounded-md shadow-lg z-50 overflow-hidden">
+                    <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                      Export as CSV
+                    </button>
+                    <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                      Export as Excel
+                    </button>
+                    <button onClick={handleExportPDF} className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                      Export as PDF
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -505,21 +580,6 @@ export default function AdminManageCustomer() {
                       <td className="p-4 border border-neutral-200">
                         <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleView(customer)}
-                              className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                              title="View Details">
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                              </svg>
-                            </button>
-                            <button
                               onClick={() => handleEdit(customer)}
                               className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
                               title="Edit">
@@ -534,6 +594,7 @@ export default function AdminManageCustomer() {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                               </svg>
                             </button>
+
                         </div>
                       </td>
                     </tr>
@@ -546,9 +607,9 @@ export default function AdminManageCustomer() {
           {/* Pagination */}
           <div className="px-4 sm:px-6 py-3 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
             <div className="text-xs sm:text-sm text-neutral-700">
-              Showing {startIndex + 1} to{" "}
-              {Math.min(endIndex, filteredAndSortedCustomers.length)} of{" "}
-              {filteredAndSortedCustomers.length} entries
+              Showing {totalEntries === 0 ? 0 : startIndex + 1} to{" "}
+              {Math.min(startIndex + Number(entriesPerPage), totalEntries)} of{" "}
+              {totalEntries} entries
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -597,7 +658,7 @@ export default function AdminManageCustomer() {
  
       {/* Customer Modal */}
       {isModalOpen && selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md overflow-hidden">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
               <h3 className="text-lg font-bold text-neutral-900">

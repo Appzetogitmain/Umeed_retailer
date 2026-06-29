@@ -138,7 +138,13 @@ export default function AdminWallet() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Wallet & Finance</h1>
+          
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="p-1 sm:p-2 text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors" aria-label="Go back">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Wallet & Finance</h1>
+          </div>
           <p className="text-gray-500">Manage transactions, track earnings, and process withdrawals.</p>
         </div>
         {/* 

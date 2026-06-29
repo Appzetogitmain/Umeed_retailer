@@ -31,6 +31,8 @@ export default function DeliverySignUp() {
     bonusType: "",
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   // File state for UI
   const [drivingLicenseFile, setDrivingLicenseFile] = useState<File | null>(
     null
@@ -52,21 +54,89 @@ export default function DeliverySignUp() {
     "Commission Based",
   ];
 
+  const validateAge = (dob: string) => {
+    if (!dob) return false;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 18;
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    if (name === "mobile") {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value.replace(/\D/g, "").slice(0, 10),
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+    let newValue = value;
+    let errorMsg = "";
+
+    switch (name) {
+      case "mobile":
+        newValue = value.replace(/\D/g, "").slice(0, 10);
+        if (value && !/^\d*$/.test(value)) {
+          errorMsg = "Mobile number can only contain numbers";
+        }
+        break;
+      case "name":
+      case "accountName":
+      case "bankName":
+        if (/[^a-zA-Z\s]/.test(value)) {
+          errorMsg = "Only alphabetic characters are allowed";
+        }
+        newValue = value.replace(/[^a-zA-Z\s]/g, "");
+        break;
+      case "city":
+        if (/[0-9]/.test(value)) {
+          errorMsg = "City name cannot contain numbers";
+        }
+        newValue = value.replace(/[0-9]/g, "");
+        break;
+      case "accountNumber":
+        if (/[^0-9]/.test(value)) {
+          errorMsg = "Account number can only contain numbers";
+        }
+        newValue = value.replace(/[^0-9]/g, "");
+        break;
+      case "ifscCode":
+        newValue = value.toUpperCase();
+        if (newValue && !/^[A-Z]{0,4}0?[A-Z0-9]{0,6}$/.test(newValue)) {
+          errorMsg = "Invalid IFSC Code format";
+        }
+        break;
+      case "pincode":
+        if (/[^0-9]/.test(value)) {
+          errorMsg = "Pincode can only contain numbers";
+        }
+        newValue = value.replace(/[^0-9]/g, "").slice(0, 6);
+        break;
+      case "address":
+        if (/[^a-zA-Z0-9\s,.\-/#]/.test(value)) {
+          errorMsg = "Address contains invalid special characters";
+        }
+        newValue = value.replace(/[^a-zA-Z0-9\s,.\-/#]/g, "");
+        break;
+      case "dateOfBirth":
+        newValue = value;
+        if (newValue && !validateAge(newValue)) {
+          errorMsg = "You must be at least 18 years old";
+        }
+        break;
+      default:
+        newValue = value;
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: newValue,
+    }));
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      [name]: errorMsg,
+    }));
   };
 
   const fetchCityFromLocation = () => {
@@ -138,17 +208,7 @@ export default function DeliverySignUp() {
     setError("");
   };
 
-  const validateAge = (dob: string) => {
-    if (!dob) return false;
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age >= 18;
-  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -361,9 +421,16 @@ export default function DeliverySignUp() {
                     onChange={handleInputChange}
                     placeholder="Enter your full name"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.name
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.name && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -386,6 +453,9 @@ export default function DeliverySignUp() {
                       disabled={loading}
                     />
                   </div>
+                  {fieldErrors.mobile && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.mobile}</p>
+                  )}
                 </div>
 
                 <div>
@@ -413,10 +483,17 @@ export default function DeliverySignUp() {
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.dateOfBirth
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                     max={new Date().toISOString().split('T')[0]}
                   />
+                  {fieldErrors.dateOfBirth && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.dateOfBirth}</p>
+                  )}
                 </div>
 
                 <div>
@@ -430,9 +507,16 @@ export default function DeliverySignUp() {
                     onChange={handleInputChange}
                     placeholder="Enter your address"
                     required
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.address
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.address && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.address}</p>
+                  )}
                 </div>
 
                 <div>
@@ -447,7 +531,11 @@ export default function DeliverySignUp() {
                       onChange={handleInputChange}
                       placeholder="Enter your city"
                       required
-                      className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 pr-10 ${
+                        fieldErrors.city
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                      }`}
                       disabled={loading || isCityLoading}
                     />
                     <button
@@ -472,6 +560,9 @@ export default function DeliverySignUp() {
                       )}
                     </button>
                   </div>
+                  {fieldErrors.city && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.city}</p>
+                  )}
                 </div>
 
                 <div>
@@ -484,9 +575,16 @@ export default function DeliverySignUp() {
                     value={formData.pincode}
                     onChange={handleInputChange}
                     placeholder="Enter pincode"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.pincode
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.pincode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.pincode}</p>
+                  )}
                 </div>
               </div>
 
@@ -506,9 +604,16 @@ export default function DeliverySignUp() {
                     value={formData.accountName}
                     onChange={handleInputChange}
                     placeholder="Account holder name"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.accountName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.accountName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountName}</p>
+                  )}
                 </div>
 
                 <div>
@@ -521,9 +626,16 @@ export default function DeliverySignUp() {
                     value={formData.bankName}
                     onChange={handleInputChange}
                     placeholder="Bank name"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.bankName
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.bankName && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.bankName}</p>
+                  )}
                 </div>
 
                 <div>
@@ -536,9 +648,16 @@ export default function DeliverySignUp() {
                     value={formData.accountNumber}
                     onChange={handleInputChange}
                     placeholder="Account number"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.accountNumber
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.accountNumber && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.accountNumber}</p>
+                  )}
                 </div>
 
                 <div>
@@ -551,9 +670,16 @@ export default function DeliverySignUp() {
                     value={formData.ifscCode}
                     onChange={handleInputChange}
                     placeholder="IFSC code"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
+                      fieldErrors.ifscCode
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                        : "border-neutral-300 focus:border-purple-500 focus:ring-purple-200"
+                    }`}
                     disabled={loading}
                   />
+                  {fieldErrors.ifscCode && (
+                    <p className="text-xs text-red-500 mt-1">{fieldErrors.ifscCode}</p>
+                  )}
                 </div>
 
                 <div>

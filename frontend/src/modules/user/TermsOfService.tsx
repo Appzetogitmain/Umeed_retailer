@@ -62,10 +62,7 @@ export default function TermsOfService() {
         ) : policy ? (
           <div className="bg-white rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-neutral-200 p-6 sm:p-10">
             <div className="prose prose-neutral max-w-none">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-6 border-b border-neutral-100 gap-4">
-                <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
-                  {policy.title}
-                </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-end mb-8 pb-6 border-b border-neutral-100 gap-4">
                 <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-100">
                   <span className="text-xs text-neutral-500 block mb-0.5">Last Revised</span>
                   <span className="text-sm font-bold text-[#B95F15]">

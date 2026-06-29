@@ -353,11 +353,12 @@ const OrderSchema = new Schema<IOrder>(
 // Generate order number before validation
 OrderSchema.pre("validate", async function (this: IOrder, next) {
   if (!this.orderNumber) {
-    const timestamp = Date.now().toString();
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-    this.orderNumber = `ORD${timestamp}${random}`;
+    const date = new Date();
+    const yy = date.getFullYear().toString().slice(2);
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+    const dd = date.getDate().toString().padStart(2, '0');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+    this.orderNumber = `ORD${yy}${mm}${dd}${random}`;
   }
   next();
 });

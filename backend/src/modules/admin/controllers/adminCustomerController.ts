@@ -35,10 +35,33 @@ export const getAllCustomers = asyncHandler(
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
     const [customers, total] = await Promise.all([
-      Customer.find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit as string)),
+      Customer.aggregate([
+        { $match: query },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "_id",
+            foreignField: "customer",
+            as: "orders",
+          },
+        },
+        {
+          $addFields: {
+            totalOrders: { $size: "$orders" },
+            totalSpent: {
+              $reduce: {
+                input: "$orders",
+                initialValue: 0,
+                in: { $add: ["$$value", "$$this.total"] },
+              },
+            },
+          },
+        },
+        { $project: { orders: 0 } },
+        { $sort: sort },
+        { $skip: skip },
+        { $limit: parseInt(limit as string) },
+      ]),
       Customer.countDocuments(query),
     ]);
 

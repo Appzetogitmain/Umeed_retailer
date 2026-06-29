@@ -2,10 +2,42 @@ import { useNavigate } from 'react-router-dom';
 import DeliveryHeader from '../components/DeliveryHeader';
 import DeliveryBottomNav from '../components/DeliveryBottomNav';
 import { useAuth } from '../../../context/AuthContext';
+import { useState, useEffect } from 'react';
 
 export default function DeliveryMenu() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  useEffect(() => {
+    if (showLogoutModal) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.overflow = 'hidden';
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
+    }
+    return () => {
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY) * -1);
+      }
+    };
+  }, [showLogoutModal]);
 
   const menuItems = [
     { id: 'menu-1', title: 'Profile', route: '/delivery/profile' },
@@ -23,6 +55,15 @@ export default function DeliveryMenu() {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" fill="none" />
             <path d="M4 20c0-4 3.5-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+          </svg>
+        );
+
+      case 'menu-wallet': // Wallet
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         );
 
@@ -112,13 +153,17 @@ export default function DeliveryMenu() {
 
   const handleMenuClick = (route: string) => {
     if (route === '/delivery/login') {
-      // Properly logout using AuthContext to clear all auth state
-      logout();
-      navigate(route);
+      setShowLogoutModal(true);
     } else {
       // Navigate to the selected route
       navigate(route);
     }
+  };
+
+  const handleConfirmLogout = () => {
+    // Properly logout using AuthContext to clear all auth state
+    logout();
+    navigate('/delivery/login');
   };
 
   return (
@@ -184,6 +229,45 @@ export default function DeliveryMenu() {
           </div>
         )}
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onTouchMove={(e) => e.preventDefault()}
+          style={{ overscrollBehavior: 'contain' }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-600">
+                  <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M16 17L21 12L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Logout?</h3>
+              <p className="text-sm text-neutral-500 mb-6">
+                Are you sure you want to log out of your account?
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 bg-neutral-100 text-neutral-900 py-2.5 rounded-xl font-semibold hover:bg-neutral-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmLogout}
+                  className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  Yes, Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DeliveryBottomNav />
     </div>
   );

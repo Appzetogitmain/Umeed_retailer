@@ -47,7 +47,7 @@ export default function Cart() {
             </button>
           )}
         </div>
-        <p className="text-xs md:text-sm text-neutral-600">Delivered in {appConfig.estimatedDeliveryTime}</p>
+        <p className="text-xs md:text-sm text-neutral-600">Delivered in {cart.estimatedDeliveryTime || appConfig.estimatedDeliveryTime}</p>
       </div>
 
       {/* Cart Items */}

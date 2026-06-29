@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import speedooLogo from "@assets/Speedoo_logo.png";
 import videoSrc from "@assets/login/loginvideo.mp4";
@@ -18,8 +18,19 @@ export default function Login() {
   const [sessionId, setSessionId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (showOTP && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showOTP, resendTimer]);
 
   const handleContinue = async () => {
     if (mobileNumber.length !== 10 && mobileNumber.length !== 12) return;
@@ -33,6 +44,7 @@ export default function Login() {
         setSessionId(response.sessionId);
       }
       setShowOTP(true);
+      setResendTimer(30); // Start 30s timer
     } catch (err: any) {
       setError(
         err.response?.data?.message ||
@@ -185,9 +197,13 @@ export default function Login() {
               </button>
               <button
                 onClick={handleContinue}
-                disabled={loading}
-                className="flex-1 h-11 rounded-xl font-black text-[10px] bg-[#f57c00] text-white border-b-4 border-[#d66a00] hover:bg-[#ff8a00] transition-all shadow-2xl tracking-widest" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {loading ? "..." : "RESEND"}
+                disabled={loading || resendTimer > 0}
+                className={`flex-1 h-11 rounded-xl font-black text-[10px] text-white transition-all shadow-2xl tracking-widest ${
+                  resendTimer > 0 
+                    ? "bg-white/5 border-white/10 cursor-not-allowed text-white/50" 
+                    : "bg-[#f57c00] border-b-4 border-[#d66a00] hover:bg-[#ff8a00]"
+                }`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {loading ? "..." : resendTimer > 0 ? `RESEND IN ${resendTimer}S` : "RESEND"}
               </button>
             </div>
           </div>

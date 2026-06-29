@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { uploadImage } from "../../../services/api/uploadService";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   validateImageFile,
   createImagePreview,
@@ -203,29 +206,47 @@ export default function AdminBrand() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = (format: "csv" | "excel" | "pdf") => {
     const headers = ["ID", "Brand Name", "Image URL"];
-    const csvContent = [
-      headers.join(","),
-      ...brands.map((brand) =>
-        [brand._id.slice(-6), `"${brand.name}"`, `"${brand.image || ""}"`].join(
-          ","
-        )
-      ),
-    ].join("\\n");
+    const data = brands.map((brand) => [
+      brand._id.slice(-6),
+      brand.name,
+      brand.image || "",
+    ]);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `brands_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (format === "csv") {
+      const csvContent = [
+        headers.join(","),
+        ...data.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `brands_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (format === "excel") {
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Brands");
+      XLSX.writeFile(
+        workbook,
+        `brands_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } else if (format === "pdf") {
+      const doc = new jsPDF();
+      (doc as any).autoTable({
+        head: [headers],
+        body: data,
+      });
+      doc.save(`brands_${new Date().toISOString().split("T")[0]}.pdf`);
+    }
   };
 
   return (
@@ -371,7 +392,7 @@ export default function AdminBrand() {
 
           {/* Controls */}
           <div className="p-4 sm:p-6 border-b border-neutral-200">
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
               {/* Entries Per Page */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-neutral-700">Show</span>
@@ -391,35 +412,53 @@ export default function AdminBrand() {
               </div>
 
               {/* Export Button */}
-              <button
-                onClick={handleExport}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
+              <div className="relative group z-10">
+                <button
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Export
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-neutral-200 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                  <button
+                    onClick={() => handleExport("csv")}
+                    className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
+                    CSV
+                  </button>
+                  <button
+                    onClick={() => handleExport("excel")}
+                    className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
+                    Excel
+                  </button>
+                  <button
+                    onClick={() => handleExport("pdf")}
+                    className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
+                    PDF
+                  </button>
+                </div>
+              </div>
 
               {/* Search */}
               <div className="flex items-center gap-2">

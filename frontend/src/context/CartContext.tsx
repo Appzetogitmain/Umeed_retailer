@@ -61,10 +61,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { location } = useLocation();
   const { showToast } = useToast();
 
-  // State for estimate delivery fee
   const [estimatedFee, setEstimatedFee] = useState<number | undefined>(undefined);
   const [platformFee, setPlatformFee] = useState<number | undefined>(undefined);
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number | undefined>(undefined);
+  const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState<string | undefined>(undefined);
 
   // Helper to map API cart items to internal CartItem structure
   const mapApiItemsToState = (apiItems: any[]): ExtendedCartItem[] => {
@@ -112,11 +112,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setEstimatedFee(response.data.estimatedDeliveryFee);
         setPlatformFee(response.data.platformFee);
         setFreeDeliveryThreshold(response.data.freeDeliveryThreshold);
+        setEstimatedDeliveryTime(response.data.estimatedDeliveryTime);
       } else {
         setItems([]);
         setEstimatedFee(undefined);
         setPlatformFee(undefined);
         setFreeDeliveryThreshold(undefined);
+        setEstimatedDeliveryTime(undefined);
       }
     } catch (error) {
       console.error("Failed to fetch cart:", error);
@@ -154,9 +156,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       itemCount,
       estimatedDeliveryFee: estimatedFee,
       platformFee,
-      freeDeliveryThreshold
+      freeDeliveryThreshold,
+      estimatedDeliveryTime
     };
-  }, [items, estimatedFee, platformFee, freeDeliveryThreshold]);
+  }, [items, estimatedFee, platformFee, freeDeliveryThreshold, estimatedDeliveryTime]);
 
   const addToCart = async (product: Product, sourceElement?: HTMLElement | null) => {
     if (!isAuthenticated || user?.userType !== 'Customer') {
@@ -267,6 +270,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           setEstimatedFee(response.data.estimatedDeliveryFee);
           setPlatformFee(response.data.platformFee);
           setFreeDeliveryThreshold(response.data.freeDeliveryThreshold);
+          setEstimatedDeliveryTime(response.data.estimatedDeliveryTime);
         }
       } catch (error: any) {
         console.error("Add to cart failed", error);
@@ -333,6 +337,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           setEstimatedFee(response.data.estimatedDeliveryFee);
           setPlatformFee(response.data.platformFee);
           setFreeDeliveryThreshold(response.data.freeDeliveryThreshold);
+          setEstimatedDeliveryTime(response.data.estimatedDeliveryTime);
         }
       } catch (error) {
         console.error("Remove from cart failed", error);
@@ -425,6 +430,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           setEstimatedFee(response.data.estimatedDeliveryFee);
           setPlatformFee(response.data.platformFee);
           setFreeDeliveryThreshold(response.data.freeDeliveryThreshold);
+          setEstimatedDeliveryTime(response.data.estimatedDeliveryTime);
         }
       } catch (error) {
         console.error("Update quantity failed", error);

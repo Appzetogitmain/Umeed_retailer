@@ -14,6 +14,7 @@ import {
   getSellerLocationsForOrder,
   refreshDeliveryOtp,
 } from "../../services/api/customerOrderService";
+import ReviewModal from "./components/ReviewModal";
 
 // Icon Components
 const ArrowLeftIcon = ({ className }: { className?: string }) => (
@@ -495,6 +496,7 @@ export default function OrderDetail() {
   // Form states
   const [specialRequests, setSpecialRequests] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
+  const [reviewProduct, setReviewProduct] = useState<{ id: string; name: string } | null>(null);
   const [selectedTip, setSelectedTip] = useState<number | "other" | null>(null);
   const [customTip, setCustomTip] = useState("");
 
@@ -1238,14 +1240,30 @@ export default function OrderDetail() {
                   {order.items?.map((item: any, index: number) => (
                     <div
                       key={index}
-                      className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="w-4 h-4 rounded border border-[#7A3E8E] flex items-center justify-center">
-                        <span className="w-2 h-2 rounded-full bg-[#7A3E8E]" />
-                      </span>
-                      <span>
-                        {item.quantity} x{" "}
-                        {item.product?.name || item.productName || "Product"}
-                      </span>
+                      className="flex items-center justify-between text-sm text-gray-600 w-full mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded border border-[#7A3E8E] flex items-center justify-center">
+                          <span className="w-2 h-2 rounded-full bg-[#7A3E8E]" />
+                        </span>
+                        <span>
+                          {item.quantity} x{" "}
+                          {item.product?.name || item.productName || "Product"}
+                        </span>
+                      </div>
+                      {orderStatus === "Delivered" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReviewProduct({
+                              id: item.product?._id || item.product,
+                              name: item.product?.name || item.productName || "Product",
+                            });
+                          }}
+                          className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full hover:bg-purple-100 transition-colors uppercase tracking-wide border border-purple-100 shrink-0"
+                        >
+                          Rate & Review
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1425,6 +1443,20 @@ export default function OrderDetail() {
                         {item.total?.toFixed(0) ||
                           (item.unitPrice * item.quantity).toFixed(0)}
                       </p>
+                      {orderStatus === "Delivered" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReviewProduct({
+                              id: item.product?._id || item.product,
+                              name: item.product?.name || item.productName || "Product",
+                            });
+                          }}
+                          className="mt-2 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full hover:bg-purple-100 transition-colors"
+                        >
+                          Write a Review
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1488,6 +1520,17 @@ export default function OrderDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Review Modal */}
+      {reviewProduct && id && (
+        <ReviewModal
+          productId={reviewProduct.id}
+          orderId={id}
+          productName={reviewProduct.name}
+          onClose={() => setReviewProduct(null)}
+          onSuccess={() => setReviewProduct(null)}
+        />
+      )}
     </div>
   );
 }

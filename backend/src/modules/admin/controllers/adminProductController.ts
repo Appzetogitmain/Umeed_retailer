@@ -588,9 +588,6 @@ export const createSubCategory = asyncHandler(
   }
 );
 
-/**
- * Get all subcategories
- */
 export const getSubCategories = asyncHandler(
   async (req: Request, res: Response) => {
     const { category, search, sortBy = "order", sortOrder = "asc" } = req.query;
@@ -603,22 +600,51 @@ export const getSubCategories = asyncHandler(
       query.name = { $regex: search as string, $options: "i" };
     }
 
-    const sort: any = {};
-    sort[sortBy as string] = sortOrder === "desc" ? -1 : 1;
+    const sortDir = sortOrder === "desc" ? -1 : 1;
+    const sortParams: any = { [sortBy as string]: sortDir };
 
-    const subcategories = await SubCategory.find(query)
+    // 1. Fetch from old SubCategory model
+    const oldSubcategories = await SubCategory.find(query)
       .populate("category", "name")
-      .sort(sort);
+      .sort(sortParams);
+
+    // 2. Fetch from new Category model (where parentId != null)
+    const categoryQuery: any = { parentId: { $ne: null } };
+    if (category) categoryQuery.parentId = category;
+    if (search) categoryQuery.name = { $regex: search as string, $options: "i" };
+
+    const newSubcategories = await Category.find(categoryQuery)
+      .populate("parentId", "name")
+      .sort(sortParams);
+
+    // Merge them and map parentId to category for frontend compatibility
+    const allSubcategories = [
+      ...oldSubcategories.map(sub => sub.toObject()),
+      ...newSubcategories.map(cat => ({
+        ...cat.toObject(),
+        category: cat.parentId,
+      }))
+    ];
+
+    // Sort combined array
+    allSubcategories.sort((a: any, b: any) => {
+      const field = sortBy as string;
+      const valA = a[field];
+      const valB = b[field];
+      if (valA < valB) return sortDir === 1 ? -1 : 1;
+      if (valA > valB) return sortDir === 1 ? 1 : -1;
+      return 0;
+    });
 
     // Get product counts for each subcategory
     const subcategoriesWithCounts = await Promise.all(
-      subcategories.map(async (subcategory) => {
+      allSubcategories.map(async (subcategory: any) => {
         const productCount = await Product.countDocuments({
           subcategory: subcategory._id,
         });
 
         return {
-          ...subcategory.toObject(),
+          ...subcategory,
           totalProduct: productCount,
         };
       })
@@ -632,18 +658,33 @@ export const getSubCategories = asyncHandler(
   }
 );
 
-/**
- * Update subcategory
- */
 export const updateSubCategory = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const subcategory = await SubCategory.findByIdAndUpdate(id, updateData, {
+    // Try SubCategory model first
+    let subcategory: any = await SubCategory.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     }).populate("category", "name");
+
+    // If not found, try Category model
+    if (!subcategory) {
+      const categoryUpdateData: any = { ...updateData };
+      if (updateData.category) {
+        categoryUpdateData.parentId = updateData.category;
+        delete categoryUpdateData.category;
+      }
+      const cat = await Category.findByIdAndUpdate(id, categoryUpdateData, {
+        new: true,
+        runValidators: true,
+      }).populate("parentId", "name");
+      
+      if (cat) {
+        subcategory = { ...cat.toObject(), category: cat.parentId };
+      }
+    }
 
     if (!subcategory) {
       return res.status(404).json({
@@ -660,9 +701,6 @@ export const updateSubCategory = asyncHandler(
   }
 );
 
-/**
- * Delete subcategory
- */
 export const deleteSubCategory = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -676,19 +714,27 @@ export const deleteSubCategory = asyncHandler(
       });
     }
 
-    const subcategory = await SubCategory.findByIdAndDelete(id);
+    let deletedSubcategory: any = await SubCategory.findByIdAndDelete(id);
+    let parentCategoryId = deletedSubcategory?.category;
 
-    if (!subcategory) {
+    if (!deletedSubcategory) {
+      deletedSubcategory = await Category.findByIdAndDelete(id);
+      parentCategoryId = deletedSubcategory?.parentId;
+    }
+
+    if (!deletedSubcategory) {
       return res.status(404).json({
         success: false,
         message: "Subcategory not found",
       });
     }
 
-    // Update category subcategory count
-    await Category.findByIdAndUpdate(subcategory.category, {
-      $inc: { totalSubcategories: -1 },
-    });
+    // Update parent category subcategory count
+    if (parentCategoryId) {
+      await Category.findByIdAndUpdate(parentCategoryId, {
+        $inc: { totalSubcategories: -1 },
+      });
+    }
 
     return res.status(200).json({
       success: true,

@@ -1145,7 +1145,7 @@ export default function Checkout() {
               </svg>
             </div>
             <span className="text-xs font-semibold text-neutral-900">
-              Delivery in {appConfig.estimatedDeliveryTime}
+              Delivery in {cart.estimatedDeliveryTime || appConfig.estimatedDeliveryTime}
             </span>
           </div>
 

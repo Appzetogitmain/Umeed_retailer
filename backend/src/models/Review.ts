@@ -88,6 +88,50 @@ ReviewSchema.index({ product: 1, status: 1 });
 ReviewSchema.index({ customer: 1 });
 ReviewSchema.index({ order: 1 });
 
-const Review = mongoose.model<IReview>("Review", ReviewSchema);
+// Static method to get avg rating and update product
+ReviewSchema.statics.calcAverageRatings = async function (productId: mongoose.Types.ObjectId) {
+  const stats = await this.aggregate([
+    {
+      $match: { product: productId }
+    },
+    {
+      $group: {
+        _id: '$product',
+        nRating: { $sum: 1 },
+        avgRating: { $avg: '$rating' }
+      }
+    }
+  ]);
+
+  if (stats.length > 0) {
+    await mongoose.model('Product').findByIdAndUpdate(productId, {
+      reviewsCount: stats[0].nRating,
+      rating: Math.round(stats[0].avgRating * 10) / 10
+    });
+  } else {
+    await mongoose.model('Product').findByIdAndUpdate(productId, {
+      reviewsCount: 0,
+      rating: 0
+    });
+  }
+};
+
+// Call calcAverageRatings after save
+ReviewSchema.post('save', function () {
+  (this.constructor as any).calcAverageRatings(this.product);
+});
+
+// Call calcAverageRatings after update/delete
+ReviewSchema.post(/^findOneAnd/, async function (doc) {
+  if (doc) {
+    await (doc.constructor as any).calcAverageRatings(doc.product);
+  }
+});
+
+interface IReviewModel extends mongoose.Model<IReview> {
+  calcAverageRatings(productId: mongoose.Types.ObjectId): Promise<void>;
+}
+
+const Review = mongoose.model<IReview, IReviewModel>("Review", ReviewSchema);
 
 export default Review;

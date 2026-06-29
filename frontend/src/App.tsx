@@ -17,6 +17,7 @@ import PublicRoute from "./components/PublicRoute";
 import LoadingSpinner from "./components/LoadingSpinner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteTransition from "./components/RouteTransition";
+import ScrollToTop from "./components/ScrollToTop";
 
 // Critical routes - load immediately (Home, Cart, Checkout)
 import Home from "./modules/user/Home";
@@ -284,6 +285,7 @@ const SellerPrivacyPolicy = lazy(
 const SellerTermsAndConditions = lazy(
   () => import("./modules/seller/pages/SellerTermsAndConditions"),
 );
+const AdminReviews = lazy(() => import("./modules/admin/pages/AdminReviews"));
 
 import { initializePushNotifications, setupForegroundNotificationHandler, registerFCMToken } from "./services/pushNotificationService";
 
@@ -319,6 +321,7 @@ function AppContent() {
                         v7_startTransition: true,
                         v7_relativeSplatPath: true,
                       }}>
+                      <ScrollToTop />
                       <RouteLoaderTrigger />
                       <Routes>
                         {/* ... (rest of the routes) */}
@@ -625,6 +628,14 @@ function AppContent() {
                                       element={<AdminBrand />}
                                     />
                                     <Route
+                                      path="product/add"
+                                      element={<SellerAddProduct />}
+                                    />
+                                    <Route
+                                      path="product/edit/:id"
+                                      element={<SellerAddProduct />}
+                                    />
+                                    <Route
                                       path="product/taxes"
                                       element={<AdminTaxes />}
                                     />
@@ -783,6 +794,10 @@ function AppContent() {
                                     <Route
                                       path="orders/:id"
                                       element={<AdminOrderDetail />}
+                                    />
+                                    <Route
+                                      path="reviews"
+                                      element={<AdminReviews />}
                                     />
                                   </Routes>
                                 </AdminLayout>

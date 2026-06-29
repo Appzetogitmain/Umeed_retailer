@@ -12,7 +12,7 @@ import Banner from "../../../models/Banner";
 import FAQ from "../../../models/FAQ";
 import mongoose from "mongoose";
 import { cache } from "../../../utils/cache";
-import { findSellersWithinRange } from "../../../utils/locationHelper";
+import { findSellersWithinRange, getNearestSellerInfo } from "../../../utils/locationHelper";
 
 // Helper function to fetch data for a home section based on its configuration
 async function fetchSectionData(
@@ -208,8 +208,14 @@ export const getHomeContent = async (req: Request, res: Response) => {
     const userLng = longitude ? parseFloat(longitude as string) : null;
 
     let nearbySellerIds: mongoose.Types.ObjectId[] = [];
+    let estimatedDeliveryTime = "12-15 mins"; // default
+    
     if (userLat !== null && userLng !== null) {
       nearbySellerIds = await findSellersWithinRange(userLat, userLng);
+      const nearestSellerInfo = await getNearestSellerInfo(userLat, userLng);
+      if (nearestSellerInfo.estimatedDeliveryTime) {
+         estimatedDeliveryTime = nearestSellerInfo.estimatedDeliveryTime;
+      }
     } else {
       // If no location provided, return empty sellers list to enforce filtering
       nearbySellerIds = [];
@@ -701,6 +707,7 @@ export const getHomeContent = async (req: Request, res: Response) => {
         cookingIdeas,
         promoCards: finalPromoCards, // Return dynamic or fallback cards
         promoStrip: promoStrip || null, // PromoStrip data for the current header category
+        estimatedDeliveryTime,
       },
     });
   } catch (error: any) {
@@ -736,9 +743,12 @@ export const checkServiceArea = async (req: Request, res: Response) => {
     }
 
     const nearbySellerIds = await findSellersWithinRange(userLat, userLng);
+    const nearestSellerInfo = await getNearestSellerInfo(userLat, userLng);
+    
     return res.status(200).json({
       success: true,
       hasSellersInRange: nearbySellerIds.length > 0,
+      estimatedDeliveryTime: nearestSellerInfo.estimatedDeliveryTime || "12-15 mins"
     });
   } catch (error: any) {
     return res.status(500).json({

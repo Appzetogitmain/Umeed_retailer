@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import Review from '../../../models/Review';
 import Order from '../../../models/Order';
+import mongoose from 'mongoose';
 
 // Get reviews for a product (Public)
 export const getProductReviews = async (req: Request, res: Response) => {
@@ -19,22 +20,17 @@ export const getProductReviews = async (req: Request, res: Response) => {
 
         const total = await Review.countDocuments({ product: productId, status: 'Approved' });
 
-        // Calculate average rating
-        const stats = await Review.aggregate([
-            { $match: { product: productId as any, status: 'Approved' } },
-            { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
-        ]);
-
-        const avgRating = stats.length > 0 ? stats[0].avgRating : 0;
-        const totalReviews = stats.length > 0 ? stats[0].count : 0;
+        // We can optionally fetch the Product's overall rating if needed, but usually frontend has it.
+        // For backwards compatibility with the route's response format:
+        const product = await mongoose.model('Product').findById(productId).select('rating reviewsCount');
 
         return res.status(200).json({
             success: true,
             data: {
                 reviews,
                 stats: {
-                    avgRating: Math.round(avgRating * 10) / 10,
-                    totalReviews
+                    avgRating: product?.rating || 0,
+                    totalReviews: product?.reviewsCount || 0
                 },
                 pagination: {
                     total,
@@ -62,14 +58,24 @@ export const addReview = async (req: Request, res: Response) => {
         const order = await Order.findOne({
             _id: orderId,
             customer: userId,
-            'items.product': productId,
             status: 'Delivered'
-        });
+        }).populate('items');
 
         if (!order) {
             return res.status(400).json({
                 success: false,
                 message: 'You can only review products from delivered orders.'
+            });
+        }
+
+        const hasProduct = order.items.some((item: any) => 
+            item.product && item.product.toString() === productId
+        );
+
+        if (!hasProduct) {
+            return res.status(400).json({
+                success: false,
+                message: 'Product not found in this order.'
             });
         }
 
@@ -87,6 +93,9 @@ export const addReview = async (req: Request, res: Response) => {
             });
         }
 
+        // Auto approve if no comment/title, else pending moderation
+        const initialStatus = (!comment && !title) ? 'Approved' : 'Pending';
+
         const review = await Review.create({
             customer: userId,
             product: productId,
@@ -95,13 +104,13 @@ export const addReview = async (req: Request, res: Response) => {
             comment,
             title,
             images,
-            status: 'Pending', // pending moderation
+            status: initialStatus,
             isVerifiedPurchase: true
         });
 
         return res.status(201).json({
             success: true,
-            message: 'Review submitted successfully available after moderation',
+            message: initialStatus === 'Approved' ? 'Review submitted successfully' : 'Review submitted successfully, available after moderation',
             data: review
         });
 

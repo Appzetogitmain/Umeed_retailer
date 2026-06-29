@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getAllSellers, updateSellerStatus, deleteSeller, Seller as SellerType, updateSeller } from '../../../services/api/sellerService';
 import SellerServiceMap from '../components/SellerServiceMap';
 
@@ -100,8 +101,9 @@ export default function AdminManageSellerList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortColumn, setSortColumn] = useState<string | null>(null);
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [sortColumn, setSortColumn] = useState<string | null>('id');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+    const [isExportOpen, setIsExportOpen] = useState(false);
     const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSeller, setEditingSeller] = useState<Seller | null>(null);
@@ -139,6 +141,33 @@ export default function AdminManageSellerList() {
 
         fetchSellers();
     }, []);
+
+    // Prevent body scrolling when modals are open
+    useEffect(() => {
+        if (isEditModalOpen || isModalOpen) {
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            const mainElements = document.getElementsByTagName('main');
+            Array.from(mainElements).forEach(el => {
+                el.style.overflow = 'hidden';
+            });
+        } else {
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+            const mainElements = document.getElementsByTagName('main');
+            Array.from(mainElements).forEach(el => {
+                el.style.overflow = '';
+            });
+        }
+        return () => {
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+            const mainElements = document.getElementsByTagName('main');
+            Array.from(mainElements).forEach(el => {
+                el.style.overflow = '';
+            });
+        };
+    }, [isEditModalOpen, isModalOpen]);
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -210,7 +239,19 @@ export default function AdminManageSellerList() {
     const endIndex = startIndex + rowsPerPage;
     const displayedSellers = filteredSellers.slice(startIndex, endIndex);
 
-    const handleExport = () => {
+    const downloadFile = (content: string, fileName: string, mimeType: string) => {
+        const blob = new Blob([content], { type: mimeType });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportCSV = () => {
         const headers = ['Id', 'Name', 'Store Name', 'Contact', 'Balance', 'Commission', 'Status'];
         const csvContent = [
             headers.join(','),
@@ -224,15 +265,20 @@ export default function AdminManageSellerList() {
                 seller.status
             ].join(','))
         ].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `sellers_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        downloadFile(csvContent, `sellers_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+        setIsExportOpen(false);
+    };
+
+    const handleExportJSON = () => {
+        const jsonContent = JSON.stringify(filteredSellers, null, 2);
+        downloadFile(jsonContent, `sellers_${new Date().toISOString().split('T')[0]}.json`, 'application/json;');
+        setIsExportOpen(false);
+    };
+
+    const handleExportTXT = () => {
+        const txtContent = filteredSellers.map(s => `ID: ${s.id} | Name: ${s.name} | Store: ${s.storeName} | Contact: ${s.phone} | Status: ${s.status}`).join('\n');
+        downloadFile(txtContent, `sellers_${new Date().toISOString().split('T')[0]}.txt`, 'text/plain;charset=utf-8;');
+        setIsExportOpen(false);
     };
 
     const handleEdit = (id: number | string) => {
@@ -424,26 +470,49 @@ export default function AdminManageSellerList() {
                             </select>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleExport}
-                                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
-                            >
-                                Export
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </button>
                             <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">Search:</span>
+                                <button
+                                    onClick={() => setIsExportOpen(!isExportOpen)}
+                                    className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
+                                >
+                                    Export
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                {isExportOpen && (
+                                    <div className="absolute right-0 mt-1 w-36 bg-white border border-neutral-200 rounded-md shadow-lg z-20 py-1 text-sm">
+                                        <button
+                                            onClick={handleExportCSV}
+                                            className="w-full text-left px-4 py-2 hover:bg-neutral-100 text-neutral-700 font-medium transition-colors"
+                                        >
+                                            Export CSV
+                                        </button>
+                                        <button
+                                            onClick={handleExportJSON}
+                                            className="w-full text-left px-4 py-2 hover:bg-neutral-100 text-neutral-700 font-medium transition-colors"
+                                        >
+                                            Export JSON
+                                        </button>
+                                        <button
+                                            onClick={handleExportTXT}
+                                            className="w-full text-left px-4 py-2 hover:bg-neutral-100 text-neutral-700 font-medium transition-colors"
+                                        >
+                                            Export Text
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="relative">
                                 <input
                                     type="text"
-                                    className="pl-14 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-teal-500 w-48"
+                                    className="px-3 py-1.5 bg-neutral-100 border border-neutral-200 rounded text-sm focus:ring-1 focus:ring-teal-500 focus:outline-none w-48 placeholder:text-neutral-400"
                                     value={searchTerm}
                                     onChange={(e) => {
                                         setSearchTerm(e.target.value);
                                         setCurrentPage(1);
                                     }}
-                                    placeholder=""
+                                    placeholder="Search..."
                                 />
                             </div>
                         </div>
@@ -691,8 +760,8 @@ export default function AdminManageSellerList() {
             </footer>
 
             {/* Categories Modal */}
-            {isModalOpen && selectedSeller && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleCloseModal}>
+            {isModalOpen && selectedSeller && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md" onClick={handleCloseModal}>
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Modal Header */}
                         <div className="bg-teal-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
@@ -746,12 +815,13 @@ export default function AdminManageSellerList() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Edit Seller Modal */}
-            {isEditModalOpen && editingSeller && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleCloseEditModal}>
+            {isEditModalOpen && editingSeller && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md" onClick={handleCloseEditModal}>
                     <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Modal Header */}
                         <div className="bg-teal-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
@@ -854,17 +924,19 @@ export default function AdminManageSellerList() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="md:col-span-2">
                                             <label className="text-xs text-neutral-500">Address</label>
-                                            <p className="text-sm font-medium text-neutral-900">{editingSeller.address || 'N/A'}</p>
+                                            <p className="text-sm font-medium text-neutral-900">
+                                                {editingSeller.address && !/^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(editingSeller.address.trim())
+                                                    ? editingSeller.address
+                                                    : 'N/A'}
+                                            </p>
                                         </div>
                                         <div>
                                             <label className="text-xs text-neutral-500">City</label>
                                             <p className="text-sm font-medium text-neutral-900">{editingSeller.city || 'N/A'}</p>
                                         </div>
-                                        <div>
-                                            <label className="text-xs text-neutral-500">Serviceable Area</label>
-                                            <p className="text-sm font-medium text-neutral-900">{editingSeller.serviceableArea || 'N/A'}</p>
-                                        </div>
-                                        {editingSeller.searchLocation && (
+                                        {editingSeller.searchLocation && 
+                                         !/^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(editingSeller.searchLocation.trim()) && 
+                                         editingSeller.searchLocation !== editingSeller.address && (
                                             <div className="md:col-span-2">
                                                 <label className="text-xs text-neutral-500">Location</label>
                                                 <p className="text-sm font-medium text-neutral-900">{editingSeller.searchLocation}</p>
@@ -1055,7 +1127,8 @@ export default function AdminManageSellerList() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

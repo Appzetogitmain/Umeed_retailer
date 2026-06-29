@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   getCategories,
   createCategory,
@@ -419,11 +420,17 @@ export default function AdminCategory() {
       {/* Header Section */}
       <div className="bg-white border-b border-neutral-200 px-3 sm:px-4 md:px-6 py-3 sm:py-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">
+          
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.history.back()} className="p-1 sm:p-2 text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors" aria-label="Go back">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+            </button>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">
             Manage Categories
           </h1>
+          </div>
           <div className="flex items-center gap-2 text-xs sm:text-sm">
-            <span className="text-neutral-500">Dashboard</span>
+            <Link to="/admin" className="text-blue-600 hover:text-blue-700 transition-colors">Dashboard</Link>
             <span className="text-neutral-400">/</span>
             <span className="text-neutral-700">Categories</span>
           </div>

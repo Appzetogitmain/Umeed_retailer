@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Delivery from "../../../models/Delivery";
+import Order from "../../../models/Order";
 import {
   sendSmsOtp as sendSmsOtpService,
   verifySmsOtp as verifySmsOtpService,
@@ -245,7 +246,7 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     return res.status(401).json({ success: false, message: "User not authenticated" });
   }
 
-  const delivery = await Delivery.findById(userId).select("-password");
+  const delivery = await Delivery.findById(userId).select("-password").lean();
 
   if (!delivery) {
     return res.status(404).json({
@@ -254,8 +255,17 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
+  // Count total delivered orders for this delivery partner
+  const totalDeliveredCount = await Order.countDocuments({
+    deliveryBoy: userId,
+    status: "Delivered"
+  });
+
   return res.status(200).json({
     success: true,
-    data: delivery,
+    data: {
+      ...delivery,
+      totalDeliveredCount
+    },
   });
 });

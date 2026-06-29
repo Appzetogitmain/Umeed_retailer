@@ -92,3 +92,86 @@ export async function findSellersWithinRange(
     return [];
   }
 }
+
+/**
+ * Calculate estimated delivery time based on distance.
+ * @param distanceKm Distance in kilometers
+ * @returns Formatted time range string (e.g., "15-20 mins")
+ */
+export function calculateEstimatedDeliveryTime(distanceKm: number): string {
+  const basePrepTime = 5; // 5 mins prep
+  const timePerKm = 4; // 4 mins per km
+  
+  let totalTime = basePrepTime + Math.ceil(distanceKm * timePerKm);
+  if (totalTime > 35) totalTime = 35; // Cap at 35 mins
+  
+  const minTime = Math.max(10, totalTime - 5);
+  const maxTime = Math.max(15, totalTime);
+  
+  return `${minTime}-${maxTime} mins`;
+}
+
+/**
+ * Find the nearest seller and their estimated delivery time.
+ * @param userLat User's latitude
+ * @param userLng User's longitude
+ * @returns Object with nearestSellerId, distance, and estimatedDeliveryTime
+ */
+export async function getNearestSellerInfo(
+  userLat: number,
+  userLng: number
+): Promise<{ nearestSellerId: string | null; distance: number | null; estimatedDeliveryTime: string }> {
+  const defaultETA = "12-15 mins";
+  
+  if (userLat === null || userLng === null || isNaN(userLat) || isNaN(userLng)) {
+    return { nearestSellerId: null, distance: null, estimatedDeliveryTime: defaultETA };
+  }
+
+  if (userLat < -90 || userLat > 90 || userLng < -180 || userLng > 180) {
+    return { nearestSellerId: null, distance: null, estimatedDeliveryTime: defaultETA };
+  }
+
+  try {
+    const sellers = await Seller.find({ status: "Approved" })
+      .select("_id location serviceRadiusKm latitude longitude");
+
+    let minDistance = Infinity;
+    let nearestSellerId: string | null = null;
+
+    for (const seller of sellers) {
+      let sellerLat: number | null = null;
+      let sellerLng: number | null = null;
+
+      if (seller.location && seller.location.coordinates && seller.location.coordinates.length === 2) {
+        sellerLng = seller.location.coordinates[0];
+        sellerLat = seller.location.coordinates[1];
+      } else if (seller.latitude && seller.longitude) {
+         sellerLat = parseFloat(seller.latitude);
+         sellerLng = parseFloat(seller.longitude);
+      }
+
+      if (sellerLat !== null && sellerLng !== null && !isNaN(sellerLat) && !isNaN(sellerLng)) {
+        const distance = calculateDistance(userLat, userLng, sellerLat, sellerLng);
+        const serviceRadius = seller.serviceRadiusKm || 10;
+
+        if (distance <= serviceRadius && distance < minDistance) {
+          minDistance = distance;
+          nearestSellerId = seller._id.toString();
+        }
+      }
+    }
+
+    if (nearestSellerId && minDistance !== Infinity) {
+      return {
+        nearestSellerId,
+        distance: minDistance,
+        estimatedDeliveryTime: calculateEstimatedDeliveryTime(minDistance)
+      };
+    }
+
+    return { nearestSellerId: null, distance: null, estimatedDeliveryTime: defaultETA };
+  } catch (error) {
+    console.error("Error finding nearest seller info:", error);
+    return { nearestSellerId: null, distance: null, estimatedDeliveryTime: defaultETA };
+  }
+}
