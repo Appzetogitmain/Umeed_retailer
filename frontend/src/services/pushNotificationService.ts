@@ -76,7 +76,11 @@ export async function getFCMToken() {
             });
 
             if (token) {
-                console.log('✅ FCM Token obtained:', token);
+                // FCM tokens are sensitive (can be used to push notifications to this
+                // device) — only log them in development.
+                if (import.meta.env.DEV) {
+                    console.log('✅ FCM Token obtained:', token);
+                }
                 return token;
             } else {
                 console.log('❌ No FCM token available');

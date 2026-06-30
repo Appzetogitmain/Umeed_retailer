@@ -6,7 +6,7 @@ import Banner from "../../../models/Banner";
  * Get all banners (Admin)
  */
 export const getAllBanners = asyncHandler(async (_req: Request, res: Response) => {
-  const banners = await Banner.find().sort({ order: 1 });
+  const banners = await Banner.find().sort({ order: 1 }).limit(500);
   res.status(200).json({
     success: true,
     data: banners,

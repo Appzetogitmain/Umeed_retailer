@@ -63,7 +63,7 @@ const calculateCartTotal = async (cartId: any, nearbySellerIds: mongoose.Types.O
 };
 
 // Helper to calculate delivery fee
-const calculateDeliveryStuff = async (total: number, items: any[], userLat: number | null, userLng: number | null) => {
+export const calculateDeliveryStuff = async (total: number, items: any[], userLat: number | null, userLng: number | null) => {
     let estimatedDeliveryFee = 0;
     let platformFee = 0;
     let freeDeliveryThreshold = 0;

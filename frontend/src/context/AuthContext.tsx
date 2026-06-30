@@ -10,6 +10,7 @@ import {
   removeAuthToken,
   setAuthToken,
 } from "../services/api/config";
+import { disconnectGlobalSocket } from "../hooks/useSocketManager";
 
 interface User {
   id: string;
@@ -99,6 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsAuthenticated(false);
     removeAuthToken();
+    // Force-disconnect the shared socket so a logged-out user's connection
+    // (and any rooms it joined) doesn't linger and receive events meant for
+    // whoever logs in next on this device.
+    disconnectGlobalSocket();
   };
 
   const updateUser = (userData: User) => {

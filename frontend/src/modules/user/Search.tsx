@@ -25,6 +25,8 @@ export default function Search() {
 
   // Fetch products based on search query
   useEffect(() => {
+    let cancelled = false;
+
     const fetchProducts = async () => {
       if (!sanitizedQuery) {
         setSearchResults([]);
@@ -40,16 +42,27 @@ export default function Search() {
           params.longitude = location.longitude;
         }
         const response = await getProducts(params);
-        setSearchResults(response.data as unknown as Product[]);
+        // Ignore this response if the query changed again before it resolved
+        // (prevents a slower earlier request from overwriting newer results).
+        if (!cancelled) {
+          setSearchResults(response.data as unknown as Product[]);
+        }
       } catch (error) {
         console.error('Error searching products:', error);
-        setSearchResults([]);
+        if (!cancelled) {
+          setSearchResults([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchProducts();
+    return () => {
+      cancelled = true;
+    };
   }, [sanitizedQuery, location]);
 
   // Fetch trending/home content for initial view

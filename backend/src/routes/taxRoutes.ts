@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { getActiveTaxes, getAllTaxes, createTax, updateTaxStatus } from '../modules/seller/controllers/taxController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireUserType } from '../middleware/auth';
 
 const router = Router();
 
-// Publicly available within the app for calculation if needed, 
-// but usually requires auth
+// Mounted at /seller/taxes — seller-only tax management (admin has its own
+// separate, admin-gated tax endpoints under /admin).
 router.use(authenticate);
+router.use(requireUserType('Seller'));
 
 // Get active taxes for selection
 router.get('/active', getActiveTaxes);

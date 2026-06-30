@@ -15,22 +15,14 @@ import { notFound } from "./middleware/notFound";
 import { ensureDefaultAdmin } from "./utils/ensureDefaultAdmin";
 import { seedHeaderCategories } from "./utils/seedHeaderCategories";
 import { initializeSocket } from "./socket/socketService";
+import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from "./config/corsOrigins";
 
 const app: Application = express();
 const httpServer = createServer(app);
 
-// Simple CORS configuration - Standard and reliable
-const allowedOrigins = [
-  "https://www.kosil.com",
-  "https://kosil.com",
-  "https://kosil-frontend.onrender.com",
-  "https://kosil.biz",
-  "https://kosil.biz/",
-  // Add more origins from environment variable if needed
-  ...(process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(",").map((url: string) => url.trim())
-    : []),
-];
+// Allow-list shared with socketService.ts via config/corsOrigins.ts so HTTP
+// and WebSocket CORS policy can't drift apart.
+const allowedOrigins = PRODUCTION_ALLOWED_ORIGINS;
 
 const corsOptions = {
   origin: (
@@ -44,10 +36,7 @@ const corsOptions = {
 
     // In development, allow localhost
     if (process.env.NODE_ENV !== "production") {
-      if (
-        origin.startsWith("http://localhost:") ||
-        origin.startsWith("http://127.0.0.1:")
-      ) {
+      if (isLocalhostOrigin(origin)) {
         return callback(null, true);
       }
     }
@@ -70,6 +59,10 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // Log rejected origins so CORS misconfiguration is visible in server logs
+    // instead of only surfacing as a silent browser-side block.
+    console.warn(`⚠️ CORS rejected origin: ${origin}`);
+
     // Reject if not allowed - return false instead of error for better handling
     return callback(null, false);
   },
@@ -89,7 +82,17 @@ const corsOptions = {
 // Apply CORS middleware - This handles everything including preflight
 app.use(cors(corsOptions));
 
-app.use(express.json());
+// Capture the raw request body alongside the parsed one so webhook handlers
+// (e.g. Razorpay) can verify HMAC signatures against the exact bytes the
+// sender signed, instead of a re-serialized JSON.stringify(req.body) which
+// can differ in key order/whitespace and break signature verification.
+app.use(
+  express.json({
+    verify: (req: Request, _res: Response, buf: Buffer) => {
+      (req as any).rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize Socket.io

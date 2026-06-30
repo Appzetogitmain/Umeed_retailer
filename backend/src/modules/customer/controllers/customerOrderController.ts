@@ -9,6 +9,7 @@ import { calculateDistance } from "../../../utils/locationHelper";
 import { notifySellersOfOrderUpdate } from "../../../services/sellerNotificationService";
 import { generateDeliveryOtp } from "../../../services/deliveryOtpService";
 import { Server as SocketIOServer } from "socket.io";
+import { calculateDeliveryStuff } from "./customerCartController";
 
 // Create a new order
 export const createOrder = async (req: Request, res: Response) => {
@@ -24,7 +25,9 @@ export const createOrder = async (req: Request, res: Response) => {
             session = null;
         }
 
-        const { items, address, paymentMethod, fees, deliveryInstructions } = req.body;
+        // Note: `fees` is intentionally not read from req.body — platformFee/deliveryFee
+        // are always recomputed server-side below (see computedFees) to prevent tampering.
+        const { items, address, paymentMethod, deliveryInstructions } = req.body;
         const userId = req.user!.userId;
 
         // Log incoming request for debugging
@@ -141,8 +144,10 @@ export const createOrder = async (req: Request, res: Response) => {
             deliveryInstructions: deliveryInstructions || '',
             subtotal: 0,
             tax: 0,
-            shipping: fees?.deliveryFee || 0,
-            platformFee: fees?.platformFee || 0,
+            // shipping/platformFee are recomputed server-side below from AppSettings,
+            // never trusted from the client (fees in req.body is display-only).
+            shipping: 0,
+            platformFee: 0,
             discount: 0,
             total: 0,
             items: []
@@ -341,13 +346,19 @@ export const createOrder = async (req: Request, res: Response) => {
             }
         }
 
-        // Apply fees
-        const platformFee = Number(fees?.platformFee) || 0;
-        const deliveryFee = Number(fees?.deliveryFee) || 0;
+        // Recompute fees server-side from AppSettings/seller distance (same logic the
+        // cart summary uses) instead of trusting the client-supplied `fees` object,
+        // which could otherwise be tampered with to reduce or zero out what's charged.
+        const sellerIdsForFees = Array.from(sellerIds).map((id) => ({ product: { seller: id } }));
+        const computedFees = await calculateDeliveryStuff(calculatedSubtotal, sellerIdsForFees, deliveryLat, deliveryLng);
+        const platformFee = Number(computedFees.platformFee) || 0;
+        const deliveryFee = Number(computedFees.estimatedDeliveryFee) || 0;
         const finalTotal = calculatedSubtotal + platformFee + deliveryFee;
 
         // Update Order with calculated values and items
         newOrder.subtotal = Number(calculatedSubtotal.toFixed(2));
+        newOrder.shipping = Number(deliveryFee.toFixed(2));
+        newOrder.platformFee = Number(platformFee.toFixed(2));
         newOrder.total = Number(finalTotal.toFixed(2));
         newOrder.items = orderItemIds;
 

@@ -354,6 +354,14 @@ export const createWithdrawalRequest = async (
             data: withdrawRequest,
         };
     } catch (error: any) {
+        // Duplicate-key error from the unique_pending_withdrawal index means a
+        // concurrent request beat this one to creating a pending withdrawal.
+        if (error?.code === 11000) {
+            return {
+                success: false,
+                message: 'You have a pending withdrawal request. Please wait for it to be processed.',
+            };
+        }
         console.error('Error creating withdrawal request:', error);
         return {
             success: false,

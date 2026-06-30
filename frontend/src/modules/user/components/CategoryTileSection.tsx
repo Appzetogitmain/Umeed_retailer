@@ -184,7 +184,10 @@ export default function CategoryTileSection({
                             target.style.display = 'none';
                             const parent = target.parentElement;
                             if (parent) {
-                              parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-3xl text-neutral-300">${tile.name.charAt(0)}</div>`;
+                              const fallback = document.createElement('div');
+                              fallback.className = 'w-full h-full flex items-center justify-center text-3xl text-neutral-300';
+                              fallback.textContent = tile.name.charAt(0);
+                              parent.replaceChildren(fallback);
                             }
                           }}
                         />

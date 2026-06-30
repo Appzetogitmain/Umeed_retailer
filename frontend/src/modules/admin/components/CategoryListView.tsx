@@ -111,7 +111,13 @@ export default function CategoryListView({
                         target.style.display = 'none';
                         const parent = target.parentElement;
                         if (parent) {
-                          parent.innerHTML = `<div class="w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center"><span class="text-lg font-semibold text-neutral-400">${category.name.charAt(0).toUpperCase()}</span></div>`;
+                          const fallback = document.createElement('div');
+                          fallback.className = 'w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center';
+                          const span = document.createElement('span');
+                          span.className = 'text-lg font-semibold text-neutral-400';
+                          span.textContent = category.name.charAt(0).toUpperCase();
+                          fallback.appendChild(span);
+                          parent.replaceChildren(fallback);
                         }
                       }}
                     />
