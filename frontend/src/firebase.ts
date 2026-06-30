@@ -13,7 +13,12 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+try {
+    getAnalytics(app);
+} catch (error: any) {
+    console.warn('Firebase Analytics not available in this environment.', error);
+}
 
 let messaging: Messaging | null = null;
 

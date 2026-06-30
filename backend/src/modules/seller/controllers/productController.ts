@@ -81,12 +81,14 @@ export const createProduct = asyncHandler(
     }
 
     // Validate variation prices
-    for (const variation of productData.variations) {
-      if (Number(variation.discPrice) > Number(variation.price)) {
-        return res.status(400).json({
-          success: false,
-          message: `Discounted price (${variation.discPrice}) cannot be greater than price (${variation.price}) for variation ${variation.title}`,
-        });
+    if (Array.isArray(productData.variations)) {
+      for (const variation of productData.variations) {
+        if (Number(variation.discPrice) > Number(variation.price)) {
+          return res.status(400).json({
+            success: false,
+            message: `Discounted price (${variation.discPrice}) cannot be greater than price (${variation.price}) for variation ${variation.title}`,
+          });
+        }
       }
     }
 

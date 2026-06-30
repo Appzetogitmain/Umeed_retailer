@@ -115,13 +115,17 @@ export const capturePayment = async (
         );
 
         if (!isValid) {
-            throw new Error('Invalid payment signature');
+            const err: any = new Error('Invalid payment signature');
+            err.statusCode = 400;
+            throw err;
         }
 
         // Find order
         const order = await Order.findById(orderId).session(session);
         if (!order) {
-            throw new Error('Order not found');
+            const err: any = new Error('Order not found');
+            err.statusCode = 404;
+            throw err;
         }
 
         // Create payment record
@@ -272,7 +276,8 @@ export const processRefund = async (
  */
 export const handleWebhook = async (
     body: any,
-    signature: string
+    signature: string,
+    rawBody?: Buffer
 ): Promise<{ success: boolean; message: string }> => {
     try {
         const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -281,10 +286,15 @@ export const handleWebhook = async (
             throw new Error('Razorpay webhook secret not configured');
         }
 
-        // Verify webhook signature
+        // Verify webhook signature against the exact raw bytes Razorpay signed.
+        // Re-serializing the parsed body (JSON.stringify(body)) can differ in key
+        // order/whitespace from what was actually sent, causing valid webhooks to
+        // fail verification (or, in principle, a tampered body to slip through if
+        // re-serialization happens to coincide with a forged signature).
+        const payloadToVerify = rawBody ? rawBody : JSON.stringify(body);
         const expectedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(JSON.stringify(body))
+            .update(payloadToVerify)
             .digest('hex');
 
         if (expectedSignature !== signature) {
