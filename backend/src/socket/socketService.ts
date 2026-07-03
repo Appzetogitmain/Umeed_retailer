@@ -1,6 +1,8 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../services/jwtService';
+import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from '../config/corsOrigins';
 import { handleOrderAcceptance, handleOrderRejection } from '../services/orderNotificationService';
 import Order from '../models/Order';
 import DeliveryTracking from '../models/DeliveryTracking';
@@ -45,23 +47,9 @@ export const initializeSocket = (httpServer: HttpServer) => {
 
                 // In production, check against allowed origins
                 if (process.env.NODE_ENV === 'production') {
-                    // Get allowed origins from environment variable (comma-separated)
-                    const frontendUrl = process.env.FRONTEND_URL || "";
-                    const allowedOrigins = frontendUrl
-                        .split(",")
-                        .map((url: string) => url.trim())
-                        .filter((url: string) => url.length > 0);
-
-                    // Default production origins if FRONTEND_URL not set
-                    const defaultOrigins = [
-                        "https://www.kosil.com",
-                        "https://kosil.com",
-                        "https://kosil-frontend.onrender.com",
-                    ];
-
-                    const allAllowedOrigins = allowedOrigins.length > 0
-                        ? [...allowedOrigins, ...defaultOrigins]
-                        : defaultOrigins;
+                    // Shared with server.ts's Express CORS config via config/corsOrigins.ts
+                    // so HTTP and WebSocket CORS policy can't drift apart.
+                    const allAllowedOrigins = PRODUCTION_ALLOWED_ORIGINS;
 
                     // Normalize origins for comparison (remove trailing slash, lowercase)
                     const normalizeUrl = (url: string) => url.replace(/\/$/, '').toLowerCase();
@@ -96,11 +84,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
                 }
 
                 // In development, allow any localhost port
-                if (
-                    origin.startsWith('http://localhost:') ||
-                    origin.startsWith('http://127.0.0.1:') ||
-                    origin.startsWith('https://localhost:')
-                ) {
+                if (isLocalhostOrigin(origin)) {
                     return callback(null, true);
                 }
 
@@ -127,7 +111,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+            const decoded = jwt.verify(token, JWT_SECRET);
             (socket as any).user = decoded;
             next();
         } catch (error) {
@@ -179,14 +163,34 @@ export const initializeSocket = (httpServer: HttpServer) => {
         });
 
         // Delivery partner joins their active deliveries room
+        // Only the authenticated delivery partner themselves may join their own room
+        // (prevents any client from eavesdropping on another delivery partner's events).
         socket.on('join-delivery-room', (deliveryPartnerId: string) => {
-            console.log(`🛵 Delivery partner joined: ${deliveryPartnerId}`);
-            socket.join(`delivery-${deliveryPartnerId}`);
+            const user = (socket as any).user;
+            const normalizedId = String(deliveryPartnerId).trim();
+
+            if (!user || user.userType !== 'Delivery' || user.userId !== normalizedId) {
+                console.warn(`⚠️ Unauthorized attempt to join delivery room: ${normalizedId}`);
+                socket.emit('join-delivery-room-error', { message: 'Unauthorized' });
+                return;
+            }
+
+            console.log(`🛵 Delivery partner joined: ${normalizedId}`);
+            socket.join(`delivery-${normalizedId}`);
         });
 
         // Seller joins their notification room
+        // Only the authenticated seller themselves may join their own room.
         socket.on('join-seller-room', (sellerId: string) => {
+            const user = (socket as any).user;
             const normalizedSellerId = String(sellerId).trim();
+
+            if (!user || user.userType !== 'Seller' || user.userId !== normalizedSellerId) {
+                console.warn(`⚠️ Unauthorized attempt to join seller room: ${normalizedSellerId}`);
+                socket.emit('joined-seller-room', { success: false, message: 'Unauthorized' });
+                return;
+            }
+
             console.log(`🏪 Seller ${normalizedSellerId} joined notifications room`);
             socket.join(`seller-${normalizedSellerId}`);
 
@@ -198,9 +202,17 @@ export const initializeSocket = (httpServer: HttpServer) => {
         });
 
         // Delivery boy joins notification room
+        // Only the authenticated delivery partner themselves may join their own room.
         socket.on('join-delivery-notifications', (deliveryBoyId: string) => {
-            // Normalize deliveryBoyId to string to ensure consistent room naming
+            const user = (socket as any).user;
             const normalizedDeliveryBoyId = String(deliveryBoyId).trim();
+
+            if (!user || user.userType !== 'Delivery' || user.userId !== normalizedDeliveryBoyId) {
+                console.warn(`⚠️ Unauthorized attempt to join delivery notifications room: ${normalizedDeliveryBoyId}`);
+                socket.emit('joined-notifications-room', { success: false, message: 'Unauthorized' });
+                return;
+            }
+
             console.log(`🔔 Delivery boy ${normalizedDeliveryBoyId} joined notifications room`);
 
             // Only join personal room (not general room) to prevent duplicate notifications

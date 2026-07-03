@@ -9,6 +9,7 @@ export const getLowestPricesProducts = async (_req: Request, res: Response) => {
         const products = await LowestPricesProduct.find()
             .populate("product", "productName mainImage price mrp discount status publish")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({
@@ -242,6 +243,7 @@ export const reorderLowestPricesProducts = async (req: Request, res: Response) =
         const updatedProducts = await LowestPricesProduct.find()
             .populate("product", "productName mainImage price mrp discount status publish")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({

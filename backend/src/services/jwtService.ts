@@ -7,7 +7,13 @@ export interface TokenPayload {
   role?: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// Fail fast on startup rather than silently signing tokens with a publicly-known
+// fallback secret that would let anyone forge valid JWTs for any user/role.
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable must be set');
+}
+
+export const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 /**

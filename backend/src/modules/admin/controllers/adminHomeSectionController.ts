@@ -10,6 +10,7 @@ export const getHomeSections = async (_req: Request, res: Response) => {
             .populate("subCategories", "name")
             .populate("headerCategoryId", "name")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({
@@ -121,6 +122,13 @@ export const createHomeSection = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error("Error creating home section:", error);
+        if (error.name === "ValidationError") {
+            return res.status(400).json({
+                success: false,
+                message: "Error creating home section",
+                error: error.message,
+            });
+        }
         return res.status(500).json({
             success: false,
             message: "Error creating home section",
@@ -257,6 +265,7 @@ export const reorderHomeSections = async (req: Request, res: Response) => {
             .populate("subCategories", "name")
             .populate("headerCategoryId", "name")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({

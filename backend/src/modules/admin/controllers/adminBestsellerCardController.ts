@@ -10,6 +10,7 @@ export const getBestsellerCards = async (_req: Request, res: Response) => {
         const cards = await BestsellerCard.find()
             .populate("category", "name slug image")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({
@@ -254,6 +255,7 @@ export const reorderBestsellerCards = async (req: Request, res: Response) => {
         const updatedCards = await BestsellerCard.find()
             .populate("category", "name slug image")
             .sort({ order: 1 })
+            .limit(500)
             .lean();
 
         return res.status(200).json({

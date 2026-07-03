@@ -446,6 +446,7 @@ function AppContent() {
                               requiredUserType="Delivery"
                               redirectTo="/delivery/login">
                               <Suspense fallback={<IconLoader forceShow />}>
+                                <ErrorBoundary>
                                 <DeliveryLayout>
                                   <Routes>
                                     <Route
@@ -507,6 +508,7 @@ function AppContent() {
                                     />
                                   </Routes>
                                 </DeliveryLayout>
+                                </ErrorBoundary>
                               </Suspense>
                             </ProtectedRoute>
                           }
@@ -520,6 +522,7 @@ function AppContent() {
                               requiredUserType="Seller"
                               redirectTo="/seller/login">
                               <Suspense fallback={<IconLoader forceShow />}>
+                                <ErrorBoundary>
                                 <SellerLayout>
                                   <Routes>
                                     <Route
@@ -584,6 +587,7 @@ function AppContent() {
                                     />
                                   </Routes>
                                 </SellerLayout>
+                                </ErrorBoundary>
                               </Suspense>
                             </ProtectedRoute>
                           }
@@ -597,6 +601,7 @@ function AppContent() {
                               requiredUserType="Admin"
                               redirectTo="/admin/login">
                               <Suspense fallback={<IconLoader forceShow />}>
+                                <ErrorBoundary>
                                 <AdminLayout>
                                   <Routes>
                                     <Route
@@ -801,6 +806,7 @@ function AppContent() {
                                     />
                                   </Routes>
                                 </AdminLayout>
+                                </ErrorBoundary>
                               </Suspense>
                             </ProtectedRoute>
                           }
@@ -810,6 +816,7 @@ function AppContent() {
                         <Route
                           path="/*"
                           element={
+                            <ErrorBoundary>
                             <AppLayout>
                               <Suspense fallback={<IconLoader forceShow />}>
                                 <Routes>
@@ -919,6 +926,7 @@ function AppContent() {
                                 </Routes>
                               </Suspense>
                             </AppLayout>
+                            </ErrorBoundary>
                           }
                         />
                       </Routes>

@@ -3,6 +3,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 interface DeliveryUserContextType {
   userName: string;
   setUserName: (name: string) => void;
+  clearUserName: () => void;
 }
 
 const DeliveryUserContext = createContext<DeliveryUserContextType | undefined>(undefined);
@@ -19,8 +20,15 @@ export function DeliveryUserProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('delivery_user_name', name);
   };
 
+  // Called on logout so the next delivery partner to use this device doesn't
+  // briefly see the previous partner's cached name.
+  const clearUserName = () => {
+    setUserName('');
+    localStorage.removeItem('delivery_user_name');
+  };
+
   return (
-    <DeliveryUserContext.Provider value={{ userName, setUserName: updateUserName }}>
+    <DeliveryUserContext.Provider value={{ userName, setUserName: updateUserName, clearUserName }}>
       {children}
     </DeliveryUserContext.Provider>
   );

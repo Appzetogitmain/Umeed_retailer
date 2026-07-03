@@ -144,17 +144,23 @@ export const createWithdrawalRequest = asyncHandler(async (req: Request, res: Re
         return res.status(400).json({ success: false, message: 'Account details are required' });
     }
 
-    const seller = await Seller.findById(sellerId);
-    if (!seller) {
-        return res.status(404).json({ success: false, message: 'Seller not found' });
-    }
+    // Atomically check-and-deduct in one operation so two concurrent requests
+    // can't both pass a stale balance check (prevents over-withdrawal races).
+    const seller = await Seller.findOneAndUpdate(
+        { _id: sellerId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { new: true }
+    );
 
-    if (seller.balance < amount) {
+    if (!seller) {
+        const exists = await Seller.exists({ _id: sellerId });
+        if (!exists) {
+            return res.status(404).json({ success: false, message: 'Seller not found' });
+        }
         return res.status(400).json({ success: false, message: 'Insufficient balance' });
     }
 
-    // Start transaction session if needed, but for now simple update
-    // Create the request
+    // Create the withdrawal request after the balance hold has been secured
     const withdrawRequest = await WithdrawRequest.create({
         sellerId,
         amount,
@@ -162,11 +168,6 @@ export const createWithdrawalRequest = asyncHandler(async (req: Request, res: Re
         accountDetails,
         status: 'Pending'
     });
-
-    // Deduct from balance immediately to "hold" it (or handle on approval)
-    // Usually it's better to deduct on approval, but here we'll follow common practice of deducting and showing as pending
-    seller.balance -= amount;
-    await seller.save();
 
     // Log as a debit transaction
     await WalletTransaction.create({

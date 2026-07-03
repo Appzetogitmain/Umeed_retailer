@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createRazorpayOrder, verifyPayment } from '../services/api/paymentService';
 
 interface RazorpayCheckoutProps {
@@ -26,7 +26,16 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
     onFailure,
     customerDetails,
 }) => {
+    // customerDetails/onSuccess/onFailure are recreated on every parent render
+    // (inline object/arrow functions in Checkout.tsx), which would otherwise
+    // re-run this effect and re-open the Razorpay modal repeatedly. This guard
+    // ensures payment is only initiated once per mount.
+    const hasInitiatedRef = useRef(false);
+
     useEffect(() => {
+        if (hasInitiatedRef.current) return;
+        hasInitiatedRef.current = true;
+
         // Load Razorpay script if not already loaded
         const loadRazorpayScript = () => {
             return new Promise((resolve) => {
@@ -109,7 +118,9 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
         };
 
         initiatePayment();
-    }, [orderId, amount, customerDetails, onSuccess, onFailure]);
+        // Intentionally run once per mount only (see hasInitiatedRef above).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom';
 import DeliveryHeader from '../components/DeliveryHeader';
 import DeliveryBottomNav from '../components/DeliveryBottomNav';
 import { useAuth } from '../../../context/AuthContext';
+import { useDeliveryUser } from '../context/DeliveryUserContext';
 import { useState, useEffect } from 'react';
 
 export default function DeliveryMenu() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { clearUserName } = useDeliveryUser();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
@@ -163,6 +165,7 @@ export default function DeliveryMenu() {
   const handleConfirmLogout = () => {
     // Properly logout using AuthContext to clear all auth state
     logout();
+    clearUserName();
     navigate('/delivery/login');
   };
 

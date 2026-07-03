@@ -219,13 +219,17 @@ export const verifyAdminPayout = async (req: Request, res: Response) => {
         // 1. Verify Signature
         const isValid = verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
         if (!isValid) {
-            throw new Error("Invalid payment signature");
+            const err: any = new Error("Invalid payment signature");
+            err.statusCode = 400;
+            throw err;
         }
 
         // 2. Update delivery boy pendingAdminPayout
         const deliveryBoy = await Delivery.findById(deliveryBoyId).session(session);
         if (!deliveryBoy) {
-            throw new Error("Delivery boy not found");
+            const err: any = new Error("Delivery boy not found");
+            err.statusCode = 404;
+            throw err;
         }
 
         // Round pending payout for comparison
@@ -233,7 +237,9 @@ export const verifyAdminPayout = async (req: Request, res: Response) => {
 
         // Validate amount doesn't significantly exceed pending
         if (amount > currentPending + 0.01) {
-            throw new Error(`Payment amount (₹${amount}) exceeds pending admin payout (₹${currentPending})`);
+            const err: any = new Error(`Payment amount (₹${amount}) exceeds pending admin payout (₹${currentPending})`);
+            err.statusCode = 400;
+            throw err;
         }
 
         // Record transaction first
@@ -273,7 +279,7 @@ export const verifyAdminPayout = async (req: Request, res: Response) => {
     } catch (error: any) {
         await session.abortTransaction();
         console.error("Error verifying admin payout:", error);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     } finally {
         session.endSession();
     }

@@ -123,7 +123,13 @@ export default function CategoryTreeView({
                         const parent = target.parentElement;
                         if (parent) {
                           const size = isSubcategory ? "w-12 h-12" : "w-16 h-16";
-                          parent.innerHTML = `<div class="${size} rounded-lg bg-neutral-100 flex items-center justify-center"><span class="text-lg font-semibold text-neutral-400">${category.name.charAt(0).toUpperCase()}</span></div>`;
+                          const fallback = document.createElement('div');
+                          fallback.className = `${size} rounded-lg bg-neutral-100 flex items-center justify-center`;
+                          const span = document.createElement('span');
+                          span.className = 'text-lg font-semibold text-neutral-400';
+                          span.textContent = category.name.charAt(0).toUpperCase();
+                          fallback.appendChild(span);
+                          parent.replaceChildren(fallback);
                         }
                       }}
                     />

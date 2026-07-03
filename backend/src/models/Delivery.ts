@@ -218,7 +218,7 @@ const DeliverySchema = new Schema<IDelivery>(
 
 // Hash password before saving
 DeliverySchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (!this.isModified('password') || !this.password) {
     return next();
   }
 

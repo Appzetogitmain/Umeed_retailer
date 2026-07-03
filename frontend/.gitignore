@@ -59,3 +59,9 @@ coverage/
 *.tar.gz
 *.rar
 *.7z
+
+# Playwright
+/test-results/
+/playwright-report/
+/e2e/.auth/
+/e2e/.report/

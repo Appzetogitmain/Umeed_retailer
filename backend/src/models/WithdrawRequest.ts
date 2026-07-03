@@ -71,6 +71,14 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>(
 WithdrawRequestSchema.index({ userId: 1, userType: 1 });
 WithdrawRequestSchema.index({ status: 1 });
 
+// Enforce "only one pending withdrawal at a time" at the database level so
+// concurrent requests can't both pass the application-level pending check
+// before either commits.
+WithdrawRequestSchema.index(
+    { userId: 1, userType: 1 },
+    { unique: true, partialFilterExpression: { status: 'Pending' }, name: 'unique_pending_withdrawal' }
+);
+
 const WithdrawRequest = mongoose.model<IWithdrawRequest>('WithdrawRequest', WithdrawRequestSchema);
 
 export default WithdrawRequest;
