@@ -4,11 +4,9 @@ import { useAuth } from "../../context/AuthContext";
 import {
   getProfile,
   CustomerProfile,
-  deleteAccount as deleteAccountApi,
+  deleteAccountDirect,
   updateProfile,
 } from "../../services/api/customerService";
-import { sendOTP } from "../../services/api/auth/customerAuthService";
-import OTPInput from "../../components/OTPInput";
 import AuthPrompt from "../../components/AuthPrompt";
 
 
@@ -19,8 +17,6 @@ export default function Account() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteOtpModal, setShowDeleteOtpModal] = useState(false);
-  const [deleteSessionId, setDeleteSessionId] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -61,7 +57,7 @@ export default function Account() {
 
   // Lock body scroll when any modal is open
   useEffect(() => {
-    const isAnyModalOpen = showEditModal || showDeleteModal || showDeleteOtpModal;
+    const isAnyModalOpen = showEditModal || showDeleteModal;
     if (isAnyModalOpen) {
       // Lock body and html
       document.body.style.overflow = 'hidden';
@@ -87,7 +83,7 @@ export default function Account() {
         mainEl.style.overflow = '';
       }
     };
-  }, [showEditModal, showDeleteModal, showDeleteOtpModal]);
+  }, [showEditModal, showDeleteModal]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Not set";
@@ -114,47 +110,20 @@ export default function Account() {
     navigate("/login");
   };
 
-  const handleDeleteRequest = async () => {
-    setLoading(true);
-    setDeleteError("");
-    try {
-      const phone = profile?.phone || user?.phone;
-      if (!phone) {
-        setDeleteError("Phone number not found. Please logout and login again.");
-        return;
-      }
-      const response = await sendOTP(phone);
-      if (response.success && response.sessionId) {
-        setDeleteSessionId(response.sessionId);
-        setShowDeleteModal(false);
-        setShowDeleteOtpModal(true);
-      } else {
-        setDeleteError(response.message || "Failed to send OTP");
-      }
-    } catch (err: any) {
-      setDeleteError(err.response?.data?.message || "Failed to send OTP");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteOtpComplete = async (otp: string) => {
+  const handleDeleteAccount = async () => {
     setIsDeleting(true);
     setDeleteError("");
     try {
-      const phone = profile?.phone || user?.phone;
-      if (!phone) throw new Error("Phone number not found");
-
-      const response = await deleteAccountApi(phone, otp, deleteSessionId);
+      const response = await deleteAccountDirect();
       if (response.success) {
-        // Clear everything and redirect
+        setShowDeleteModal(false);
         authLogout();
         navigate("/login", { state: { message: "Account deleted successfully." } });
       } else {
         setDeleteError(response.message || "Failed to delete account");
       }
     } catch (err: any) {
-      setDeleteError(err.response?.data?.message || "Failed to delete account");
+      setDeleteError(err.response?.data?.message || "Failed to delete account. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -469,12 +438,12 @@ export default function Account() {
             <div className="pt-2 pb-6">
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="w-full flex items-center justify-center gap-2 p-3 text-neutral-400 hover:text-red-500 transition-all duration-300 group outline-none">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                className="w-full flex items-center justify-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100 hover:bg-red-50 hover:border-red-200 transition-all duration-300 group outline-none">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 group-hover:scale-110 transition-transform">
                   <path d="M3 6h18" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                <span className="text-xs font-semibold">Delete Account</span>
+                <span className="text-sm font-bold text-red-600">Delete Account</span>
               </button>
             </div>
           </div>
@@ -486,7 +455,7 @@ export default function Account() {
         <>
           <div
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
-            onClick={() => !loading && setShowDeleteModal(false)}
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
           />
           <div className="fixed inset-x-0 bottom-0 z-[60] animate-in slide-in-from-bottom duration-500 ease-out p-4">
             <div className="bg-white rounded-[32px] shadow-2xl max-w-lg mx-auto p-8 relative overflow-hidden">
@@ -502,10 +471,12 @@ export default function Account() {
                 </div>
                 
                 <h3 className="text-2xl font-black text-neutral-900 mb-3">
-                  Delete Account?
+                  Delete Account
                 </h3>
                 <p className="text-sm text-neutral-500 mb-8 leading-relaxed">
-                  This will <span className="font-bold text-red-600">permanently delete</span> your profile, addresses, and all personal data. Completed orders will be anonymized for records. This action <span className="font-bold">cannot be undone</span>.
+                  Are you sure you want to permanently delete your account?<br /><br />
+                  This action cannot be undone.<br />
+                  All your data will be permanently removed.
                 </p>
 
                 {deleteError && (
@@ -514,75 +485,24 @@ export default function Account() {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={handleDeleteRequest}
-                    disabled={loading}
-                    className="w-full rounded-2xl bg-red-600 text-white font-black py-4 hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                    {loading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      "Continue to Delete"
-                    )}
-                  </button>
+                <div className="flex gap-4">
                   <button
                     onClick={() => setShowDeleteModal(false)}
-                    disabled={loading}
-                    className="w-full rounded-2xl bg-neutral-100 text-neutral-900 font-bold py-4 hover:bg-neutral-200 transition-all uppercase tracking-widest text-sm">
+                    disabled={isDeleting}
+                    className="flex-1 rounded-2xl bg-neutral-100 text-neutral-900 font-bold py-4 hover:bg-neutral-200 transition-all uppercase tracking-widest text-sm">
                     Cancel
                   </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={isDeleting}
+                    className="flex-1 rounded-2xl bg-red-600 text-white font-black py-4 hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                    {isDeleting ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "Delete"
+                    )}
+                  </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Delete OTP Verification Modal */}
-      {showDeleteOtpModal && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
-            onClick={() => !isDeleting && setShowDeleteOtpModal(false)}
-          />
-          <div className="fixed inset-x-0 bottom-0 z-[60] animate-in slide-in-from-bottom duration-500 ease-out p-4">
-            <div className="bg-white rounded-[32px] shadow-2xl max-w-lg mx-auto p-8 relative">
-              <div className="text-center">
-                <div className="mx-auto mb-6 w-20 h-20 rounded-2xl bg-purple-50 flex items-center justify-center">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="M9 12l2 2 4-4" />
-                  </svg>
-                </div>
-                
-                <h3 className="text-2xl font-black text-neutral-900 mb-2">
-                  Verify Identity
-                </h3>
-                <p className="text-sm text-neutral-500 mb-8">
-                  Enter the OTP sent to your registered mobile number <span className="font-bold text-neutral-900">+{profile?.phone || user?.phone}</span> to confirm deletion.
-                </p>
-
-                <div className="flex justify-center mb-8">
-                  <OTPInput 
-                    onComplete={handleDeleteOtpComplete} 
-                    disabled={isDeleting} 
-                    size="compact"
-                    variant="light"
-                  />
-                </div>
-
-                {deleteError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold">
-                    {deleteError}
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowDeleteOtpModal(false)}
-                  disabled={isDeleting}
-                  className="w-full rounded-2xl bg-neutral-100 text-neutral-900 font-bold py-4 hover:bg-neutral-200 transition-all uppercase tracking-widest text-sm">
-                  Go Back
-                </button>
               </div>
             </div>
           </div>

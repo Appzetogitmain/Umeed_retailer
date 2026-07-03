@@ -19,4 +19,7 @@ router.get("/location", authenticate, customerController.getLocation);
 // Delete customer account (protected route)
 router.delete("/profile", authenticate, customerController.deleteAccount);
 
+// Delete customer account direct (protected route)
+router.delete("/delete-account", authenticate, customerController.deleteAccountDirect);
+
 export default router;

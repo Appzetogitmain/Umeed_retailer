@@ -58,3 +58,11 @@ export const deleteAccount = async (phone: string, otp: string, sessionId: strin
   return response.data;
 };
 
+/**
+ * Delete customer account directly without OTP verification
+ */
+export const deleteAccountDirect = async (): Promise<{ success: boolean; message: string }> => {
+  const response = await api.delete('/customer/delete-account');
+  return response.data;
+};
+

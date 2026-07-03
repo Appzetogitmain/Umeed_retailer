@@ -331,3 +331,75 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response) =>
     message: "Your account and all related personal data have been permanently deleted.",
   });
 });
+
+/**
+ * Delete customer account directly without OTP verification (authenticated only)
+ */
+export const deleteAccountDirect = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+
+  if (!userId || (req as any).user?.userType !== "Customer") {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized or not a customer",
+    });
+  }
+
+  const customer = await Customer.findById(userId);
+  if (!customer) {
+    return res.status(404).json({
+      success: false,
+      message: "Customer not found",
+    });
+  }
+
+  // 1. Anonymize Orders
+  await Order.updateMany(
+    { customer: userId },
+    {
+      $set: {
+        customerName: "Deleted User",
+        customerEmail: "deleted@example.com",
+        customerPhone: "0000000000",
+        customerNotes: "[Anonymized]",
+      }
+    }
+  );
+
+  // 2. Anonymize Reviews
+  await Review.updateMany(
+    { customer: userId },
+    {
+      $set: {
+        comment: "[Review deleted by user]",
+        title: "[Deleted]",
+      }
+    }
+  );
+
+  // 3. Delete related data
+  // Delete Addresses
+  await Address.deleteMany({ customer: userId });
+
+  // Delete Cart & Items
+  const cart = await Cart.findOne({ customer: userId });
+  if (cart) {
+    await CartItem.deleteMany({ cart: cart._id });
+    await Cart.deleteOne({ _id: cart._id });
+  }
+
+  // Delete Wishlist
+  await Wishlist.deleteOne({ customer: userId });
+
+  // Delete Notifications
+  await Notification.deleteMany({ recipientId: userId, recipientType: "Customer" });
+
+  // 4. Finally, Hard Delete Customer
+  await Customer.deleteOne({ _id: userId });
+
+  return res.status(200).json({
+    success: true,
+    message: "Your account and all related personal data have been permanently deleted.",
+  });
+});
+
