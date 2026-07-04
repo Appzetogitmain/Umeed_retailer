@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { normalizeImageUrl } from "../../../utils/imageUrl";
 
 interface CategoryTile {
   id: string;
@@ -154,7 +155,7 @@ export default function CategoryTileSection({
                             img ? (
                               <img
                                 key={idx}
-                                src={img}
+                                src={normalizeImageUrl(img)}
                                 alt=""
                                 className="w-full h-full object-contain bg-white rounded-sm"
                                 onError={(e) => {
@@ -175,7 +176,7 @@ export default function CategoryTileSection({
                       ) : (
                         // Other sections: Single image - use contain to show full image without cropping
                         <img
-                          src={images[0]}
+                          src={normalizeImageUrl(images[0])}
                           alt={tile.name}
                           className="w-full h-full object-contain rounded-lg"
                           onError={(e) => {

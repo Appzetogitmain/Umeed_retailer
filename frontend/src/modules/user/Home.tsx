@@ -13,7 +13,7 @@ import { getHeaderCategoriesPublic } from "../../services/api/headerCategoryServ
 import { useLocation } from "../../hooks/useLocation";
 import { useLoading } from "../../context/LoadingContext";
 import PageLoader from "../../components/PageLoader";
-
+import { normalizeImageUrl } from "../../utils/imageUrl";
 import { useThemeContext } from "../../context/ThemeContext";
 
 export default function Home() {
@@ -308,10 +308,10 @@ export default function Home() {
                             className="block bg-white rounded-xl shadow-sm border border-neutral-200 hover:shadow-md transition-shadow cursor-pointer overflow-hidden">
                             {hasImages ? (
                               <img
-                                src={
+                                src={normalizeImageUrl(
                                   tile.image ||
                                   (tile.productImages ? tile.productImages[0] : "")
-                                }
+                                )}
                                 alt={tile.name}
                                 className="w-full h-16 object-cover"
                               />

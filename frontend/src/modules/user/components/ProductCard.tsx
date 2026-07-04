@@ -12,6 +12,7 @@ import Badge from '../../../components/ui/badge';
 import StarRating from '../../../components/ui/StarRating';
 import { calculateProductPrice } from '../../../utils/priceUtils';
 import { useThemeContext } from '../../../context/ThemeContext';
+import { normalizeImageUrl } from '../../../utils/imageUrl';
 // Helper to get consistent product ID across MongoDB _id and virtual id
 export const getProductId = (p: any): string => String(p?.id || p?._id || '');
 
@@ -232,7 +233,7 @@ export default function ProductCard({
           {product.imageUrl || product.mainImage ? (
             <img
               ref={imageRef}
-              src={product.imageUrl || product.mainImage}
+              src={normalizeImageUrl(product.imageUrl || product.mainImage)}
               alt={product.name || product.productName || 'Product'}
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
