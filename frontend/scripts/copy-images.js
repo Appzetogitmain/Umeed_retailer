@@ -64,18 +64,34 @@ function copyCategoryImages() {
   const categoryDir = path.join(assetsDir, "category");
   if (!fs.existsSync(categoryDir)) return;
 
+  const destCategoryDir = path.join(publicAssetsDir, "category");
+  if (!fs.existsSync(destCategoryDir)) {
+    fs.mkdirSync(destCategoryDir, { recursive: true });
+  }
+
   const files = fs.readdirSync(categoryDir);
   files.forEach((file) => {
-    if (file.endsWith(".png")) {
+    if (file.endsWith(".png") || file.endsWith(".jpg") || file.endsWith(".jpeg")) {
       const srcPath = path.join(categoryDir, file);
-      const categoryName = file.replace(".png", "");
-      const destName =
-        imageMap[categoryName] ||
-        `category-${file.toLowerCase().replace(/\s+/g, "-")}`;
-      const destPath = path.join(publicAssetsDir, destName);
-      if (!fs.existsSync(destPath)) {
-        fs.copyFileSync(srcPath, destPath);
-        console.log(`Copied category: ${file} -> ${destName}`);
+      
+      // 1. Copy exactly as is to dist/assets/category/ to match local dev behavior
+      const destPathExact = path.join(destCategoryDir, file);
+      if (!fs.existsSync(destPathExact)) {
+        fs.copyFileSync(srcPath, destPathExact);
+        console.log(`Copied exactly: category/${file}`);
+      }
+
+      // 2. Legacy renaming logic for backward compatibility
+      if (file.endsWith(".png")) {
+        const categoryName = file.replace(".png", "");
+        const destName =
+          imageMap[categoryName] ||
+          `category-${file.toLowerCase().replace(/\s+/g, "-")}`;
+        const destPath = path.join(publicAssetsDir, destName);
+        if (!fs.existsSync(destPath)) {
+          fs.copyFileSync(srcPath, destPath);
+          console.log(`Copied category (legacy): ${file} -> ${destName}`);
+        }
       }
     }
   });
