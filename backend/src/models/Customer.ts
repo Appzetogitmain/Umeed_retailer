@@ -8,6 +8,8 @@ export interface ICustomer extends Document {
   registrationDate: Date;
   status: 'Active' | 'Inactive';
   refCode: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
   deliveryOtp: string; // Permanent 4-digit OTP for delivery verification
   totalOrders: number;
   totalSpent: number;
@@ -91,6 +93,13 @@ const CustomerSchema = new Schema<ICustomer>(
       type: String,
       enum: ['Active', 'Inactive'],
       default: 'Active',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
     },
     refCode: {
       type: String,

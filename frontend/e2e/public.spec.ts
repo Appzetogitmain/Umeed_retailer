@@ -9,7 +9,7 @@ const routes: SweepRoute[] = [
   { path: '/delivery/signup' },
   { path: '/admin/login' },
   { path: '/privacy-policy' },
-  { path: '/terms' },
+  { path: '/terms-and-conditions' },
   { path: '/seller/privacy-policy' },
   { path: '/seller/terms-and-conditions' },
   { path: '/delivery/privacy-policy' },

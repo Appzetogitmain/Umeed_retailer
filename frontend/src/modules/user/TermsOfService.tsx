@@ -40,8 +40,7 @@ export default function TermsOfService() {
               </svg>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-neutral-900 leading-tight">Terms of Service</h1>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Legal Documents</p>
+              <h1 className="text-lg font-bold text-neutral-900 leading-tight">Terms and Conditions</h1>
             </div>
           </div>
           {policy && (
@@ -62,20 +61,21 @@ export default function TermsOfService() {
         ) : policy ? (
           <div className="bg-white rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-neutral-200 p-6 sm:p-10">
             <div className="prose prose-neutral max-w-none">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-end mb-8 pb-6 border-b border-neutral-100 gap-4">
-                <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-100">
+              
+              <div className="text-neutral-700 leading-relaxed text-base sm:text-lg whitespace-pre-wrap font-medium">
+                {policy.content}
+              </div>
+
+              <div className="mt-16 pt-8 border-t border-neutral-100 flex justify-center">
+                <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-100 inline-block text-center">
                   <span className="text-xs text-neutral-500 block mb-0.5">Last Revised</span>
                   <span className="text-sm font-bold text-[#B95F15]">
                     {new Date(policy.updatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
               </div>
-              
-              <div className="text-neutral-700 leading-relaxed text-base sm:text-lg whitespace-pre-wrap font-medium">
-                {policy.content}
-              </div>
 
-              <div className="mt-16 pt-8 border-t border-neutral-100">
+              <div className="mt-6">
                 <div className="bg-neutral-50 rounded-2xl p-6 text-center">
                   <p className="text-sm text-neutral-500 italic mb-4">
                     By using our platform, you agree to these terms. If you have any questions, contact us at support@speedoo.com

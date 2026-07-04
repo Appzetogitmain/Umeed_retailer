@@ -24,6 +24,7 @@ router.get("/dashboard/stats", deliveryDashboardController.getDashboardStats);
 
 // Help & Support
 router.get("/help", deliveryDashboardController.getHelpSupport);
+router.get("/faqs", deliveryDashboardController.getHelpSupport);
 
 // Orders
 router.get("/orders/history", deliveryOrderController.getAllOrdersHistory);

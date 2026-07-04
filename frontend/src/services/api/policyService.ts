@@ -11,3 +11,16 @@ export const getAllPolicies = async (): Promise<ApiResponse<Policy[]>> => {
   const response = await api.get<ApiResponse<Policy[]>>("/policies");
   return response.data;
 };
+
+export interface PublicSettings {
+  appName: string;
+  contactEmail: string;
+  contactPhone: string;
+  supportEmail?: string;
+  supportPhone?: string;
+}
+
+export const getPublicSettings = async (): Promise<ApiResponse<PublicSettings>> => {
+  const response = await api.get<ApiResponse<PublicSettings>>("/policies/settings");
+  return response.data;
+};

@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 // Load environment variables as early as possible
 dotenv.config();
+import path from "path";
 
 console.log('--- SERVER STARTING ---');
 console.log('RAZORPAY_KEY_ID exists:', !!process.env.RAZORPAY_KEY_ID);
@@ -14,6 +15,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { notFound } from "./middleware/notFound";
 import { ensureDefaultAdmin } from "./utils/ensureDefaultAdmin";
 import { seedHeaderCategories } from "./utils/seedHeaderCategories";
+import { seedFAQs } from "./utils/seedFAQs";
 import { initializeSocket } from "./socket/socketService";
 import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from "./config/corsOrigins";
 
@@ -94,6 +96,7 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Initialize Socket.io
 const io = initializeSocket(httpServer);
@@ -128,6 +131,7 @@ async function startServer() {
   await connectDB();
   await ensureDefaultAdmin();
   await seedHeaderCategories();
+  await seedFAQs();
 
   httpServer.listen(PORT, () => {
     console.log("\n\x1b[32m✓\x1b[0m \x1b[1mKosil Server Started\x1b[0m");

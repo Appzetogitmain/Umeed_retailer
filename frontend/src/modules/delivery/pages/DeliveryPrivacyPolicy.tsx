@@ -41,7 +41,6 @@ export default function DeliveryPrivacyPolicy() {
             </button>
             <div>
               <h1 className="text-lg font-bold text-neutral-900 leading-tight">Delivery Partner Privacy Policy</h1>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Delivery Legal Documents</p>
             </div>
           </div>
           {policy && (
@@ -62,11 +61,13 @@ export default function DeliveryPrivacyPolicy() {
         ) : policy ? (
           <div className="bg-white rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-neutral-200 p-6 sm:p-10">
             <div className="prose prose-neutral max-w-none">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-6 border-b border-neutral-100 gap-4">
-                <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
-                  {policy.title}
-                </h2>
-                <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
+
+              <div className="text-neutral-700 leading-relaxed text-base sm:text-lg whitespace-pre-wrap font-medium">
+                {policy.content}
+              </div>
+
+              <div className="mt-16 pt-8 border-t border-neutral-100 flex justify-center">
+                <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 inline-block text-center">
                   <span className="text-xs text-neutral-500 block mb-0.5">Last Revised</span>
                   <span className="text-sm font-bold text-blue-600">
                     {new Date(policy.updatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -74,11 +75,7 @@ export default function DeliveryPrivacyPolicy() {
                 </div>
               </div>
 
-              <div className="text-neutral-700 leading-relaxed text-base sm:text-lg whitespace-pre-wrap font-medium">
-                {policy.content}
-              </div>
-
-              <div className="mt-16 pt-8 border-t border-neutral-100">
+              <div className="mt-6">
                 <div className="bg-neutral-50 rounded-2xl p-6 text-center">
                   <p className="text-sm text-neutral-500 italic mb-4">
                     If you have any questions regarding this policy, please contact our delivery support team.

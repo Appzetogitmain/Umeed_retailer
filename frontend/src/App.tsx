@@ -41,6 +41,7 @@ const AboutUs = lazy(() => import("./modules/user/AboutUs"));
 const PrivacyPolicy = lazy(() => import("./modules/user/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./modules/user/TermsOfService"));
 const FAQ = lazy(() => import("./modules/user/FAQ"));
+const Support = lazy(() => import("./modules/user/Support"));
 const Wishlist = lazy(() => import("./modules/user/Wishlist"));
 const Addresses = lazy(() => import("./modules/user/Addresses"));
 const AddressBook = lazy(() => import("./modules/user/AddressBook"));
@@ -103,8 +104,11 @@ const DeliveryEarnings = lazy(
 const DeliverySettings = lazy(
   () => import("./modules/delivery/pages/DeliverySettings"),
 );
-const DeliveryHelp = lazy(
-  () => import("./modules/delivery/pages/DeliveryHelp"),
+const DeliverySupport = lazy(
+  () => import("./modules/delivery/pages/DeliverySupport"),
+);
+const DeliveryFAQ = lazy(
+  () => import("./modules/delivery/pages/DeliveryFAQ"),
 );
 const DeliveryAbout = lazy(
   () => import("./modules/delivery/pages/DeliveryAbout"),
@@ -398,10 +402,18 @@ function AppContent() {
                           }
                         />
                         <Route
-                          path="/terms"
+                          path="/terms-and-conditions"
                           element={
                             <Suspense fallback={<IconLoader forceShow />}>
                               <TermsOfService />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/support"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <Support />
                             </Suspense>
                           }
                         />
@@ -495,8 +507,12 @@ function AppContent() {
                                       element={<DeliverySettings />}
                                     />
                                     <Route
-                                      path="help"
-                                      element={<DeliveryHelp />}
+                                      path="support"
+                                      element={<DeliverySupport />}
+                                    />
+                                    <Route
+                                      path="faq"
+                                      element={<DeliveryFAQ />}
                                     />
                                     <Route
                                       path="about"

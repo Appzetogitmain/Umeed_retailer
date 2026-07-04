@@ -14,7 +14,8 @@ const routes: SweepRoute[] = [
   { path: '/delivery/profile' },
   { path: '/delivery/wallet' },
   { path: '/delivery/settings' },
-  { path: '/delivery/help' },
+  { path: '/delivery/support' },
+  { path: '/delivery/faq' },
   { path: '/delivery/about' },
   { path: '/delivery/sellers-in-range' },
 ];

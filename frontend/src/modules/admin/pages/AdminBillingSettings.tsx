@@ -22,6 +22,10 @@ export default function AdminBillingSettings() {
     const [deliveryBoyKmRate, setDeliveryBoyKmRate] = useState<number>(0);
     const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
 
+    // Support Info Config
+    const [supportEmail, setSupportEmail] = useState<string>('');
+    const [supportPhone, setSupportPhone] = useState<string>('');
+
     useEffect(() => {
         fetchSettings();
     }, []);
@@ -38,6 +42,8 @@ export default function AdminBillingSettings() {
                 setPlatformFee(data.platformFee || 0);
                 setFreeDeliveryThreshold(data.freeDeliveryThreshold || 0);
                 setDeliveryCharges(data.deliveryCharges || 0);
+                setSupportEmail(data.supportEmail || '');
+                setSupportPhone(data.supportPhone || '');
 
                 if (data.deliveryConfig) {
                     setIsDistanceBased(data.deliveryConfig.isDistanceBased || false);
@@ -67,6 +73,8 @@ export default function AdminBillingSettings() {
                 platformFee,
                 freeDeliveryThreshold,
                 deliveryCharges,
+                supportEmail,
+                supportPhone,
                 deliveryConfig: {
                     isDistanceBased,
                     baseCharge,
@@ -318,6 +326,39 @@ export default function AdminBillingSettings() {
                             </div>
                         </motion.div>
                     )}
+                </div>
+                {/* Support Contact Settings */}
+                <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Support Contacts</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Support Email
+                            </label>
+                            <input
+                                type="email"
+                                value={supportEmail}
+                                onChange={(e) => setSupportEmail(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                                placeholder="e.g. support@speedoo.com"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">This email will be shown to users on the Support page.</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Support Phone Number
+                            </label>
+                            <input
+                                type="text"
+                                value={supportPhone}
+                                onChange={(e) => setSupportPhone(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                                placeholder="e.g. +91 9999999999"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">This phone number will be shown to users on the Support page.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </motion.div>

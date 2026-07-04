@@ -15,7 +15,8 @@ export function serveAssetsPlugin(): Plugin {
         // Only handle /assets/* requests
         const url = req.url;
         if (url?.startsWith('/assets/')) {
-          const assetPath = url.replace('/assets/', '');
+          const decodedUrl = decodeURIComponent(url);
+          const assetPath = decodedUrl.replace('/assets/', '');
           const assetsDir = resolve(__dirname, 'assets');
           const fullPath = join(assetsDir, assetPath);
 

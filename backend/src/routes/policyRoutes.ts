@@ -1,8 +1,27 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import Policy from "../models/Policy";
+import AppSettings from "../models/AppSettings";
 
 const router = Router();
+
+/**
+ * GET /api/v1/policies/settings
+ * Fetch public app settings (support email, support phone, contact email, contact phone)
+ */
+router.get("/settings", asyncHandler(async (req, res) => {
+    const settings = await AppSettings.findOne().select("appName contactEmail contactPhone supportEmail supportPhone");
+    return res.status(200).json({
+        success: true,
+        data: settings || {
+            appName: "Speedoo",
+            contactEmail: "contact@speedoo.com",
+            contactPhone: "1234567890",
+            supportEmail: "support@speedoo.com",
+            supportPhone: "1234567890",
+        },
+    });
+}));
 
 /**
  * GET /api/v1/policies

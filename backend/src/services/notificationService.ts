@@ -81,7 +81,7 @@ export const sendBroadcastNotification = async (
       userIds = sellers.map((s: any) => s._id.toString());
       break;
     case "Customer":
-      const customers = await Customer.find().select("_id");
+      const customers = await Customer.find({ isDeleted: { $ne: true } }).select("_id");
       userIds = customers.map((c: any) => c._id.toString());
       break;
     case "Delivery":

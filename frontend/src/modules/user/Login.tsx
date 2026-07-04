@@ -212,7 +212,7 @@ export default function Login() {
         {/* Minimal Privacy Text */}
         <p className="text-[11px] text-white/50 text-center font-medium drop-shadow-md pb-4">
            By continuing, you agree to our 
-           <span onClick={() => navigate("/terms")} className="text-white/80 underline cursor-pointer hover:text-white transition-colors ml-1">Terms</span> & <span onClick={() => navigate("/privacy-policy")} className="text-white/80 underline cursor-pointer hover:text-white transition-colors">Privacy Policy</span>
+           <span onClick={() => navigate("/terms-and-conditions")} className="text-white/80 underline cursor-pointer hover:text-white transition-colors ml-1">Terms</span> & <span onClick={() => navigate("/privacy-policy")} className="text-white/80 underline cursor-pointer hover:text-white transition-colors">Privacy Policy</span>
         </p>
 
       </div>

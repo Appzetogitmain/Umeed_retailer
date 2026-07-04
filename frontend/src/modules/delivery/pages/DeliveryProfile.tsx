@@ -548,13 +548,13 @@ export default function DeliveryProfile() {
             
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => navigate("/privacy-policy")}
+                onClick={() => navigate("/delivery/privacy-policy")}
                 className="bg-white py-3 px-4 rounded-xl border border-neutral-200 text-sm font-semibold text-neutral-700 hover:border-orange-500 transition-colors text-center"
               >
                 Privacy Policy
               </button>
               <button
-                onClick={() => navigate("/terms")}
+                onClick={() => navigate("/delivery/terms-and-conditions")}
                 className="bg-white py-3 px-4 rounded-xl border border-neutral-200 text-sm font-semibold text-neutral-700 hover:border-orange-500 transition-colors text-center"
               >
                 Terms & Conditions

@@ -124,7 +124,7 @@ export default function DeliverySettings() {
               </div>
             </button>
             <button 
-              onClick={() => navigate("/privacy-policy")}
+              onClick={() => navigate("/delivery/privacy-policy")}
               className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
             >
               <div className="flex-1 text-left">
@@ -142,7 +142,7 @@ export default function DeliverySettings() {
               </svg>
             </button>
             <button 
-              onClick={() => navigate("/terms")}
+              onClick={() => navigate("/delivery/terms-and-conditions")}
               className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
             >
               <div className="flex-1 text-left">

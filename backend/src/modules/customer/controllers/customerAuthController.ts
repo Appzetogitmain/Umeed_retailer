@@ -100,8 +100,8 @@ export const verifySmsOtp = asyncHandler(async (req: Request, res: Response) => 
     });
   }
 
-  // Find or create customer
-  let customer = await Customer.findOne({ phone: normalizedMobile });
+  // Find or create customer (excluding soft-deleted ones)
+  let customer = await Customer.findOne({ phone: normalizedMobile, isDeleted: { $ne: true } });
   let isNewUser = false;
 
   if (!customer) {

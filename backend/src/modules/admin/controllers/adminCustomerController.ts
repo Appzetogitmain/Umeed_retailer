@@ -17,7 +17,7 @@ export const getAllCustomers = asyncHandler(
       sortOrder = "desc",
     } = req.query;
 
-    const query: any = {};
+    const query: any = { isDeleted: { $ne: true } };
 
     if (status) query.status = status;
     if (search) {
@@ -86,7 +86,7 @@ export const getCustomerById = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const customer = await Customer.findById(id);
+    const customer = await Customer.findOne({ _id: id, isDeleted: { $ne: true } });
 
     if (!customer) {
       return res.status(404).json({
@@ -118,8 +118,8 @@ export const updateCustomerStatus = asyncHandler(
       });
     }
 
-    const customer = await Customer.findByIdAndUpdate(
-      id,
+    const customer = await Customer.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
       { status },
       { new: true, runValidators: true }
     );

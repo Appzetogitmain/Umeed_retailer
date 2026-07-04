@@ -394,8 +394,23 @@ export const deleteAccountDirect = asyncHandler(async (req: Request, res: Respon
   // Delete Notifications
   await Notification.deleteMany({ recipientId: userId, recipientType: "Customer" });
 
-  // 4. Finally, Hard Delete Customer
-  await Customer.deleteOne({ _id: userId });
+  // 4. Finally, Soft Delete Customer (preserving record for history while releasing unique keys)
+  const timestamp = Date.now();
+  await Customer.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        status: "Inactive",
+        name: "Deleted User",
+        phone: `deleted_${customer.phone}_${timestamp}`,
+        email: customer.email ? `deleted_${customer.email}_${timestamp}` : undefined,
+        fcmTokens: [],
+        fcmTokenMobile: [],
+      }
+    }
+  );
 
   return res.status(200).json({
     success: true,

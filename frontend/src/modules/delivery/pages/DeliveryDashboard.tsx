@@ -188,13 +188,35 @@ export default function DeliveryDashboard() {
             )}
           </div>
           {locationError && isOnline && (
-            <div className="mt-3 p-2 bg-red-50 border border-red-100 rounded text-xs text-red-600 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              {locationError}
+            <div className="mt-4 bg-orange-50/50 border border-orange-200 rounded-2xl p-4 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor" className="text-orange-600">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" />
+                </svg>
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  </div>
+                  <h4 className="text-sm font-bold text-neutral-900">Location Access Required</h4>
+                </div>
+                <p className="text-xs text-neutral-700 leading-relaxed font-medium mb-3">
+                  To assign you nearby orders and accurately update customers on delivery progress, the app requires access to your location while you are online.
+                </p>
+                <div className="bg-white/80 rounded-xl p-3 border border-orange-100/50">
+                  <p className="text-[11px] font-bold text-neutral-800 mb-1.5">How to enable in your device settings:</p>
+                  <ul className="text-[11px] text-neutral-600 space-y-1.5 list-disc pl-4 font-medium">
+                    <li>Open your device <strong>Settings</strong></li>
+                    <li>Navigate to <strong>Privacy & Security &gt; Location Services</strong></li>
+                    <li>Select this app and set access to <strong>"While Using the App"</strong></li>
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
         </div>
