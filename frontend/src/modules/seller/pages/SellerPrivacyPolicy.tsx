@@ -46,8 +46,6 @@ export default function SellerPrivacyPolicy() {
           </div>
           {policy && (
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-tighter">Version</span>
-              <span className="text-xs font-bold text-[#7A3E8E]">{policy.version}</span>
             </div>
           )}
         </div>

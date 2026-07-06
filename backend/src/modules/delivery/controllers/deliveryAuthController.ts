@@ -37,7 +37,7 @@ export const sendSmsOtp = asyncHandler(async (req: Request, res: Response) => {
   const normalizedMobile = cleanMobile;
 
   // Check if delivery partner exists with this mobile
-  const delivery = await Delivery.findOne({ mobile: normalizedMobile });
+  const delivery = await Delivery.findOne({ mobile: normalizedMobile, isDeleted: { $ne: true } });
   if (!delivery) {
     return res.status(400).json({
       success: false,
@@ -107,7 +107,7 @@ export const verifySmsOtp = asyncHandler(async (req: Request, res: Response) => 
   }
 
   // Find delivery partner
-  const delivery = await Delivery.findOne({ mobile: normalizedMobile }).select("-password");
+  const delivery = await Delivery.findOne({ mobile: normalizedMobile, isDeleted: { $ne: true } }).select("-password");
 
   if (!delivery) {
     return res.status(401).json({
@@ -246,7 +246,7 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     return res.status(401).json({ success: false, message: "User not authenticated" });
   }
 
-  const delivery = await Delivery.findById(userId).select("-password").lean();
+  const delivery = await Delivery.findOne({ _id: userId, isDeleted: { $ne: true } }).select("-password").lean();
 
   if (!delivery) {
     return res.status(404).json({

@@ -137,3 +137,37 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
         data: delivery.settings
     });
 });
+
+/**
+ * Soft Delete Delivery Account
+ * Sets isDeleted flag and clears FCM tokens to log user out everywhere
+ */
+export const deleteAccount = asyncHandler(async (req: Request, res: Response) => {
+    const deliveryId = req.user?.userId;
+
+    const delivery = await Delivery.findById(deliveryId);
+
+    if (!delivery) {
+        return res.status(404).json({
+            success: false,
+            message: "Delivery partner not found"
+        });
+    }
+
+    delivery.isDeleted = true;
+    delivery.deletedAt = new Date();
+    
+    // Clear tokens to log out on all devices
+    delivery.fcmTokens = [];
+    delivery.fcmTokenMobile = [];
+    
+    // Optional: make them offline
+    delivery.isOnline = false;
+
+    await delivery.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Account deleted successfully"
+    });
+});

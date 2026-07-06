@@ -30,20 +30,6 @@ export default function AuthPrompt({
         className="w-48 h-48 bg-purple-50 rounded-full flex items-center justify-center mb-8 relative shadow-inner"
       >
         <span className="text-8xl select-none">{icon}</span>
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            rotate: [0, 10, -10, 0]
-          }}
-          transition={{ 
-            duration: 4, 
-            repeat: Infinity,
-            ease: "easeInOut" 
-          }}
-          className="absolute -bottom-2 -right-2 bg-white p-4 rounded-2xl shadow-xl border border-purple-50"
-        >
-          <span className="text-4xl">✨</span>
-        </motion.div>
       </motion.div>
 
       <motion.h2 
@@ -80,16 +66,6 @@ export default function AuthPrompt({
         Login
       </motion.button>
 
-      
-      <motion.button
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        onClick={() => navigate('/')}
-        className="mt-6 text-neutral-400 font-bold text-xs hover:text-neutral-600 transition-colors uppercase tracking-widest"
-      >
-        Continue as Guest
-      </motion.button>
     </div>
   );
 }

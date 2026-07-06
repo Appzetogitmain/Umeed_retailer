@@ -59,8 +59,8 @@ export default function AboutUs() {
         {/* Logo/Brand Section */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-neutral-900 mb-2">Speedoo</h2>
-          <p className="text-sm text-neutral-600 font-medium tracking-wide">
-            Your Trusted 10-Minute Delivery Partner
+          <p className="text-sm text-purple-600 font-bold tracking-wide">
+            Lightning-Fast Delivery, Right to Your Doorstep
           </p>
         </div>
 

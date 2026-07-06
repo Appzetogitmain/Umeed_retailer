@@ -418,6 +418,22 @@ function AppContent() {
                           }
                         />
                         <Route
+                          path="/about-us"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <AboutUs />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/faq"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <FAQ />
+                            </Suspense>
+                          }
+                        />
+                        <Route
                           path="/seller/privacy-policy"
                           element={
                             <Suspense fallback={<IconLoader forceShow />}>
@@ -446,6 +462,22 @@ function AppContent() {
                           element={
                             <Suspense fallback={<IconLoader forceShow />}>
                               <DeliveryTermsAndConditions />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/delivery/support"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <DeliverySupport />
+                            </Suspense>
+                          }
+                        />
+                        <Route
+                          path="/delivery/about"
+                          element={
+                            <Suspense fallback={<IconLoader forceShow />}>
+                              <DeliveryAbout />
                             </Suspense>
                           }
                         />
@@ -507,16 +539,8 @@ function AppContent() {
                                       element={<DeliverySettings />}
                                     />
                                     <Route
-                                      path="support"
-                                      element={<DeliverySupport />}
-                                    />
-                                    <Route
                                       path="faq"
                                       element={<DeliveryFAQ />}
-                                    />
-                                    <Route
-                                      path="about"
-                                      element={<DeliveryAbout />}
                                     />
                                     <Route
                                       path="sellers-in-range"
@@ -861,11 +885,6 @@ function AppContent() {
                                     path="/account"
                                     element={<Account />}
                                   />
-                                  <Route
-                                    path="/about-us"
-                                    element={<AboutUs />}
-                                  />
-                                  <Route path="/faq" element={<FAQ />} />
                                   <Route
                                     path="/wishlist"
                                     element={<Wishlist />}

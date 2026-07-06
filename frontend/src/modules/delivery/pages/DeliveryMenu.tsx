@@ -4,15 +4,19 @@ import DeliveryBottomNav from '../components/DeliveryBottomNav';
 import { useAuth } from '../../../context/AuthContext';
 import { useDeliveryUser } from '../context/DeliveryUserContext';
 import { useState, useEffect } from 'react';
+import { useToast } from '../../../context/ToastContext';
+import { deleteDeliveryAccount } from '../../../services/api/delivery/deliveryService';
 
 export default function DeliveryMenu() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { clearUserName } = useDeliveryUser();
+  const { showToast } = useToast();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    if (showLogoutModal) {
+    if (showLogoutModal || showDeleteModal) {
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
@@ -39,13 +43,14 @@ export default function DeliveryMenu() {
         window.scrollTo(0, parseInt(scrollY) * -1);
       }
     };
-  }, [showLogoutModal]);
+  }, [showLogoutModal, showDeleteModal]);
 
   const menuItems = [
     { id: 'menu-1', title: 'Profile', route: '/delivery/profile' },
     { id: 'menu-wallet', title: 'Wallet & Payouts', route: '/delivery/wallet' },
     { id: 'menu-4', title: 'Help & Support', route: '/delivery/support' },
     { id: 'menu-5', title: 'About', route: '/delivery/about' },
+    { id: 'menu-delete', title: 'Delete Account', route: '/delivery/delete' },
     { id: 'menu-6', title: 'Logout', route: '/delivery/login' },
   ];
 
@@ -98,6 +103,13 @@ export default function DeliveryMenu() {
             />
           </svg>
         );
+      case 'menu-delete': // Delete Account
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
       case 'menu-6': // Logout
         return (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -135,6 +147,8 @@ export default function DeliveryMenu() {
   const handleMenuClick = (route: string) => {
     if (route === '/delivery/login') {
       setShowLogoutModal(true);
+    } else if (route === '/delivery/delete') {
+      setShowDeleteModal(true);
     } else {
       // Navigate to the selected route
       navigate(route);
@@ -146,6 +160,20 @@ export default function DeliveryMenu() {
     logout();
     clearUserName();
     navigate('/delivery/login');
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteDeliveryAccount();
+      logout();
+      clearUserName();
+      navigate('/delivery/login');
+      showToast('Account deleted successfully', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to delete account', 'error');
+    } finally {
+      setShowDeleteModal(false);
+    }
   };
 
   return (
@@ -174,14 +202,14 @@ export default function DeliveryMenu() {
               <button
                 key={item.id}
                 onClick={() => handleMenuClick(item.route)}
-                className={`w-full bg-white rounded-xl p-4 shadow-sm border border-neutral-200 flex items-center gap-3 hover:shadow-md transition-shadow ${item.id === 'menu-6' ? 'text-red-600 hover:bg-red-50' : 'hover:bg-neutral-50'
+                className={`w-full bg-white rounded-xl p-4 shadow-sm border border-neutral-200 flex items-center gap-3 hover:shadow-md transition-shadow ${(item.id === 'menu-6' || item.id === 'menu-delete') ? 'text-red-600 hover:bg-red-50' : 'hover:bg-neutral-50'
                   }`}
               >
-                <span className={`flex-shrink-0 ${item.id === 'menu-6' ? 'text-red-600' : 'text-neutral-600'}`}>
+                <span className={`flex-shrink-0 ${(item.id === 'menu-6' || item.id === 'menu-delete') ? 'text-red-600' : 'text-neutral-600'}`}>
                   {getMenuIcon(item.id)}
                 </span>
                 <span
-                  className={`text-sm font-medium flex-1 text-left ${item.id === 'menu-6' ? 'text-red-600' : 'text-neutral-900'
+                  className={`text-sm font-medium flex-1 text-left ${(item.id === 'menu-6' || item.id === 'menu-delete') ? 'text-red-600' : 'text-neutral-900'
                     }`}
                 >
                   {item.title}
@@ -192,7 +220,7 @@ export default function DeliveryMenu() {
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
-                  className={item.id === 'menu-6' ? 'text-red-600' : 'text-neutral-400'}
+                  className={(item.id === 'menu-6' || item.id === 'menu-delete') ? 'text-red-600' : 'text-neutral-400'}
                 >
                   <path
                     d="M9 18L15 12L9 6"
@@ -243,6 +271,42 @@ export default function DeliveryMenu() {
                   className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-sm"
                 >
                   Yes, Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onTouchMove={(e) => e.preventDefault()}
+          style={{ overscrollBehavior: 'contain' }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl border border-red-100">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-red-600">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">Delete Account?</h3>
+              <p className="text-sm text-neutral-500 mb-6">
+                Are you sure you want to delete your account? This action will disable your access.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 bg-neutral-100 text-neutral-900 py-2.5 rounded-xl font-semibold hover:bg-neutral-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-semibold hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  Yes, Delete
                 </button>
               </div>
             </div>

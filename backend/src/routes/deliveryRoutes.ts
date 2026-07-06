@@ -14,6 +14,7 @@ router.get("/profile", getProfile);
 router.put("/profile", deliveryProfileController.updateProfile);
 router.put("/status", deliveryProfileController.updateStatus);
 router.put("/settings", deliveryProfileController.updateSettings);
+router.delete("/account", deliveryProfileController.deleteAccount);
 
 // Notifications
 router.get("/notifications", deliveryNotificationController.getNotifications);

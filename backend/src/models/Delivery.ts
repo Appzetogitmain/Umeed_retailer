@@ -46,6 +46,9 @@ export interface IDelivery extends Document {
   fcmTokens?: string[];
   fcmTokenMobile?: string[];
 
+  isDeleted: boolean;
+  deletedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -209,6 +212,14 @@ const DeliverySchema = new Schema<IDelivery>(
     fcmTokenMobile: {
       type: [String],
       default: [],
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

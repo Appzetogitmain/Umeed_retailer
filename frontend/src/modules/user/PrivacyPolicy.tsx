@@ -45,8 +45,6 @@ export default function PrivacyPolicy() {
           </div>
           {policy && (
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-tighter">Version</span>
-              <span className="text-xs font-bold text-[#9048A5]">{policy.version}</span>
             </div>
           )}
         </div>
