@@ -72,8 +72,7 @@ import * as bestsellerCardController from "../modules/admin/controllers/adminBes
 // Lowest Prices Controllers
 import * as lowestPricesController from "../modules/admin/controllers/adminLowestPricesController";
 
-// PromoStrip Controllers
-import * as promoStripController from "../modules/admin/controllers/adminPromoStripController";
+
 
 // Banner Controllers
 import * as bannerController from "../modules/admin/controllers/adminBannerController";
@@ -392,12 +391,7 @@ router.put(
   lowestPricesController.reorderLowestPricesProducts,
 );
 
-// ==================== PromoStrip Routes ====================
-router.get("/promo-strips", promoStripController.getAllPromoStrips);
-router.get("/promo-strips/:id", promoStripController.getPromoStripById);
-router.post("/promo-strips", promoStripController.createPromoStrip);
-router.put("/promo-strips/:id", promoStripController.updatePromoStrip);
-router.delete("/promo-strips/:id", promoStripController.deletePromoStrip);
+
 
 // ==================== Banner Routes ====================
 router.get("/banners", bannerController.getAllBanners);

@@ -229,9 +229,7 @@ const AdminHomeSection = lazy(
 const AdminBestsellerCards = lazy(
   () => import("./modules/admin/pages/AdminBestsellerCards"),
 );
-const AdminPromoStrip = lazy(
-  () => import("./modules/admin/pages/AdminPromoStrip"),
-);
+
 const AdminLowestPrices = lazy(
   () => import("./modules/admin/pages/AdminLowestPrices"),
 );
@@ -788,10 +786,7 @@ function AppContent() {
                                       path="bestseller-cards"
                                       element={<AdminBestsellerCards />}
                                     />
-                                    <Route
-                                      path="promo-strip"
-                                      element={<AdminPromoStrip />}
-                                    />
+
                                     <Route
                                       path="lowest-prices"
                                       element={<AdminLowestPrices />}

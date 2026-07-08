@@ -123,7 +123,7 @@ const CouponSchema = new Schema<ICoupon>(
 );
 
 // Indexes for faster queries
-CouponSchema.index({ code: 1 });
+// CouponSchema.index({ code: 1 });
 CouponSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
 
 const Coupon = mongoose.model<ICoupon>("Coupon", CouponSchema);

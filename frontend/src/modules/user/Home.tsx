@@ -4,7 +4,6 @@ import HomeHero from "./components/HomeHero";
 import HomeBannerCarousel from "./components/HomeBannerCarousel";
 
 import CategoryTileSection from "./components/CategoryTileSection";
-import PromoStrip from "./components/PromoStrip";
 import LowestPricesEver from "./components/LowestPricesEver";
 
 import ProductCard from "./components/ProductCard";
@@ -124,16 +123,8 @@ export default function Home() {
       {/* Hero Header with Gradient and Tabs */}
       <HomeHero activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Promo Strip - Only on specific category tabs */}
-      {activeTab !== "all" && (
-        <div className="max-w-7xl mx-auto w-full">
-          <PromoStrip activeTab={activeTab} />
-        </div>
-      )}
-
       {/* Dynamic Banners Carousel */}
-      {activeTab === "all" &&
-        homeData.promoBanners &&
+      {homeData.promoBanners &&
         homeData.promoBanners.length > 0 && (
           <div className="max-w-7xl mx-auto w-full">
             <HomeBannerCarousel banners={homeData.promoBanners} />

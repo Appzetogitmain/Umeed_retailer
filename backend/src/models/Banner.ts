@@ -6,6 +6,7 @@ export interface IBanner extends Document {
   link?: string;
   order: number;
   isActive: boolean;
+  headerCategorySlug: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,12 @@ const BannerSchema = new Schema<IBanner>(
       type: Boolean,
       default: true,
     },
+    headerCategorySlug: {
+      type: String,
+      default: "all",
+      trim: true,
+      lowercase: true,
+    },
   },
   {
     timestamps: true,
@@ -40,6 +47,7 @@ const BannerSchema = new Schema<IBanner>(
 );
 
 // Indexes for better query performance
+BannerSchema.index({ headerCategorySlug: 1, order: 1, isActive: 1 });
 BannerSchema.index({ order: 1, isActive: 1 });
 
 const Banner = mongoose.model<IBanner>("Banner", BannerSchema);

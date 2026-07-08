@@ -7,6 +7,7 @@ export interface Banner {
   link?: string;
   order: number;
   isActive: boolean;
+  headerCategorySlug?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,6 +18,7 @@ export interface BannerFormData {
   link?: string;
   order: number;
   isActive: boolean;
+  headerCategorySlug?: string;
 }
 
 // Get all banners

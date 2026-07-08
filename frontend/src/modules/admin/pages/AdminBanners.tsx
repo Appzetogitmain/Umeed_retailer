@@ -8,9 +8,11 @@ import {
   BannerFormData,
 } from "../../../services/api/admin/adminBannerService";
 import BannerFormModal from "../components/BannerFormModal";
+import { getHeaderCategoriesAdmin, type HeaderCategory } from "../../../services/api/headerCategoryService";
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [headerCategories, setHeaderCategories] = useState<HeaderCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,7 +21,17 @@ export default function AdminBanners() {
 
   useEffect(() => {
     fetchBanners();
+    fetchHeaderCategories();
   }, []);
+
+  const fetchHeaderCategories = async () => {
+    try {
+      const data = await getHeaderCategoriesAdmin();
+      setHeaderCategories(data);
+    } catch (err) {
+      console.error("Error fetching header categories:", err);
+    }
+  };
 
   const fetchBanners = async () => {
     try {
@@ -186,6 +198,13 @@ export default function AdminBanners() {
                     </span>
                   </div>
                 </div>
+                {/* Category badge */}
+                <div className="mt-3 flex items-center justify-between border-t border-gray-50 pt-3">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</span>
+                  <span className="px-2.5 py-0.5 bg-green-50 text-green-700 text-xs font-bold rounded-md capitalize">
+                    {banner.headerCategorySlug || "all"}
+                  </span>
+                </div>
               </div>
             </div>
           ))}
@@ -198,6 +217,7 @@ export default function AdminBanners() {
         onSubmit={handleSubmit}
         banner={editingBanner}
         mode={modalMode}
+        headerCategories={headerCategories}
       />
     </div>
   );

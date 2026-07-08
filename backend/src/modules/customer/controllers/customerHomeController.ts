@@ -7,7 +7,6 @@ import HeaderCategory from "../../../models/HeaderCategory";
 import HomeSection from "../../../models/HomeSection";
 import BestsellerCard from "../../../models/BestsellerCard";
 import LowestPricesProduct from "../../../models/LowestPricesProduct";
-import PromoStrip from "../../../models/PromoStrip";
 import Banner from "../../../models/Banner";
 import FAQ from "../../../models/FAQ";
 import mongoose from "mongoose";
@@ -621,59 +620,21 @@ export const getHomeContent = async (req: Request, res: Response) => {
       }),
     );
 
-    // 10. Fetch PromoStrip for the current header category (with caching)
-    const currentHeaderCategorySlug = (headerCategorySlug as string) || "all";
-    const promoStripCacheKey = `promoStrip-${currentHeaderCategorySlug.toLowerCase()}`;
-
-    // Try to get from cache first
-    let promoStrip = cache.get(promoStripCacheKey) as any;
-
-    if (!promoStrip) {
-      const now = new Date();
-      const promoStripDoc = await PromoStrip.findOne({
-        headerCategorySlug: currentHeaderCategorySlug.toLowerCase(),
-        isActive: true,
-        startDate: { $lte: now },
-        endDate: { $gte: now },
-      })
-        .populate("categoryCards.categoryId", "name slug image")
-        .populate(
-          "featuredProducts",
-          "productName mainImage mainImageUrl galleryImageUrls galleryImages price mrp compareAtPrice discount rating reviewsCount seller",
-        )
-        .sort({ order: 1 })
-        .lean();
-
-      promoStrip = promoStripDoc;
-
-      // If we have promoStrip, filter featured products to only include in-range ones
-      if (promoStrip && (promoStrip as any).featuredProducts) {
-        (promoStrip as any).featuredProducts = (
-          promoStrip as any
-        ).featuredProducts
-          .filter((p: any) => {
-            const isAvailable =
-              nearbySellerIds && nearbySellerIds.length > 0 && p.seller
-                ? nearbySellerIds.some(
-                  (id) => id.toString() === p.seller.toString(),
-                )
-                : false;
-            return isAvailable;
-          })
-          .map((p: any) => ({ ...p, isAvailable: true }));
-      }
-
-      // Cache for 3 minutes (PromoStrip data doesn't change frequently)
-      if (promoStrip) {
-        cache.set(promoStripCacheKey, promoStrip, 3 * 60 * 1000);
-      } else {
-        // Cache null result for 1 minute to prevent repeated DB queries
-        cache.set(promoStripCacheKey, null, 60 * 1000);
-      }
+    // 10. Fetch banners from database filtered by headerCategorySlug
+    const currentHeaderCategorySlug = ((headerCategorySlug as string) || "all").toLowerCase();
+    const bannerQuery: any = { isActive: true };
+    if (currentHeaderCategorySlug === "all") {
+      // For default tab, find banners set to 'all' or legacy banners that have no headerCategorySlug defined
+      bannerQuery.$or = [
+        { headerCategorySlug: "all" },
+        { headerCategorySlug: { $exists: false } },
+        { headerCategorySlug: null }
+      ];
+    } else {
+      bannerQuery.headerCategorySlug = currentHeaderCategorySlug;
     }
 
-    // Fetch banners from database
-    const banners = await Banner.find({ isActive: true })
+    const banners = await Banner.find(bannerQuery)
       .sort({ order: 1 })
       .lean();
 
@@ -706,7 +667,7 @@ export const getHomeContent = async (req: Request, res: Response) => {
         trending,
         cookingIdeas,
         promoCards: finalPromoCards, // Return dynamic or fallback cards
-        promoStrip: promoStrip || null, // PromoStrip data for the current header category
+        promoStrip: null, // PromoStrip is deprecated, return null to maintain backward compatibility
         estimatedDeliveryTime,
       },
     });

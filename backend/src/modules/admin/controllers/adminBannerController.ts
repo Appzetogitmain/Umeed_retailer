@@ -17,7 +17,7 @@ export const getAllBanners = asyncHandler(async (_req: Request, res: Response) =
  * Create a new banner
  */
 export const createBanner = asyncHandler(async (req: Request, res: Response) => {
-  const { title, image, link, order, isActive } = req.body;
+  const { title, image, link, order, isActive, headerCategorySlug } = req.body;
 
   if (!title || !image) {
     res.status(400).json({
@@ -33,6 +33,7 @@ export const createBanner = asyncHandler(async (req: Request, res: Response) => 
     link,
     order: order || 0,
     isActive: isActive !== undefined ? isActive : true,
+    headerCategorySlug: headerCategorySlug || "all",
   });
 
   res.status(201).json({
@@ -46,7 +47,7 @@ export const createBanner = asyncHandler(async (req: Request, res: Response) => 
  */
 export const updateBanner = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { title, image, link, order, isActive } = req.body;
+  const { title, image, link, order, isActive, headerCategorySlug } = req.body;
 
   const banner = await Banner.findById(id);
 
@@ -63,6 +64,7 @@ export const updateBanner = asyncHandler(async (req: Request, res: Response) => 
   if (link !== undefined) banner.link = link;
   if (order !== undefined) banner.order = order;
   if (isActive !== undefined) banner.isActive = isActive;
+  if (headerCategorySlug !== undefined) banner.headerCategorySlug = headerCategorySlug;
 
   await banner.save();
 

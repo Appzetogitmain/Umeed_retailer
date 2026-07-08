@@ -19,7 +19,6 @@ export { default as Inventory } from "./Inventory";
 export { default as Payment } from "./Payment";
 export { default as Notification } from "./Notification";
 export { default as AppSettings } from "./AppSettings";
-export { default as PromoStrip } from "./PromoStrip";
 export { default as Banner } from "./Banner";
 
 // Support & Reference Models

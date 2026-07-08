@@ -8,6 +8,7 @@ import {
   validateImageFile,
   createImagePreview,
 } from "../../../utils/imageUpload";
+import { type HeaderCategory } from "../../../services/api/headerCategoryService";
 
 interface BannerFormModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface BannerFormModalProps {
   onSubmit: (data: BannerFormData) => Promise<void>;
   banner?: Banner | null;
   mode: "create" | "edit";
+  headerCategories: HeaderCategory[];
 }
 
 export default function BannerFormModal({
@@ -23,6 +25,7 @@ export default function BannerFormModal({
   onSubmit,
   banner,
   mode,
+  headerCategories,
 }: BannerFormModalProps) {
   const [formData, setFormData] = useState<BannerFormData>({
     title: "",
@@ -30,6 +33,7 @@ export default function BannerFormModal({
     link: "",
     order: 0,
     isActive: true,
+    headerCategorySlug: "all",
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -48,6 +52,7 @@ export default function BannerFormModal({
           link: banner.link || "",
           order: banner.order,
           isActive: banner.isActive,
+          headerCategorySlug: banner.headerCategorySlug || "all",
         });
         setImagePreview(banner.image);
       } else {
@@ -57,6 +62,7 @@ export default function BannerFormModal({
           link: "",
           order: 0,
           isActive: true,
+          headerCategorySlug: "all",
         });
         setImagePreview("");
         setImageFile(null);
@@ -186,6 +192,26 @@ export default function BannerFormModal({
               {errors.title && (
                 <p className="mt-1 text-sm text-red-500">{errors.title}</p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Header Category *
+              </label>
+              <select
+                value={formData.headerCategorySlug || "all"}
+                onChange={(e) =>
+                  setFormData({ ...formData, headerCategorySlug: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-green-100 focus:border-green-500 outline-none transition-all"
+              >
+                <option value="all">All / Home Page</option>
+                {headerCategories.map((hc) => (
+                  <option key={hc._id} value={hc.slug}>
+                    {hc.name} ({hc.slug})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
