@@ -422,12 +422,17 @@ export const createOrder = async (req: Request, res: Response) => {
 
         // Return a more informative error message if it's a validation error
         let errorMessage = "Error creating order. " + error.message;
+        let statusCode = 500;
+
         if (error.name === 'ValidationError') {
+            statusCode = 400;
             const fields = Object.keys(error.errors).join(', ');
             errorMessage = `Validation failed for fields: ${fields}. ${error.message}`;
+        } else if (error.message.includes('Insufficient stock') || error.message.includes('Invalid item')) {
+            statusCode = 400;
         }
 
-        return res.status(500).json({
+        return res.status(statusCode).json({
             success: false,
             message: errorMessage,
             error: error.message,

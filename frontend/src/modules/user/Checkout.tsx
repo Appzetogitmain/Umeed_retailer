@@ -92,6 +92,7 @@ export default function Checkout() {
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "Online">("Online");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Profile completion modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -432,7 +433,7 @@ export default function Checkout() {
     // Only bypass if explicitly passed true (handles event objects from onClick)
     const bypassProfileCheck = arg === true;
 
-    if (!selectedAddress || cart.items.length === 0) {
+    if (!selectedAddress || cart.items.length === 0 || isSubmitting) {
       return;
     }
 
@@ -452,6 +453,8 @@ export default function Checkout() {
       alert("Please ensure your address has city and pincode.");
       return;
     }
+
+    setIsSubmitting(true);
 
     // Use user's current location as fallback if address doesn't have coordinates
     const finalLatitude = selectedAddress.latitude ?? userLocation?.latitude;
@@ -520,6 +523,8 @@ export default function Checkout() {
         error.response?.data?.message ||
         "Failed to place order. Please try again.";
       alert(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -2115,14 +2120,14 @@ export default function Checkout() {
         {selectedAddress ? (
           <button
             onClick={handlePlaceOrder}
-            disabled={cart.items.length === 0}
-            className={`w-full py-3 px-4 font-bold text-sm uppercase tracking-wide transition-colors ${cart.items.length > 0
+            disabled={cart.items.length === 0 || isSubmitting}
+            className={`w-full py-3 px-4 font-bold text-sm uppercase tracking-wide transition-colors ${(cart.items.length > 0 && !isSubmitting)
               ? "text-black shadow-[0_-4px_10px_rgba(0,0,0,0.1)]"
               : "bg-neutral-300 text-neutral-500 cursor-not-allowed"
               }`}
-            style={cart.items.length > 0 ? { backgroundColor: currentTheme.accentColor } : {}}
+            style={(cart.items.length > 0 && !isSubmitting) ? { backgroundColor: currentTheme.accentColor } : {}}
           >
-            Place Order
+            {isSubmitting ? "Processing..." : "Place Order"}
           </button>
         ) : (
           <button

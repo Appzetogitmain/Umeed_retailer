@@ -59,9 +59,19 @@ export const createRazorpayOrder = async (
         };
     } catch (error: any) {
         console.error('Error creating Razorpay order:', error);
+        
+        // Extract Razorpay specific error message if available
+        let errorMessage = 'Failed to create Razorpay order';
+        if (error.error && error.error.description) {
+            errorMessage = error.error.description;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
         return {
             success: false,
-            message: error.message || 'Failed to create Razorpay order',
+            message: errorMessage,
+            errorDetails: error
         };
     }
 };

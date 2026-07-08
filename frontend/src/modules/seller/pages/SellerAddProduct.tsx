@@ -73,6 +73,7 @@ export default function SellerAddProduct() {
     stock: "0",
     status: "Available" as "Available" | "Sold out",
   });
+  const [editVariationIndex, setEditVariationIndex] = useState<number | null>(null);
 
   const [mainImageFile, setMainImageFile] = useState<File | null>(null);
   const [mainImagePreview, setMainImagePreview] = useState<string>("");
@@ -364,6 +365,12 @@ export default function SellerAddProduct() {
     setGalleryImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleVariationNumberChange = (field: keyof typeof variationForm, value: string) => {
+    // Remove leading zeros followed by a digit (e.g., "05" -> "5", "00" -> "0")
+    let cleaned = value.replace(/^0+(?=\d)/, '');
+    setVariationForm(prev => ({ ...prev, [field]: cleaned }));
+  };
+
   const addVariation = () => {
     if (!variationForm.title || !variationForm.price) {
       setUploadError("Please fill in variation title and price");
@@ -387,7 +394,15 @@ export default function SellerAddProduct() {
       status: variationForm.status,
     };
 
-    setVariations([...variations, newVariation]);
+    if (editVariationIndex !== null) {
+      const updatedVariations = [...variations];
+      updatedVariations[editVariationIndex] = newVariation;
+      setVariations(updatedVariations);
+      setEditVariationIndex(null);
+    } else {
+      setVariations([...variations, newVariation]);
+    }
+
     setVariationForm({
       title: "",
       price: "",
@@ -400,6 +415,28 @@ export default function SellerAddProduct() {
 
   const removeVariation = (index: number) => {
     setVariations((prev) => prev.filter((_, i) => i !== index));
+    if (editVariationIndex === index) {
+      setEditVariationIndex(null);
+      setVariationForm({
+        title: "",
+        price: "",
+        discPrice: "0",
+        stock: "0",
+        status: "Available",
+      });
+    }
+  };
+
+  const editVariation = (index: number) => {
+    setEditVariationIndex(index);
+    const variation = variations[index];
+    setVariationForm({
+      title: variation.title || "",
+      price: (variation.price || 0).toString(),
+      discPrice: (variation.discPrice || 0).toString(),
+      stock: (variation.stock || 0).toString(),
+      status: (variation.status as "Available" | "Sold out") || "Available",
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -892,12 +929,7 @@ export default function SellerAddProduct() {
                   <input
                     type="number"
                     value={variationForm.price}
-                    onChange={(e) =>
-                      setVariationForm({
-                        ...variationForm,
-                        price: e.target.value,
-                      })
-                    }
+                    onChange={(e) => handleVariationNumberChange("price", e.target.value)}
                     placeholder="100"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
@@ -909,40 +941,47 @@ export default function SellerAddProduct() {
                   <input
                     type="number"
                     value={variationForm.discPrice}
-                    onChange={(e) =>
-                      setVariationForm({
-                        ...variationForm,
-                        discPrice: e.target.value,
-                      })
-                    }
+                    onChange={(e) => handleVariationNumberChange("discPrice", e.target.value)}
                     placeholder="80"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Stock (0 = Unlimited)
+                    Stock
                   </label>
                   <input
                     type="number"
                     value={variationForm.stock}
-                    onChange={(e) =>
-                      setVariationForm({
-                        ...variationForm,
-                        stock: e.target.value,
-                      })
-                    }
+                    onChange={(e) => handleVariationNumberChange("stock", e.target.value)}
                     placeholder="0"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <button
                     type="button"
                     onClick={addVariation}
                     className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium">
-                    Add Variation
+                    {editVariationIndex !== null ? "Save Variation" : "Add Variation"}
                   </button>
+                  {editVariationIndex !== null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditVariationIndex(null);
+                        setVariationForm({
+                          title: "",
+                          price: "",
+                          discPrice: "0",
+                          stock: "0",
+                          status: "Available",
+                        });
+                      }}
+                      className="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded-lg font-medium">
+                      Cancel
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -956,7 +995,7 @@ export default function SellerAddProduct() {
                     {variations.map((variation, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 bg-white border border-neutral-200 rounded-lg">
+                        className={`flex items-center justify-between p-3 bg-white border ${editVariationIndex === index ? 'border-teal-500 ring-1 ring-teal-500' : 'border-neutral-200'} rounded-lg`}>
                         <div className="flex-1">
                           <span className="font-medium">{variation.title}</span>{" "}
                           - ₹{variation.price}
@@ -966,19 +1005,23 @@ export default function SellerAddProduct() {
                             </span>
                           )}
                           <span className="ml-4 text-sm text-neutral-600">
-                            Stock:{" "}
-                            {variation.stock === 0
-                              ? "Unlimited"
-                              : variation.stock}{" "}
-                            | Status: {variation.status}
+                            Stock: {variation.stock} | Status: {variation.status}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeVariation(index)}
-                          className="text-red-600 hover:text-red-700 ml-4">
-                          Remove
-                        </button>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => editVariation(index)}
+                            className="text-teal-600 hover:text-teal-700 ml-4">
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeVariation(index)}
+                            className="text-red-600 hover:text-red-700 ml-4">
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

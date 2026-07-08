@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getOrders, Order, GetOrdersParams } from '../../../services/api/orderService';
+import { jsPDF } from 'jspdf';
 
 
 type SortField = 'orderId' | 'deliveryDate' | 'orderDate' | 'status' | 'amount';
@@ -11,13 +12,17 @@ export default function SellerOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [dateRange, setDateRange] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const fromDateRef = useRef<HTMLInputElement>(null);
+  const toDateRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState('All Status');
   const [entriesPerPage, setEntriesPerPage] = useState('10');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   // Fetch orders from API
   useEffect(() => {
@@ -33,12 +38,9 @@ export default function SellerOrders() {
         };
 
         // Parse date range
-        if (dateRange) {
-          const [startDate, endDate] = dateRange.split(' - ');
-          if (startDate && endDate) {
-            params.dateFrom = startDate;
-            params.dateTo = endDate;
-          }
+        if (dateFrom && dateTo) {
+          params.dateFrom = dateFrom;
+          params.dateTo = dateTo;
         }
 
         // Add status filter
@@ -65,10 +67,11 @@ export default function SellerOrders() {
     };
 
     fetchOrders();
-  }, [dateRange, status, entriesPerPage, searchQuery, currentPage, sortField, sortDirection]);
+  }, [dateFrom, dateTo, status, entriesPerPage, searchQuery, currentPage, sortField, sortDirection]);
 
   const handleClearDate = () => {
-    setDateRange('');
+    setDateFrom('');
+    setDateTo('');
     setCurrentPage(1);
   };
 
@@ -81,12 +84,63 @@ export default function SellerOrders() {
     }
   };
 
-  const handleExport = () => {
+  const filteredAndSortedOrders = useMemo(() => {
+    let result = [...orders];
+
+    // Client-side filtering as fallback/enhancement
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(order =>
+        order.orderId?.toLowerCase().includes(query) ||
+        order.status?.toLowerCase().includes(query) ||
+        order.amount?.toString().includes(query)
+      );
+    }
+    
+    if (status !== 'All Status') {
+      result = result.filter(order => order.status === status);
+    }
+
+    if (dateFrom && dateTo) {
+      const start = new Date(dateFrom).getTime();
+      const end = new Date(dateTo).getTime();
+      // adjust end to include the whole day
+      const adjustedEnd = end + (24 * 60 * 60 * 1000) - 1;
+      
+      result = result.filter(order => {
+        if (!order.orderDate) return true;
+        const orderTime = new Date(order.orderDate).getTime();
+        return orderTime >= start && orderTime <= adjustedEnd;
+      });
+    }
+
+    // Apply sorting
+    if (sortField) {
+      result.sort((a, b) => {
+        let aVal = a[sortField];
+        let bVal = b[sortField];
+        if (aVal == null) aVal = "";
+        if (bVal == null) bVal = "";
+        
+        if (sortField === 'amount') {
+          return sortDirection === 'asc' ? (Number(aVal) - Number(bVal)) : (Number(bVal) - Number(aVal));
+        }
+
+        return sortDirection === 'asc' 
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      });
+    }
+
+    return result;
+  }, [orders, searchQuery, status, dateFrom, dateTo, sortField, sortDirection]);
+
+  const handleExportCSV = () => {
     // Create CSV content
     const headers = ['Order ID', 'Delivery Date', 'Order Date', 'Status', 'Amount'];
     const csvContent = [
       headers.join(','),
-      ...orders.map(order =>
+      ...filteredAndSortedOrders.map(order =>
         [order.orderId, order.deliveryDate, order.orderDate, order.status, order.amount].join(',')
       )
     ].join('\n');
@@ -103,12 +157,84 @@ export default function SellerOrders() {
     document.body.removeChild(link);
   };
 
+  const handleExportExcel = () => {
+    const headers = ['Order ID', 'Delivery Date', 'Order Date', 'Status', 'Amount'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredAndSortedOrders.map(order =>
+        [order.orderId, order.deliveryDate, order.orderDate, order.status, order.amount].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `orders_${new Date().toISOString().split('T')[0]}.xls`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica");
+    doc.setFontSize(16);
+    doc.text("Speedoo - Seller Orders Export", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
+
+    let y = 30;
+    const cols = ["Order ID", "Delivery Date", "Order Date", "Status", "Amount"];
+    doc.setFont("helvetica", "bold");
+    let x = 14;
+    cols.forEach((col, idx) => {
+      let width = 35;
+      if (idx === 0) width = 45;
+      if (idx === 3) width = 30;
+      doc.text(col, x, y);
+      x += width;
+    });
+
+    y += 8;
+    doc.line(14, y - 4, 195, y - 4);
+
+    doc.setFont("helvetica", "normal");
+    filteredAndSortedOrders.forEach(order => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      x = 14;
+      
+      const row = [
+        order.orderId || "N/A",
+        order.deliveryDate || "N/A",
+        order.orderDate || "N/A",
+        order.status || "N/A",
+        order.amount ? `Rs. ${order.amount}` : "Rs. 0"
+      ];
+
+      row.forEach((col, idx) => {
+        let width = 35;
+        if (idx === 0) width = 45;
+        if (idx === 3) width = 30;
+        doc.text(String(col), x, y);
+        x += width;
+      });
+      y += 8;
+    });
+
+    doc.save(`orders_${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
   // Pagination (client-side for now, can be moved to backend later)
   const entriesPerPageNum = parseInt(entriesPerPage);
-  const totalPages = Math.ceil(orders.length / entriesPerPageNum);
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedOrders.length / entriesPerPageNum));
   const startIndex = (currentPage - 1) * entriesPerPageNum;
   const endIndex = startIndex + entriesPerPageNum;
-  const paginatedOrders = orders.slice(startIndex, endIndex);
+  const paginatedOrders = filteredAndSortedOrders.slice(startIndex, endIndex);
 
   const handlePreviousPage = () => {
     setCurrentPage(prev => Math.max(1, prev - 1));
@@ -167,46 +293,86 @@ export default function SellerOrders() {
           <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-neutral-200">
             <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-4">
               {/* Date Range Filter */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full lg:w-auto">
                 <label className="text-xs sm:text-sm font-medium text-neutral-700 whitespace-nowrap">
                   From - To Order Date
                 </label>
-                <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 w-full sm:w-auto">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-neutral-500 flex-shrink-0"
-                  >
-                    <path
-                      d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    value={dateRange}
-                    onChange={(e) => {
-                      setDateRange(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="flex-1 sm:w-48 text-xs sm:text-sm text-neutral-600 bg-transparent focus:outline-none placeholder:text-neutral-400"
-                    placeholder="MM/DD/YYYY - MM/DD/YYYY"
-                  />
-                  {dateRange && (
-                    <button
-                      onClick={handleClearDate}
-                      className="ml-2 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors flex-shrink-0"
+                <div className="flex items-center gap-2 bg-white border border-neutral-300 rounded px-2 sm:px-3 py-1 sm:py-1.5 w-full sm:w-auto">
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => fromDateRef.current?.showPicker?.() || fromDateRef.current?.focus()}
+                      className="p-1 hover:bg-neutral-100 rounded transition-colors"
                     >
-                      Clear
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="text-neutral-500 flex-shrink-0">
+                        <path
+                          d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
                     </button>
-                  )}
+                    <input
+                      type="date"
+                      ref={fromDateRef}
+                      value={dateFrom}
+                      onChange={(e) => {
+                        setDateFrom(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      max={dateTo || undefined}
+                      className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0 bg-transparent focus:outline-none"
+                    />
+                  </div>
+                  <span className="text-neutral-400 font-medium text-xs sm:text-sm">-</span>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => toDateRef.current?.showPicker?.() || toDateRef.current?.focus()}
+                      className="p-1 hover:bg-neutral-100 rounded transition-colors"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="text-neutral-500 flex-shrink-0">
+                        <path
+                          d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <input
+                      type="date"
+                      ref={toDateRef}
+                      value={dateTo}
+                      onChange={(e) => {
+                        setDateTo(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      min={dateFrom || undefined}
+                      className="border-none focus-visible:ring-0 h-8 text-xs w-28 p-0 bg-transparent focus:outline-none"
+                    />
+                  </div>
                 </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={handleClearDate}
+                    className="px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded transition-colors">
+                    Clear
+                  </button>
+                )}
               </div>
 
               {/* Status Filter */}
@@ -266,45 +432,82 @@ export default function SellerOrders() {
               </div>
 
               {/* Export Button */}
-              <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                <button
-                  onClick={handleExport}
-                  className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto"
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="flex-shrink-0"
+              <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
+                <div className="relative">
+                  <button
+                    onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded text-xs sm:text-sm font-medium transition-colors w-full sm:w-auto"
                   >
-                    <path
-                      d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15M7 10L12 15M12 15L17 10M12 15V3"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Export</span>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="hidden sm:block flex-shrink-0"
-                  >
-                    <path
-                      d="M6 9L12 15L18 9"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="flex-shrink-0"
+                    >
+                      <path
+                        d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15M7 10L12 15M12 15L17 10M12 15V3"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">Export</span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="hidden sm:block flex-shrink-0"
+                    >
+                      <path
+                        d="M6 9L12 15L18 9"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  {isExportDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsExportDropdownOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-neutral-200 py-1 z-20">
+                        <button
+                          onClick={() => {
+                            handleExportCSV();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                          Export as CSV
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleExportExcel();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                          Export as Excel
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleExportPDF();
+                            setIsExportDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors">
+                          Export as PDF
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -522,9 +725,14 @@ export default function SellerOrders() {
 
           {/* Pagination */}
           <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
-            <div className="text-xs sm:text-sm text-neutral-700">
-              Showing {orders.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, orders.length)} of {orders.length} entries
-            </div>
+              <span className="text-sm text-neutral-700">
+                Showing <span className="font-medium">{filteredAndSortedOrders.length > 0 ? startIndex + 1 : 0}</span> to{" "}
+                <span className="font-medium">
+                  {Math.min(endIndex, filteredAndSortedOrders.length)}
+                </span>{" "}
+                of <span className="font-medium">{filteredAndSortedOrders.length}</span>{" "}
+                entries
+              </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePreviousPage}

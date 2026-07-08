@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRazorpayOrder, verifyPayment } from '../services/api/paymentService';
 
 interface RazorpayCheckoutProps {
@@ -31,6 +31,7 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
     // re-run this effect and re-open the Razorpay modal repeatedly. This guard
     // ensures payment is only initiated once per mount.
     const hasInitiatedRef = useRef(false);
+    const [status, setStatus] = useState<'initiating' | 'verifying'>('initiating');
 
     useEffect(() => {
         if (hasInitiatedRef.current) return;
@@ -83,6 +84,7 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
                         color: '#F57C00', // Speedoo Orange
                     },
                     handler: async function (response: any) {
+                        setStatus('verifying');
                         try {
                             // Verify payment with backend
                             const verificationResponse = await verifyPayment({
@@ -127,8 +129,14 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
             <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-                    <h3 className="text-lg font-semibold mb-2">Initiating Payment...</h3>
-                    <p className="text-gray-600">Please wait while we redirect you to the payment gateway</p>
+                    <h3 className="text-lg font-semibold mb-2">
+                        {status === 'initiating' ? 'Initiating Payment...' : 'Verifying Payment...'}
+                    </h3>
+                    <p className="text-gray-600">
+                        {status === 'initiating' 
+                            ? 'Please wait while we redirect you to the payment gateway' 
+                            : 'Please wait while we confirm your payment securely'}
+                    </p>
                 </div>
             </div>
         </div>
