@@ -46,9 +46,10 @@ export const getHomeContent = async (
     return response.data;
   };
 
-  if (useCache) {
-    return apiCache.getOrFetch(cacheKey, fetchFn, cacheTTL);
-  }
+  // Temporarily bypass cache during development to see immediate changes
+  // if (useCache) {
+  //   return apiCache.getOrFetch(cacheKey, fetchFn, cacheTTL);
+  // }
 
   return fetchFn();
 };
