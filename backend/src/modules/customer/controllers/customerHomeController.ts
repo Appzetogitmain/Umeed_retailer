@@ -537,44 +537,7 @@ export const getHomeContent = async (req: Request, res: Response) => {
       }),
     );
 
-    // Fallback to hardcoded cards if no categories with headerCategoryId exist
-    const finalPromoCards =
-      promoCards.length > 0
-        ? promoCards
-        : [
-          {
-            id: "self-care",
-            badge: "Up to 55% OFF",
-            title: "Self Care & Wellness",
-            categoryId: "personal-care",
-            bgColor: "bg-yellow-50",
-            subcategoryImages: [],
-          },
-          {
-            id: "hot-meals",
-            badge: "Up to 55% OFF",
-            title: "Hot Meals & Drinks",
-            categoryId: "breakfast-instant",
-            bgColor: "bg-yellow-50",
-            subcategoryImages: [],
-          },
-          {
-            id: "kitchen-essentials",
-            badge: "Up to 55% OFF",
-            title: "Kitchen Essentials",
-            categoryId: "atta-rice",
-            bgColor: "bg-yellow-50",
-            subcategoryImages: [],
-          },
-          {
-            id: "cleaning-home",
-            badge: "Up to 75% OFF",
-            title: "Cleaning & Home Needs",
-            categoryId: "household",
-            bgColor: "bg-yellow-50",
-            subcategoryImages: [],
-          },
-        ];
+    const finalPromoCards = promoCards;
 
     // 9. Dynamic Home Sections - Fetch from database
     // Filter by pageLocation: "home" if we are on the main home page
@@ -634,9 +597,20 @@ export const getHomeContent = async (req: Request, res: Response) => {
       bannerQuery.headerCategorySlug = currentHeaderCategorySlug;
     }
 
-    const banners = await Banner.find(bannerQuery)
+    let banners = await Banner.find(bannerQuery)
       .sort({ order: 1 })
       .lean();
+
+    // Fallback to "all" banners if none found for specific header category
+    if (banners.length === 0 && currentHeaderCategorySlug !== "all") {
+      const fallbackQuery: any = { isActive: true };
+      fallbackQuery.$or = [
+        { headerCategorySlug: "all" },
+        { headerCategorySlug: { $exists: false } },
+        { headerCategorySlug: null }
+      ];
+      banners = await Banner.find(fallbackQuery).sort({ order: 1 }).lean();
+    }
 
     res.status(200).json({
       success: true,
@@ -647,23 +621,7 @@ export const getHomeContent = async (req: Request, res: Response) => {
         // Dynamic sections created by admin
         homeSections: dynamicSections,
         shops,
-        promoBanners:
-          banners.length > 0
-            ? banners
-            : [
-              {
-                id: 1,
-                image:
-                  "https://img.freepik.com/free-vector/horizontal-banner-template-grocery-sales_23-2149432421.jpg",
-                link: "/category/grocery",
-              },
-              {
-                id: 2,
-                image:
-                  "https://img.freepik.com/free-vector/flat-supermarket-social-media-cover-template_23-2149363385.jpg",
-                link: "/category/snacks",
-              },
-            ],
+        promoBanners: banners, // Return actual banners or empty array, no dummy images
         trending,
         cookingIdeas,
         promoCards: finalPromoCards, // Return dynamic or fallback cards
