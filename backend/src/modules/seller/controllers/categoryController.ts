@@ -31,9 +31,13 @@ export const getCategories = asyncHandler(
     // Get subcategory and product counts for each category
     const categoriesWithCounts = await Promise.all(
       categories.map(async (category) => {
-        const subcategoryCount = await SubCategory.countDocuments({
+        const oldSubcategoryCount = await SubCategory.countDocuments({
           category: category._id,
         });
+        const newSubcategoryCount = await Category.countDocuments({
+          parentId: category._id,
+        });
+        const subcategoryCount = oldSubcategoryCount + newSubcategoryCount;
 
         const productCount = await Product.countDocuments({
           category: category._id, // Note: Product model uses 'category', not 'categoryId'
@@ -340,35 +344,74 @@ export const getAllSubcategories = asyncHandler(
       sortBy === "subcategoryName" ? "name" : (sortBy as string);
     sort[sortField] = sortOrder === "asc" ? 1 : -1;
 
-    // Fetch subcategories from the SubCategory model instead of Category model
-    // This fixes the issue where subcategories created by Admin (in SubCategory collection)
-    // were not visible to Sellers because this controller was looking in Category collection
-    const subcategories = await SubCategory.find(query)
-      .populate("category", "name image")
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum);
+    const categoryQuery = { parentId: { $ne: null }, ...query };
+    console.log("getAllSubcategories -> categoryQuery:", categoryQuery);
+    
+    // Fetch from both models
+    const newSubs = await Category.find(categoryQuery).populate("parentId", "name image");
+    const oldSubs = await SubCategory.find(query).populate("category", "name image");
+    
+    console.log("newSubs.length:", newSubs.length, "oldSubs.length:", oldSubs.length);
 
-    // Get product counts and format response
+    // Format new model subcategories
+    const formattedNewSubs = newSubs.map(cat => ({
+        id: cat._id,
+        _id: cat._id,
+        categoryName: (cat.parentId as any)?.name || "Unknown",
+        subcategoryName: cat.name,
+        subcategoryImage: cat.image || "",
+        isNewModel: true,
+        totalProduct: 0
+    }));
+
+    // Format old model subcategories
+    const formattedOldSubs = oldSubs.map(sub => ({
+        id: sub._id,
+        _id: sub._id,
+        categoryName: (sub.category as any)?.name || "Unknown",
+        subcategoryName: sub.name,
+        subcategoryImage: sub.image || "",
+        isNewModel: false,
+        totalProduct: 0
+    }));
+
+    const allSubs = [...formattedNewSubs, ...formattedOldSubs];
+
+    // Remove duplicates
+    const uniqueSubs = Array.from(
+      new Map(
+        allSubs.map((item) => [item.id.toString(), item])
+      ).values()
+    );
+
+    // Sort
+    uniqueSubs.sort((a, b) => {
+      const aValue = (a as any)[sortField] || "";
+      const bValue = (b as any)[sortField] || "";
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    // Paginate
+    const paginatedSubs = uniqueSubs.slice(skip, skip + limitNum);
+
+    // Get product counts
     const subcategoriesWithCounts = await Promise.all(
-      subcategories.map(async (subcategory) => {
-        const productCount = await Product.countDocuments({
-          subcategory: subcategory._id, // Note: Product model uses 'subcategory', not 'subcategoryId'
-        });
-
-        const parentCategory = subcategory.category as any;
-
+      paginatedSubs.map(async (subcategory) => {
+        const productCountOld = await Product.countDocuments({ subcategory: subcategory.id });
+        const productCountNew = await Product.countDocuments({ category: subcategory.id });
+        
         return {
-          id: subcategory._id,
-          categoryName: parentCategory?.name || "Unknown",
-          subcategoryName: subcategory.name,
-          subcategoryImage: subcategory.image || "",
-          totalProduct: productCount,
+          ...subcategory,
+          totalProduct: productCountOld + productCountNew,
         };
       })
     );
 
-    const total = await SubCategory.countDocuments(query);
+    const total = uniqueSubs.length;
 
     return res.status(200).json({
       success: true,

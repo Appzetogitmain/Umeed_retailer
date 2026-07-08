@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   getProducts,
   deleteProduct,
@@ -22,7 +22,8 @@ export default function SellerProductList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Category");
   const [statusFilter, setStatusFilter] = useState("All Products");
-  const [stockFilter, setStockFilter] = useState("All Products");
+  const location = useLocation();
+  const [stockFilter, setStockFilter] = useState(location.state?.stock || "All Products");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(

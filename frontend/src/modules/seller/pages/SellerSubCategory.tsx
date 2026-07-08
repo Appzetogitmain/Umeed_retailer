@@ -52,6 +52,8 @@ export default function SellerSubCategory() {
             let bVal: any = b[sortColumn as keyof typeof b];
             if (typeof aVal === 'string') {
                 aVal = aVal.toLowerCase();
+            }
+            if (typeof bVal === 'string') {
                 bVal = bVal.toLowerCase();
             }
             if (sortDirection === 'asc') {
