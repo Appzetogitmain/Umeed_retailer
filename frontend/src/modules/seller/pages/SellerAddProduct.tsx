@@ -44,8 +44,6 @@ export default function SellerAddProduct() {
     subcategory: "",
     subSubCategory: "",
     publish: "No",
-    popular: "No",
-    dealOfDay: "No",
     brand: "",
     tags: "",
     smallDescription: "",
@@ -182,8 +180,6 @@ export default function SellerAddProduct() {
                 (product as any).subSubCategoryId ||
                 "",
               publish: product.publish ? "Yes" : "No",
-              popular: product.popular ? "Yes" : "No",
-              dealOfDay: product.dealOfDay ? "Yes" : "No",
               brand: (product.brand as any)?._id || product.brandId || "",
               tags: product.tags.join(", "),
               smallDescription: product.smallDescription || "",
@@ -481,8 +477,6 @@ export default function SellerAddProduct() {
         subSubCategoryId: formData.subSubCategory || undefined,
         brandId: formData.brand || undefined,
         publish: formData.publish === "Yes",
-        popular: formData.popular === "Yes",
-        dealOfDay: formData.dealOfDay === "Yes",
         seoTitle: formData.seoTitle || undefined,
         seoKeywords: formData.seoKeywords || undefined,
         seoImageAlt: formData.seoImageAlt || undefined,
@@ -515,7 +509,7 @@ export default function SellerAddProduct() {
         const updateFn = isAdmin ? adminUpdateProduct : updateProduct;
         response = await updateFn(id as string, productData as any);
       } else {
-        response = await createProduct(productData);
+        response = await createProduct(productData as any);
       }
 
       if (response.success) {
@@ -532,8 +526,6 @@ export default function SellerAddProduct() {
               subcategory: "",
               subSubCategory: "",
               publish: "No",
-              popular: "No",
-              dealOfDay: "No",
               brand: "",
               tags: "",
               smallDescription: "",
@@ -737,32 +729,7 @@ export default function SellerAddProduct() {
                     <option value="Yes">Yes</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Make Product Popular?
-                  </label>
-                  <select
-                    name="popular"
-                    value={formData.popular}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white">
-                    <option value="No">No</option>
-                    <option value="Yes">Yes</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Insert to Deal of the day?
-                  </label>
-                  <select
-                    name="dealOfDay"
-                    value={formData.dealOfDay}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white">
-                    <option value="No">No</option>
-                    <option value="Yes">Yes</option>
-                  </select>
-                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Select Brand
@@ -894,6 +861,8 @@ export default function SellerAddProduct() {
                   <option value="Weight">Weight</option>
                   <option value="Color">Color</option>
                   <option value="Pack">Pack</option>
+                  <option value="Variant">Variant</option>
+                  <option value="Options">Options</option>
                 </select>
               </div>
 

@@ -11,8 +11,9 @@ import {
   uploadImageFromBuffer,
   uploadDocumentFromBuffer,
   deleteImage,
-} from "../services/cloudinaryService";
-import { CLOUDINARY_FOLDERS } from "../config/cloudinary";
+  validateImageBuffer,
+  IMAGE_FOLDERS,
+} from "../services/imageService";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const router = Router();
@@ -32,7 +33,21 @@ router.post(
       });
     }
 
-    const folder = (req.body.folder as string) || CLOUDINARY_FOLDERS.PRODUCTS;
+    let folder = (req.body.folder as string) || IMAGE_FOLDERS.PRODUCTS;
+    folder = folder.replace(/\\/g, '/');
+    if (folder.includes('/')) {
+        folder = folder.split('/').pop() || IMAGE_FOLDERS.PRODUCTS;
+    }
+    if (folder === 'gallery' || folder === 'Speedoo') {
+        folder = 'products';
+    }
+    
+    let maxBytes = 10 * 1024 * 1024; // 10MB default
+    if (folder === IMAGE_FOLDERS.BANNERS) maxBytes = 15 * 1024 * 1024;
+    else if (folder === IMAGE_FOLDERS.CATEGORIES || folder === IMAGE_FOLDERS.SELLERS) maxBytes = 5 * 1024 * 1024;
+    
+    await validateImageBuffer((req as any).file.buffer, (req as any).file.mimetype, maxBytes);
+
     const result = await uploadImageFromBuffer((req as any).file.buffer, {
       folder,
       resourceType: "image",
@@ -59,8 +74,23 @@ router.post(
       });
     }
 
-    const folder = (req.body.folder as string) || CLOUDINARY_FOLDERS.PRODUCTS;
+    let folder = (req.body.folder as string) || IMAGE_FOLDERS.PRODUCTS;
+    folder = folder.replace(/\\/g, '/');
+    if (folder.includes('/')) {
+        folder = folder.split('/').pop() || IMAGE_FOLDERS.PRODUCTS;
+    }
+    if (folder === 'gallery' || folder === 'Speedoo') {
+        folder = 'products';
+    }
     const files = (req as any).files as any[];
+    
+    let maxBytes = 10 * 1024 * 1024; // 10MB default
+    if (folder === IMAGE_FOLDERS.BANNERS) maxBytes = 15 * 1024 * 1024;
+    else if (folder === IMAGE_FOLDERS.CATEGORIES || folder === IMAGE_FOLDERS.SELLERS) maxBytes = 5 * 1024 * 1024;
+
+    for (const file of files) {
+        await validateImageBuffer(file.buffer, file.mimetype, maxBytes);
+    }
 
     const uploadPromises = files.map((file) =>
       uploadImageFromBuffer(file.buffer, {
@@ -95,12 +125,14 @@ router.post(
     }
 
     // Determine folder based on user type if authenticated, otherwise default to delivery
-    let folder: string = CLOUDINARY_FOLDERS.DELIVERY_DOCUMENTS;
+    let folder: string = IMAGE_FOLDERS.DELIVERY_DOCUMENTS;
     const userType = (req as any).user?.userType;
 
     if (userType === "Seller") {
-      folder = CLOUDINARY_FOLDERS.SELLER_DOCUMENTS;
+      folder = IMAGE_FOLDERS.SELLER_DOCUMENTS;
     }
+    
+    await validateImageBuffer((req as any).file.buffer, (req as any).file.mimetype, 10 * 1024 * 1024);
 
     // Check if it's an image or PDF
     const isImage = (req as any).file.mimetype.startsWith("image/");
@@ -135,14 +167,18 @@ router.post(
     }
 
     // Determine folder
-    let folder: string = CLOUDINARY_FOLDERS.DELIVERY_DOCUMENTS;
+    let folder: string = IMAGE_FOLDERS.DELIVERY_DOCUMENTS;
     const userType = (req as any).user?.userType;
 
     if (userType === "Seller") {
-      folder = CLOUDINARY_FOLDERS.SELLER_DOCUMENTS;
+      folder = IMAGE_FOLDERS.SELLER_DOCUMENTS;
     }
 
     const files = (req as any).files as any[];
+    
+    for (const file of files) {
+        await validateImageBuffer(file.buffer, file.mimetype, 10 * 1024 * 1024);
+    }
 
     const uploadPromises = files.map((file) => {
       const isImage = file.mimetype.startsWith("image/");

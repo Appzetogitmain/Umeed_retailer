@@ -18,6 +18,8 @@ import { seedHeaderCategories } from "./utils/seedHeaderCategories";
 import { seedFAQs } from "./utils/seedFAQs";
 import { initializeSocket } from "./socket/socketService";
 import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from "./config/corsOrigins";
+import { ensureUploadDirs } from "./utils/ensureUploadDirs";
+import { cleanupTempFiles } from "./services/imageService";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -127,6 +129,8 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 async function startServer() {
+  ensureUploadDirs();
+  cleanupTempFiles();
   // Connect DB then ensure default admin exists
   await connectDB();
   await ensureDefaultAdmin();
