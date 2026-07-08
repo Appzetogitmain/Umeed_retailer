@@ -4,7 +4,7 @@ import HomeHero from "./components/HomeHero";
 import HomeBannerCarousel from "./components/HomeBannerCarousel";
 
 import CategoryTileSection from "./components/CategoryTileSection";
-import LowestPricesEver from "./components/LowestPricesEver";
+
 
 import ProductCard from "./components/ProductCard";
 import { getHomeContent } from "../../services/api/customerHomeService";
@@ -131,57 +131,14 @@ export default function Home() {
           </div>
         )}
 
-      {/* Lowest Prices Ever - Only on specific category tabs */}
-      {activeTab !== "all" && (
-        <div className="max-w-7xl mx-auto w-full">
-          <LowestPricesEver
-            activeTab={activeTab}
-            products={homeData.lowestPrices}
-          />
-        </div>
-      )}
+
 
       {/* Main content */}
       <div
         ref={contentRef}
         className="bg-neutral-50 -mt-2 pt-1 pb-10 space-y-5 md:space-y-8 md:pt-4 w-full">
         <div className="max-w-7xl mx-auto w-full">
-        {/* Filtered Products Section (from bestsellers) */}
-        {activeTab !== "all" && filteredProducts.length > 0 && (
-          <div data-products-section className="mt-6 mb-6 md:mt-8 md:mb-8">
-            <h2 className="text-lg md:text-2xl font-semibold text-neutral-900 mb-3 md:mb-6 px-4 md:px-6 lg:px-8 tracking-tight capitalize">
-              {activeTab === "grocery" ? "Grocery Items" : activeTab}
-            </h2>
-            <div className="px-4 md:px-6 lg:px-8">
-              {filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4">
-                  {filteredProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      categoryStyle={true}
-                      showBadge={true}
-                      showPackBadge={false}
-                      showStockInfo={true}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="px-4 md:px-6 lg:px-8 py-16 text-center flex flex-col items-center justify-center bg-white rounded-2xl border border-neutral-100 shadow-sm">
-                  <div className="w-16 h-16 bg-neutral-50 border border-neutral-100 rounded-full flex items-center justify-center mb-3 shadow-inner animate-pulse">
-                    <span className="text-2xl">🛍️</span>
-                  </div>
-                  <p className="text-neutral-800 font-semibold md:text-lg">
-                    No products available in this category for your area
-                  </p>
-                  <p className="text-neutral-500 text-sm mt-1 max-w-xs">
-                    Sellers delivering to your location don't have these items in stock right now. Try a different category!
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+
 
         {/* Content Sections */}
         {(activeTab === "all" || (homeData.homeSections && homeData.homeSections.length > 0)) && (
