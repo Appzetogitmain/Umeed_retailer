@@ -115,6 +115,7 @@ export const capturePayment = async (
 ) => {
     const session = await mongoose.startSession();
     session.startTransaction();
+    let isSessionEnded = false;
 
     try {
         // Verify signature
@@ -190,23 +191,17 @@ export const capturePayment = async (
         }
         await order.save({ session });
 
-        // Trigger creation of Pending commissions
+        await session.commitTransaction();
+        session.endSession();
+        isSessionEnded = true;
+
+        // Trigger creation of Pending commissions post-commit (outside transaction to avoid deadlocks)
         try {
             const { createPendingCommissions } = await import('./commissionService');
             await createPendingCommissions(orderId);
         } catch (commError) {
             console.error("Failed to create pending commissions after payment:", commError);
         }
-
-        // Trigger creation of Pending commissions
-        // Note: We do this inside the transaction or right after. Ideally inside but createPendingCommissions might not support session passing yet.
-        // For safety/simplicity in this refactor step, we'll do it post-commit or ensure createPendingCommissions is safe.
-        // Given existing architecture, let's do it part of the flow but loosely coupled if needed.
-        // Actually, for data integrity, let's run it.
-        const { createPendingCommissions } = await import('./commissionService');
-        await createPendingCommissions(orderId); // This creates them as 'Pending'
-
-        await session.commitTransaction();
 
         return {
             success: true,
@@ -217,14 +212,22 @@ export const capturePayment = async (
             },
         };
     } catch (error: any) {
-        await session.abortTransaction();
+        if (!isSessionEnded) {
+            try {
+                await session.abortTransaction();
+            } catch (abortError) {
+                console.error('Failed to abort transaction:', abortError);
+            }
+        }
         console.error('Error capturing payment:', error);
         return {
             success: false,
             message: error.message || 'Failed to capture payment',
         };
     } finally {
-        session.endSession();
+        if (!isSessionEnded) {
+            session.endSession();
+        }
     }
 };
 
