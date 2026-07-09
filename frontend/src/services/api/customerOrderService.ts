@@ -103,3 +103,41 @@ export const updateOrderNotes = async (id: string, data: { deliveryInstructions?
     const response = await api.patch<OrderResponse>(`/customer/orders/${id}/notes`, data);
     return response.data;
 };
+
+/**
+ * Create customer return request
+ */
+export const createReturnRequest = async (data: {
+    orderId: string;
+    orderItemId: string;
+    reason: string;
+    description?: string;
+    refundMethod: "Bank" | "UPI";
+    bankAccountInfo?: {
+        accountNumber: string;
+        ifscCode: string;
+        accountHolderName: string;
+        bankName: string;
+    };
+    upiId?: string;
+    images: string[];
+}): Promise<OrderResponse> => {
+    const response = await api.post<OrderResponse>('/customer/returns', data);
+    return response.data;
+};
+
+/**
+ * Get customer's return requests
+ */
+export const getMyReturnRequests = async (params?: { page?: number; limit?: number }): Promise<any> => {
+    const response = await api.get('/customer/returns', { params });
+    return response.data;
+};
+
+/**
+ * Get details of a customer return request
+ */
+export const getReturnRequestById = async (id: string): Promise<any> => {
+    const response = await api.get(`/customer/returns/${id}`);
+    return response.data;
+};

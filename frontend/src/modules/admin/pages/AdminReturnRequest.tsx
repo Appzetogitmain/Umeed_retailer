@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import {
   getReturnRequests,
   updateReturnRequest,
+  assignReturnDeliveryBoy,
   type MiscReturnRequest as ReturnRequest,
 } from "../../../services/api/admin/adminMiscService";
+import { getDeliveryBoys, type DeliveryBoy } from "../../../services/api/admin/adminDeliveryService";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function AdminReturnRequest() {
@@ -21,6 +23,132 @@ export default function AdminReturnRequest() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Details Modal and Refund/Rider States
+  const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [deliveryBoys, setDeliveryBoys] = useState<DeliveryBoy[]>([]);
+  const [loadingDeliveryBoys, setLoadingDeliveryBoys] = useState(false);
+  const [selectedRiderId, setSelectedRiderId] = useState("");
+  const [transactionIdInput, setTransactionIdInput] = useState("");
+  const [submittingAction, setSubmittingAction] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Fetch Delivery Boys for manual assignment
+  useEffect(() => {
+    if (showDetailsModal) {
+      const fetchRiders = async () => {
+        try {
+          setLoadingDeliveryBoys(true);
+          const res = await getDeliveryBoys({ status: "Active" });
+          if (res.success && res.data) {
+            setDeliveryBoys(res.data);
+          }
+        } catch (err) {
+          console.error("Error loading delivery boys:", err);
+        } finally {
+          setLoadingDeliveryBoys(false);
+        }
+      };
+      fetchRiders();
+    }
+  }, [showDetailsModal]);
+
+  const handleOpenDetails = (request: ReturnRequest) => {
+    setSelectedRequest(request);
+    setShowDetailsModal(true);
+    setModalError(null);
+    setTransactionIdInput("");
+    setSelectedRiderId(request.deliveryBoy?._id || request.deliveryBoy || "");
+  };
+
+  const handleAssignRider = async () => {
+    if (!selectedRequest || !selectedRiderId) return;
+    try {
+      setSubmittingAction(true);
+      setModalError(null);
+      const res = await assignReturnDeliveryBoy(selectedRequest._id, selectedRiderId);
+      if (res.success) {
+        alert("Delivery rider assigned successfully!");
+        // Update local state details
+        setSelectedRequest(prev => prev ? { ...prev, deliveryBoy: selectedRiderId } : null);
+        // Refresh requests list
+        handleRefreshList();
+      } else {
+        setModalError(res.message || "Failed to assign delivery boy");
+      }
+    } catch (err: any) {
+      setModalError(err.response?.data?.message || err.message || "Failed to assign delivery boy");
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const handleProcessRefund = async () => {
+    if (!selectedRequest) return;
+    if (!transactionIdInput.trim()) {
+      setModalError("Please enter offline bank transaction reference ID");
+      return;
+    }
+    try {
+      setSubmittingAction(true);
+      setModalError(null);
+      const res = await updateReturnRequest(selectedRequest._id, {
+        status: "Refunded",
+        transactionId: transactionIdInput.trim()
+      });
+      if (res.success) {
+        alert("Refund processed successfully!");
+        setShowDetailsModal(false);
+        handleRefreshList();
+      } else {
+        setModalError(res.message || "Failed to process refund");
+      }
+    } catch (err: any) {
+      setModalError(err.response?.data?.message || err.message || "Failed to process refund");
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const handleAdminOverrideStatus = async (status: "Approved" | "Rejected") => {
+    if (!selectedRequest) return;
+    const reason = status === "Rejected" ? prompt("Enter rejection reason:") : null;
+    if (status === "Rejected" && !reason) return;
+
+    try {
+      setSubmittingAction(true);
+      setModalError(null);
+      const res = await updateReturnRequest(selectedRequest._id, {
+        status,
+        adminNotes: reason || undefined
+      });
+      if (res.success) {
+        alert(`Return status overridden to ${status} successfully!`);
+        setShowDetailsModal(false);
+        handleRefreshList();
+      } else {
+        setModalError(res.message || `Failed to update status to ${status}`);
+      }
+    } catch (err: any) {
+      setModalError(err.response?.data?.message || err.message || `Failed to update status to ${status}`);
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const handleRefreshList = async () => {
+    const params: any = {
+      page: currentPage,
+      limit: entriesPerPage,
+    };
+    if (selectedStatus !== "all") params.status = selectedStatus;
+    if (searchTerm) params.search = searchTerm;
+    const response = await getReturnRequests(params);
+    if (response.success) {
+      setReturnRequests(response.data);
+    }
+  };
 
   // Fetch return requests on component mount
   useEffect(() => {
@@ -693,53 +821,12 @@ export default function AdminReturnRequest() {
                       {new Date(request.requestedAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 sm:px-6 py-3">
-                      <div className="flex items-center gap-2">
-                        {request.status === "Pending" ? (
-                          <>
-                            <button
-                              onClick={() => handleApproveReturn(request._id)}
-                              disabled={updating === request._id}
-                              className="p-1.5 bg-green-100 hover:bg-green-200 disabled:bg-neutral-100 disabled:text-neutral-400 text-green-700 rounded transition-colors"
-                              title="Approve">
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleRejectReturn(request._id)}
-                              disabled={updating === request._id}
-                              className="p-1.5 bg-red-100 hover:bg-red-200 disabled:bg-neutral-100 disabled:text-neutral-400 text-red-700 rounded transition-colors"
-                              title="Reject">
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                              </svg>
-                            </button>
-                          </>
-                        ) : (
-                          <span className="text-sm text-neutral-400">
-                            {request.status === "Approved"
-                              ? "Approved"
-                              : "Rejected"}
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => handleOpenDetails(request)}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-teal-50 hover:bg-teal-100 text-teal-700 rounded transition-colors"
+                      >
+                        Details
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -807,6 +894,255 @@ export default function AdminReturnRequest() {
           </div>
         </div>
       </div>
+
+      {/* Return Request Details Modal */}
+      {showDetailsModal && selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 overflow-y-auto font-sans">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50 rounded-t-lg">
+              <div>
+                <h2 className="text-lg font-bold text-neutral-900">Return Request Details</h2>
+                <p className="text-xs text-neutral-500 mt-0.5">Request ID: {selectedRequest._id}</p>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {modalError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {modalError}
+                </div>
+              )}
+
+              {/* Product and Order details */}
+              <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-neutral-500 font-semibold uppercase">Product</p>
+                    <p className="text-sm font-semibold text-neutral-800">{selectedRequest.productName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-500 font-semibold uppercase">Variant</p>
+                    <p className="text-sm font-semibold text-neutral-800">{selectedRequest.variant || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 pt-2 border-t border-neutral-200/60">
+                  <div>
+                    <p className="text-[10px] text-neutral-500 uppercase font-semibold">Price</p>
+                    <p className="text-xs font-medium text-neutral-800">₹{selectedRequest.price?.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-neutral-500 uppercase font-semibold">Disc. Price</p>
+                    <p className="text-xs font-medium text-neutral-800">₹{(selectedRequest.discountedPrice || selectedRequest.price)?.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-neutral-500 uppercase font-semibold">Qty</p>
+                    <p className="text-xs font-semibold text-neutral-800">{selectedRequest.quantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-neutral-500 uppercase font-semibold">Total Amount</p>
+                    <p className="text-xs font-bold text-green-700">₹{selectedRequest.total?.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="grid grid-cols-2 gap-4 border-b border-neutral-100 pb-4">
+                <div>
+                  <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Name</p>
+                  <p className="text-sm font-medium text-neutral-800">{selectedRequest.userName || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Phone</p>
+                  <p className="text-sm font-medium text-neutral-800">{selectedRequest.userPhone || "N/A"}</p>
+                </div>
+              </div>
+
+              {/* Reason & Comments */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-neutral-500 font-semibold uppercase">Return Reason</p>
+                  <span className="inline-block mt-1 px-3 py-1 bg-red-50 text-red-700 border border-red-100 font-bold rounded text-xs">
+                    {selectedRequest.reason || "N/A"}
+                  </span>
+                </div>
+                {selectedRequest.description && (
+                  <div>
+                    <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Notes</p>
+                    <div className="p-3 bg-neutral-50 border border-neutral-200 rounded text-sm text-neutral-700 mt-1">
+                      {selectedRequest.description}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Customer Uploaded Images */}
+              {selectedRequest.images && selectedRequest.images.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Uploaded Images</p>
+                  <div className="flex flex-wrap gap-2.5">
+                    {selectedRequest.images.map((img: string, idx: number) => (
+                      <a key={idx} href={img} target="_blank" rel="noopener noreferrer" className="relative w-20 h-20 rounded-lg border border-neutral-200 overflow-hidden hover:opacity-90 transition-opacity">
+                        <img src={img} alt="customer upload" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Payment details (Admin View) */}
+              <div className="p-4 bg-teal-50/50 border border-teal-100 rounded-xl space-y-3">
+                <p className="text-xs font-bold text-teal-900 uppercase tracking-wider">Refund Payout Details (Admin Only)</p>
+                {selectedRequest.refundMethod === "UPI" ? (
+                  <div>
+                    <p className="text-xs text-neutral-500">Refund Method: <span className="font-semibold text-neutral-800">UPI Account</span></p>
+                    <p className="text-sm font-bold text-teal-950 mt-1 select-all">UPI ID: {selectedRequest.upiId || "N/A"}</p>
+                  </div>
+                ) : selectedRequest.bankAccountInfo ? (
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-neutral-500">Account Holder</p>
+                      <p className="text-sm font-bold text-teal-950">{selectedRequest.bankAccountInfo.accountHolderName || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">Bank Name</p>
+                      <p className="text-sm font-bold text-teal-950">{selectedRequest.bankAccountInfo.bankName || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">Account Number</p>
+                      <p className="text-sm font-bold text-teal-950 select-all">{selectedRequest.bankAccountInfo.accountNumber || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">IFSC Code</p>
+                      <p className="text-sm font-bold text-teal-950 select-all">{selectedRequest.bankAccountInfo.ifscCode || "N/A"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-neutral-500 font-medium">No payout details provided</p>
+                )}
+              </div>
+
+              {/* Manual Rider Assignment (Show if Approved/Accepted) */}
+              {(selectedRequest.status === "Approved" || selectedRequest.status === "Accepted") && (
+                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3">
+                  <p className="text-xs font-bold text-neutral-700 uppercase tracking-wider">Assign Delivery Partner</p>
+                  <div className="flex gap-2">
+                    {loadingDeliveryBoys ? (
+                      <span className="text-xs text-neutral-500">Loading delivery riders...</span>
+                    ) : (
+                      <select
+                        value={selectedRiderId}
+                        onChange={(e) => setSelectedRiderId(e.target.value)}
+                        className="flex-1 border border-neutral-300 bg-white rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        disabled={submittingAction}
+                      >
+                        <option value="">-- Broadcast to all riders --</option>
+                        {deliveryBoys.map((db) => (
+                          <option key={db._id} value={db._id}>
+                            {db.name} ({db.mobile})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={handleAssignRider}
+                      disabled={submittingAction || loadingDeliveryBoys}
+                      className="px-4 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shrink-0"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                  {selectedRequest.deliveryBoy && (
+                    <div className="text-xs text-neutral-600 flex justify-between items-center bg-white p-2.5 rounded-lg border border-neutral-200/80">
+                      <span>Currently Assigned: <span className="font-bold text-neutral-800">{
+                        typeof selectedRequest.deliveryBoy === 'object' ? selectedRequest.deliveryBoy.name : "Rider ID: " + selectedRequest.deliveryBoy
+                      }</span></span>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-indigo-700">
+                        {selectedRequest.deliveryBoyStatus || "Pending"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Refund input (Show if Approved or Completed) */}
+              {(selectedRequest.status === "Approved" || selectedRequest.status === "Completed") && (
+                <div className="p-4 bg-green-50/50 border border-green-200/80 rounded-xl space-y-3">
+                  <p className="text-xs font-bold text-green-950 uppercase tracking-wider">Complete Refund (Offline Settlement)</p>
+                  <p className="text-xs text-green-800 leading-relaxed font-medium">Please proceed bank/UPI transfer manually using payout details above. Once completed, enter the reference transaction ID below to mark refund as completed.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter offline transaction ID"
+                      className="flex-1 border border-green-300 bg-white rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={transactionIdInput}
+                      onChange={(e) => setTransactionIdInput(e.target.value)}
+                      disabled={submittingAction}
+                    />
+                    <button
+                      onClick={handleProcessRefund}
+                      disabled={submittingAction || !transactionIdInput.trim()}
+                      className="px-4 py-2.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors shrink-0 disabled:bg-neutral-300 disabled:cursor-not-allowed"
+                    >
+                      Mark Refunded
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* If Refunded */}
+              {selectedRequest.status === "Refunded" && (
+                <div className="p-4 bg-green-50/50 border border-green-200/60 rounded-xl space-y-1.5 text-xs font-medium text-green-900">
+                  <p className="text-xs font-bold uppercase tracking-wider">Refund Settlement Details</p>
+                  <p>Refund Payout: <span className="font-semibold">{selectedRequest.refundMethod === "UPI" ? "UPI Account" : "Bank Transfer"}</span></p>
+                  <p>Transaction ID: <span className="font-mono font-bold select-all bg-white border border-green-200 px-1 py-0.5 rounded text-[11px]">{selectedRequest.transactionId}</span></p>
+                  {selectedRequest.refundedAt && <p>Date: {new Date(selectedRequest.refundedAt).toLocaleString()}</p>}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-between items-center px-6 py-4 border-t border-neutral-200 bg-neutral-50 rounded-b-lg">
+              <div className="flex gap-2">
+                {selectedRequest.status === "Pending" && (
+                  <>
+                    <button
+                      onClick={() => handleAdminOverrideStatus("Rejected")}
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+                      disabled={submittingAction}
+                    >
+                      Reject Request
+                    </button>
+                    <button
+                      onClick={() => handleAdminOverrideStatus("Approved")}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors"
+                      disabled={submittingAction}
+                    >
+                      Approve Return
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 rounded hover:bg-neutral-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="text-center text-sm text-neutral-500 py-4">

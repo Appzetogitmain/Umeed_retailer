@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getReturnRequests, ReturnRequest, GetReturnRequestsParams } from '../../../services/api/returnService';
+import {
+    getReturnRequests,
+    ReturnRequest,
+    GetReturnRequestsParams,
+    getReturnRequestById,
+    updateReturnStatus
+} from '../../../services/api/returnService';
 
 export default function SellerReturnRequest() {
     const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
@@ -14,6 +20,66 @@ export default function SellerReturnRequest() {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    // View Details Modal States
+    const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
+    const [requestDetails, setRequestDetails] = useState<any | null>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [processingStatus, setProcessingStatus] = useState(false);
+    const [modalError, setModalError] = useState('');
+
+    const handleViewDetails = async (request: ReturnRequest) => {
+        setSelectedRequest(request);
+        setShowDetailsModal(true);
+        setLoadingDetails(true);
+        setModalError('');
+        setRequestDetails(null);
+        try {
+            const response = await getReturnRequestById(request.id);
+            if (response.success && response.data) {
+                setRequestDetails(response.data);
+            } else {
+                setModalError(response.message || 'Failed to load details');
+            }
+        } catch (err: any) {
+            setModalError(err.response?.data?.message || err.message || 'Failed to load return details');
+        } finally {
+            setLoadingDetails(false);
+        }
+    };
+
+    const handleUpdateStatus = async (status: 'Approved' | 'Rejected') => {
+        if (!selectedRequest) return;
+        setProcessingStatus(true);
+        setModalError('');
+        try {
+            const response = await updateReturnStatus(selectedRequest.id, { status });
+            if (response.success) {
+                alert(`Return request ${status.toLowerCase()} successfully`);
+                setShowDetailsModal(false);
+                // Refresh list
+                const params: GetReturnRequestsParams = {
+                    page: currentPage,
+                    limit: rowsPerPage,
+                    sortBy: sortColumn || 'returnDate',
+                    sortOrder: sortDirection,
+                };
+                if (statusFilter !== 'All Status') params.status = statusFilter;
+                if (searchTerm) params.search = searchTerm;
+                const listRes = await getReturnRequests(params);
+                if (listRes.success && listRes.data) {
+                    setReturnRequests(listRes.data);
+                }
+            } else {
+                setModalError(response.message || `Failed to update status to ${status}`);
+            }
+        } catch (err: any) {
+            setModalError(err.response?.data?.message || err.message || `Failed to update status to ${status}`);
+        } finally {
+            setProcessingStatus(false);
+        }
+    };
 
     // Fetch return requests from API
     useEffect(() => {
@@ -369,12 +435,10 @@ export default function SellerReturnRequest() {
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.date}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">
                                                 <button
-                                                    onClick={() => {
-                                                        alert(`Return Request Details:\n\nOrder Item ID: ${request.orderItemId}\nProduct: ${request.product}\nVariant: ${request.variant}\nPrice: ₹${request.price.toFixed(2)}\nDiscounted Price: ₹${request.discPrice.toFixed(2)}\nQuantity: ${request.quantity}\nTotal: ₹${request.total.toFixed(2)}\nStatus: ${request.status}\nDate: ${request.date}`);
-                                                    }}
-                                                    className="text-green-600 hover:text-green-700 text-xs font-medium transition-colors"
+                                                    onClick={() => handleViewDetails(request)}
+                                                    className="text-green-600 hover:text-green-700 text-xs font-semibold bg-green-50 px-2.5 py-1 rounded transition-colors"
                                                 >
-                                                    View
+                                                    View Details
                                                 </button>
                                             </td>
                                         </tr>
@@ -413,6 +477,159 @@ export default function SellerReturnRequest() {
                     </div>
                 </div>
             </div>
+
+            {/* View Details Modal */}
+            {showDetailsModal && selectedRequest && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 overflow-y-auto">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50 rounded-t-lg">
+                            <h2 className="text-lg font-semibold text-neutral-900">Return Request Details</h2>
+                            <button
+                                onClick={() => setShowDetailsModal(false)}
+                                className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            {loadingDetails ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-2"></div>
+                                    <p className="text-sm text-neutral-500">Loading details...</p>
+                                </div>
+                            ) : modalError ? (
+                                <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                                    {modalError}
+                                </div>
+                            ) : requestDetails ? (
+                                <div className="space-y-6">
+                                    {/* Product and Order Info */}
+                                    <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-3">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs text-neutral-500 font-semibold uppercase">Product Name</p>
+                                                <p className="text-sm font-medium text-neutral-800">{requestDetails.productName || selectedRequest.product}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-neutral-500 font-semibold uppercase">Variant</p>
+                                                <p className="text-sm font-medium text-neutral-800">{requestDetails.variantTitle || selectedRequest.variant || "N/A"}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-neutral-200/60">
+                                            <div>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-semibold">Price</p>
+                                                <p className="text-xs font-semibold text-neutral-800">₹{(requestDetails.price || selectedRequest.price).toFixed(2)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-semibold">Disc. Price</p>
+                                                <p className="text-xs font-semibold text-neutral-800">₹{(requestDetails.discPrice || selectedRequest.discPrice || 0).toFixed(2)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-semibold">Qty</p>
+                                                <p className="text-xs font-semibold text-neutral-800">{requestDetails.quantity || selectedRequest.quantity}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-semibold">Total</p>
+                                                <p className="text-xs font-bold text-green-700">₹{(requestDetails.total || selectedRequest.total).toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Customer and Request Info */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Name</p>
+                                            <p className="text-sm font-medium text-neutral-800">{requestDetails.customerName || "N/A"}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-neutral-500 font-semibold uppercase">Customer Phone</p>
+                                            <p className="text-sm font-medium text-neutral-800">{requestDetails.customerPhone || "N/A"}</p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-xs text-neutral-500 font-semibold uppercase">Return Reason</p>
+                                        <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-100 rounded px-2.5 py-1.5 mt-1 inline-block">
+                                            {requestDetails.reason || "N/A"}
+                                        </p>
+                                    </div>
+
+                                    {requestDetails.description && (
+                                        <div>
+                                            <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Customer Description</p>
+                                            <div className="p-3 bg-neutral-50 rounded border border-neutral-200 text-sm text-neutral-700">
+                                                {requestDetails.description}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Uploaded Images */}
+                                    {requestDetails.images && requestDetails.images.length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-neutral-500 font-semibold uppercase mb-2">Customer Uploaded Images</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                {requestDetails.images.map((imgUrl: string, idx: number) => (
+                                                    <a key={idx} href={imgUrl} target="_blank" rel="noopener noreferrer" className="relative block w-24 h-24 rounded-lg border border-neutral-200 overflow-hidden hover:opacity-90 transition-opacity">
+                                                        <img src={imgUrl} alt={`Uploaded ${idx + 1}`} className="w-full h-full object-cover" />
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Request Timeline Status */}
+                                    <div className="flex justify-between items-center py-2 border-t border-b border-neutral-100">
+                                        <span className="text-xs text-neutral-500 font-semibold uppercase">Current Status</span>
+                                        <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider border ${
+                                            requestDetails.status === "Pending" ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
+                                            requestDetails.status === "Approved" ? "bg-blue-50 text-blue-700 border-blue-100" :
+                                            requestDetails.status === "Rejected" ? "bg-red-50 text-red-700 border-red-100" :
+                                            "bg-green-50 text-green-700 border-green-100"
+                                        }`}>
+                                            {requestDetails.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-neutral-200 bg-neutral-50 rounded-b-lg">
+                            <button
+                                onClick={() => setShowDetailsModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 rounded hover:bg-neutral-50 transition-colors"
+                                disabled={processingStatus}
+                            >
+                                Close
+                            </button>
+                            {requestDetails && requestDetails.status === 'Pending' && (
+                                <>
+                                    <button
+                                        onClick={() => handleUpdateStatus('Rejected')}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+                                        disabled={processingStatus}
+                                    >
+                                        {processingStatus ? 'Processing...' : 'Reject Request'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateStatus('Approved')}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors"
+                                        disabled={processingStatus}
+                                    >
+                                        {processingStatus ? 'Processing...' : 'Approve Return'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Footer */}
             <footer className="px-4 sm:px-6 py-4 text-center bg-white border-t border-neutral-200">

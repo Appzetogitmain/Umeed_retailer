@@ -161,6 +161,7 @@ router.get("/orders/export/csv", orderController.exportOrders);
 router.get("/return-requests", orderController.getReturnRequests);
 router.get("/return-requests/:id", orderController.getReturnRequestById);
 router.put("/return-requests/:id", orderController.processReturnRequest);
+router.patch("/return-requests/:id/assign-delivery", orderController.assignReturnDeliveryBoy);
 // Legacy route support if needed, but frontend uses /return-requests
 router.patch("/returns/:id/process", orderController.processReturnRequest);
 

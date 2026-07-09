@@ -387,6 +387,9 @@ export default function SellerAddProduct() {
     }
 
     const newVariation: ProductVariation = {
+      ...(editVariationIndex !== null && variations[editVariationIndex]?._id
+        ? { _id: variations[editVariationIndex]._id }
+        : {}),
       title: variationForm.title,
       price,
       discPrice,

@@ -9,7 +9,23 @@ export interface IReturn extends Document {
   // Return Info
   reason: string;
   description?: string;
-  status: "Pending" | "Approved" | "Rejected" | "Processing" | "Completed";
+  status: "Pending" | "Approved" | "Rejected" | "Processing" | "Completed" | "Refunded";
+
+  // Approval trackers
+  sellerApprovalStatus: "Pending" | "Approved" | "Rejected";
+  adminApprovalStatus: "Pending" | "Approved" | "Rejected" | "Overridden";
+
+  // Refund details
+  refundMethod: "Bank" | "UPI";
+  bankAccountInfo?: {
+    accountNumber: string;
+    ifscCode: string;
+    accountHolderName: string;
+    bankName: string;
+  };
+  upiId?: string;
+  transactionId?: string;
+  refundedAt?: Date;
 
   // Items
   quantity: number;
@@ -29,7 +45,13 @@ export interface IReturn extends Document {
     pincode: string;
   };
 
-  // Refund
+  // Delivery Rider for Return Pickup
+  deliveryBoy?: mongoose.Types.ObjectId;
+  deliveryBoyStatus?: "Pending" | "Accepted" | "Picked Up" | "Completed" | "Failed";
+  pickupOtp?: string;
+  pickupOtpExpiresAt?: Date;
+
+  // Refund Legacy
   refundAmount?: number;
   refundId?: mongoose.Types.ObjectId;
 
@@ -67,8 +89,44 @@ const ReturnSchema = new Schema<IReturn>(
     },
     status: {
       type: String,
-      enum: ["Pending", "Approved", "Rejected", "Processing", "Completed"],
+      enum: ["Pending", "Approved", "Rejected", "Processing", "Completed", "Refunded"],
       default: "Pending",
+    },
+
+    // Approval trackers
+    sellerApprovalStatus: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Pending",
+    },
+    adminApprovalStatus: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected", "Overridden"],
+      default: "Pending",
+    },
+
+    // Refund details
+    refundMethod: {
+      type: String,
+      enum: ["Bank", "UPI"],
+      required: [true, "Refund method is required"],
+    },
+    bankAccountInfo: {
+      accountNumber: { type: String, trim: true },
+      ifscCode: { type: String, trim: true },
+      accountHolderName: { type: String, trim: true },
+      bankName: { type: String, trim: true },
+    },
+    upiId: {
+      type: String,
+      trim: true,
+    },
+    transactionId: {
+      type: String,
+      trim: true,
+    },
+    refundedAt: {
+      type: Date,
     },
 
     // Items
@@ -108,7 +166,25 @@ const ReturnSchema = new Schema<IReturn>(
       pincode: String,
     },
 
-    // Refund
+    // Delivery Rider for Return Pickup
+    deliveryBoy: {
+      type: Schema.Types.ObjectId,
+      ref: "Delivery",
+    },
+    deliveryBoyStatus: {
+      type: String,
+      enum: ["Pending", "Accepted", "Picked Up", "Completed", "Failed"],
+      default: "Pending",
+    },
+    pickupOtp: {
+      type: String,
+      trim: true,
+    },
+    pickupOtpExpiresAt: {
+      type: Date,
+    },
+
+    // Refund Legacy
     refundAmount: {
       type: Number,
       min: [0, "Refund amount cannot be negative"],
@@ -127,7 +203,8 @@ const ReturnSchema = new Schema<IReturn>(
 ReturnSchema.index({ order: 1 });
 ReturnSchema.index({ customer: 1 });
 ReturnSchema.index({ status: 1 });
+ReturnSchema.index({ deliveryBoy: 1 });
 
-const Return = mongoose.model<IReturn>("Return", ReturnSchema);
+const Return = mongoose.models.Return || mongoose.model<IReturn>("Return", ReturnSchema);
 
 export default Return;

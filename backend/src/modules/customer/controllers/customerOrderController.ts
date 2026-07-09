@@ -213,14 +213,20 @@ export const createOrder = async (req: Request, res: Response) => {
                 const checkProduct = await Product.findById(item.product.id);
 
                 if (checkProduct && checkProduct.variations && checkProduct.variations.length > 0) {
-                    // Product has variations, but we didn't match one.
-                    // If a variation was provided, it means that specific variation is out of stock.
-                    if (variationValue) {
+                    // Check if the variationValue exists in product's variations
+                    const hasVariation = variationValue ? checkProduct.variations.some((v: any) => 
+                        (v._id && v._id.toString() === variationValue) ||
+                        v.value === variationValue ||
+                        v.title === variationValue ||
+                        v.pack === variationValue
+                    ) : false;
+
+                    // If a variation was provided and it actually exists on the product, it means that variation is out of stock.
+                    if (variationValue && hasVariation) {
                         throw new Error(`Insufficient stock for variation: ${variationValue}`);
                     }
 
-                    // No variation was provided, but the product has them.
-                    // To maintain data consistency, we'll try to decrement from the first variation.
+                    // If no variation was provided, or if the variation ID is stale/invalid, fall back to the first variation.
                     product = session
                         ? await Product.findOneAndUpdate(
                             {
@@ -517,7 +523,7 @@ export const getOrderById = async (req: Request, res: Response) => {
             .populate({
                 path: 'items',
                 populate: [
-                    { path: 'product', select: 'productName mainImage pack manufacturer price' },
+                    { path: 'product', select: 'productName mainImage pack manufacturer price isReturnable maxReturnDays' },
                     { path: 'seller', select: 'storeName city phone fssaiLicNo' }
                 ]
             })

@@ -25,6 +25,7 @@ export interface MiscReturnRequest {
   orderItemId: string;
   userId: string;
   userName: string;
+  userPhone?: string;
   sellerId: string;
   sellerName: string;
   productId: string;
@@ -35,9 +36,23 @@ export interface MiscReturnRequest {
   quantity: number;
   total: number;
   reason: string;
-  status: "Pending" | "Approved" | "Rejected" | "Refunded";
+  description?: string;
+  images?: string[];
+  refundMethod?: "Bank" | "UPI";
+  upiId?: string;
+  bankAccountInfo?: {
+    accountNumber: string;
+    ifscCode: string;
+    accountHolderName: string;
+    bankName: string;
+  };
+  deliveryBoy?: any;
+  deliveryBoyStatus?: "Pending" | "Accepted" | "Picked Up" | "Completed" | "Failed";
+  transactionId?: string;
+  status: "Pending" | "Approved" | "Rejected" | "Refunded" | "Accepted" | "Completed";
   requestedAt: string;
   processedAt?: string;
+  refundedAt?: string;
   refundAmount?: number;
   adminNotes?: string;
 }
@@ -89,9 +104,10 @@ export interface CreateReturnRequestData {
 }
 
 export interface UpdateReturnRequestData {
-  status?: "Pending" | "Approved" | "Rejected" | "Refunded";
+  status?: "Pending" | "Approved" | "Rejected" | "Refunded" | "Accepted" | "Completed";
   refundAmount?: number;
   adminNotes?: string;
+  transactionId?: string;
 }
 
 export interface CreateHeaderCategoryData {
@@ -201,6 +217,17 @@ export const updateReturnRequest = async (
   const response = await api.put<ApiResponse<MiscReturnRequest>>(
     `/admin/return-requests/${id}`,
     data
+  );
+  return response.data;
+};
+
+export const assignReturnDeliveryBoy = async (
+  id: string,
+  deliveryBoyId: string
+): Promise<ApiResponse<MiscReturnRequest>> => {
+  const response = await api.patch<ApiResponse<MiscReturnRequest>>(
+    `/admin/return-requests/${id}/assign-delivery`,
+    { deliveryBoyId }
   );
   return response.data;
 };

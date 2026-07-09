@@ -117,7 +117,8 @@ export const getReturnRequestById = asyncHandler(
       tax: 0, // Mock for now
       total: (item?.unitPrice || 0) * returnRequest.quantity,
       reason: returnRequest.reason,
-      reasonDescription: returnRequest.description
+      reasonDescription: returnRequest.description,
+      images: returnRequest.images || []
     };
 
 
@@ -131,14 +132,16 @@ export const getReturnRequestById = asyncHandler(
 export const updateReturnStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, rejectionReason } = req.body; // "Approved" or "Rejected"
 
-    const returnRequest = await Return.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
+    if (!["Approved", "Rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be Approved or Rejected"
+      });
+    }
 
+    const returnRequest = await Return.findById(id);
     if (!returnRequest) {
       return res.status(404).json({
         success: false,
@@ -146,9 +149,21 @@ export const updateReturnStatus = asyncHandler(
       });
     }
 
+    // Update seller approval and general status
+    returnRequest.sellerApprovalStatus = status;
+    returnRequest.status = status;
+    
+    if (status === "Approved") {
+      returnRequest.deliveryBoyStatus = "Pending"; // Broadcast state
+    } else {
+      returnRequest.rejectionReason = rejectionReason || "Rejected by seller";
+    }
+
+    await returnRequest.save();
+
     return res.status(200).json({
       success: true,
-      message: "Return status updated successfully",
+      message: `Return status updated to ${status} successfully`,
       data: returnRequest
     });
   }

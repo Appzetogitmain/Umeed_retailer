@@ -470,9 +470,9 @@ export const getReturnRequestById = asyncHandler(
 export const processReturnRequest = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status, rejectionReason, refundAmount, adminNotes } = req.body;
+    const { status, rejectionReason, refundAmount, adminNotes, transactionId } = req.body;
 
-    const validStatuses = ["Approved", "Rejected", "Processing", "Completed"];
+    const validStatuses = ["Approved", "Rejected", "Refunded"];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -493,16 +493,45 @@ export const processReturnRequest = asyncHandler(
       processedAt: new Date(),
     };
 
-    if (status) updateData.status = status;
-
-    // Handle rejection reason (frontend sends 'adminNotes' for rejection reason)
-    if (status === "Rejected") {
+    if (status === "Approved") {
+      updateData.status = "Approved";
+      // Check if this is an override (e.g. if seller rejected it)
+      if (returnRequest.sellerApprovalStatus === "Rejected") {
+        updateData.adminApprovalStatus = "Overridden";
+      } else {
+        updateData.adminApprovalStatus = "Approved";
+      }
+      updateData.deliveryBoyStatus = "Pending"; // Broadcast state
+    } else if (status === "Rejected") {
+      updateData.status = "Rejected";
+      updateData.adminApprovalStatus = "Rejected";
       if (rejectionReason) updateData.rejectionReason = rejectionReason;
       else if (adminNotes) updateData.rejectionReason = adminNotes;
-    }
+    } else if (status === "Refunded") {
+      // Refund requires transactionId
+      if (!transactionId) {
+        return res.status(400).json({
+          success: false,
+          message: "Transaction ID is required to process the refund",
+        });
+      }
+      updateData.status = "Refunded";
+      updateData.transactionId = transactionId;
+      updateData.refundedAt = new Date();
+      if (refundAmount) updateData.refundAmount = refundAmount;
 
-    if (status === "Approved" && refundAmount) {
-      updateData.refundAmount = refundAmount;
+      // Update OrderItem status
+      await OrderItem.findByIdAndUpdate(returnRequest.orderItem, { status: "Returned" });
+
+      // Check if all items in order are returned/cancelled
+      const orderItems = await OrderItem.find({ order: returnRequest.order });
+      const allReturnedOrCancelled = orderItems.every(
+        (item) => item.status === "Returned" || item.status === "Cancelled"
+      );
+
+      if (allReturnedOrCancelled) {
+        await Order.findByIdAndUpdate(returnRequest.order, { status: "Returned" });
+      }
     }
 
     const updatedReturn = await Return.findByIdAndUpdate(id, updateData, {
@@ -515,9 +544,67 @@ export const processReturnRequest = asyncHandler(
 
     return res.status(200).json({
       success: true,
-      message: `Return request ${status ? status.toLowerCase() : "updated"
-        } successfully`,
+      message: `Return request status updated to ${status} successfully`,
       data: updatedReturn,
+    });
+  }
+);
+
+/**
+ * Manually assign delivery boy to return pickup
+ */
+export const assignReturnDeliveryBoy = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params; // Return request ID
+    const { deliveryBoyId } = req.body;
+
+    if (!deliveryBoyId) {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery boy ID is required",
+      });
+    }
+
+    // Verify delivery boy
+    const deliveryBoy = await Delivery.findById(deliveryBoyId);
+    if (!deliveryBoy) {
+      return res.status(404).json({
+        success: false,
+        message: "Delivery boy not found",
+      });
+    }
+
+    if (deliveryBoy.status !== "Active") {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery boy is not active",
+      });
+    }
+
+    const returnRequest = await Return.findById(id);
+    if (!returnRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "Return request not found",
+      });
+    }
+
+    if (returnRequest.status !== "Approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Return request must be approved before assigning a rider",
+      });
+    }
+
+    // Assign rider
+    returnRequest.deliveryBoy = deliveryBoyId as any;
+    returnRequest.deliveryBoyStatus = "Accepted"; // Set to Accepted directly when manually assigned
+    await returnRequest.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Delivery boy assigned to return pickup successfully",
+      data: returnRequest,
     });
   }
 );

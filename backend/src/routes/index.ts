@@ -44,6 +44,11 @@ import {
   cancelOrder,
   updateOrderNotes,
 } from "../modules/customer/controllers/customerOrderController";
+import {
+  createReturnRequest as customerCreateReturnRequest,
+  getMyReturnRequests as customerGetMyReturnRequests,
+  getReturnRequestById as customerGetReturnRequestById,
+} from "../modules/customer/controllers/customerReturnController";
 
 const router = Router();
 
@@ -107,6 +112,11 @@ router.get("/customer/orders", authenticate, requireUserType("Customer"), getMyO
 router.get("/customer/orders/:id", authenticate, requireUserType("Customer"), getOrderById);
 router.post("/customer/orders/:id/cancel", authenticate, requireUserType("Customer"), cancelOrder);
 router.patch("/customer/orders/:id/notes", authenticate, requireUserType("Customer"), updateOrderNotes);
+
+// Customer Return routes
+router.post("/customer/returns", authenticate, requireUserType("Customer"), customerCreateReturnRequest);
+router.get("/customer/returns", authenticate, requireUserType("Customer"), customerGetMyReturnRequests);
+router.get("/customer/returns/:id", authenticate, requireUserType("Customer"), customerGetReturnRequestById);
 
 router.use("/customer/coupons", customerCouponRoutes);
 router.use("/customer/addresses", customerAddressRoutes);

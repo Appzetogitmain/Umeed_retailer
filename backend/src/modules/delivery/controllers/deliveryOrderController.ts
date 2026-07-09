@@ -4,6 +4,7 @@ import Order from "../../../models/Order";
 import { notifySellersOfOrderUpdate } from "../../../services/sellerNotificationService";
 import OrderItem from "../../../models/OrderItem";
 import Seller from "../../../models/Seller";
+import Return from "../../../models/Return";
 import { generateDeliveryOtp, verifyDeliveryOtp } from "../../../services/deliveryOtpService";
 import { processOrderStatusTransition } from "../../../services/orderService";
 
@@ -741,5 +742,155 @@ export const checkCustomerProximity = asyncHandler(async (req: Request, res: Res
             distanceMeters: Math.round(distance * 1000), // in meters
             customerName: order.customerName
         }
+    });
+});
+
+/**
+ * Get Available Return Pickups (Broadcasted return requests with no rider assigned)
+ */
+export const getAvailableReturnPickups = asyncHandler(async (req: Request, res: Response) => {
+    // Available return requests are approved but don't have a delivery boy assigned yet
+    const returns = await Return.find({
+        status: "Approved",
+        deliveryBoy: null,
+        deliveryBoyStatus: "Pending"
+    })
+        .populate({
+            path: "orderItem",
+            select: "productName productImage quantity unitPrice total variation"
+        })
+        .populate("order", "orderNumber customerName customerPhone deliveryAddress paymentMethod")
+        .sort({ updatedAt: -1 });
+
+    const formattedReturns = returns.map((ret: any) => ({
+        id: ret._id,
+        orderId: ret.order?.orderNumber,
+        customerName: ret.order?.customerName,
+        customerPhone: ret.order?.customerPhone,
+        pickupAddress: ret.pickupAddress || (ret.order?.deliveryAddress ? `${ret.order.deliveryAddress.address}, ${ret.order.deliveryAddress.city}` : "N/A"),
+        productName: ret.orderItem?.productName || "Unknown Item",
+        quantity: ret.quantity,
+        totalAmount: ret.orderItem?.total || 0,
+        status: ret.status,
+        deliveryBoyStatus: ret.deliveryBoyStatus,
+        reason: ret.reason,
+        description: ret.description,
+        images: ret.images || [],
+        createdAt: ret.createdAt
+    }));
+
+    return res.status(200).json({
+        success: true,
+        data: formattedReturns
+    });
+});
+
+/**
+ * Get Active Return Pickups for current delivery partner
+ */
+export const getActiveReturnPickups = asyncHandler(async (req: Request, res: Response) => {
+    const deliveryId = req.user?.userId;
+
+    const returns = await Return.find({
+        deliveryBoy: deliveryId,
+        deliveryBoyStatus: { $in: ["Accepted", "Picked Up"] }
+    })
+        .populate({
+            path: "orderItem",
+            select: "productName productImage quantity unitPrice total variation"
+        })
+        .populate("order", "orderNumber customerName customerPhone deliveryAddress paymentMethod")
+        .sort({ updatedAt: -1 });
+
+    const formattedReturns = returns.map((ret: any) => ({
+        id: ret._id,
+        orderId: ret.order?.orderNumber,
+        customerName: ret.order?.customerName,
+        customerPhone: ret.order?.customerPhone,
+        pickupAddress: ret.pickupAddress || (ret.order?.deliveryAddress ? `${ret.order.deliveryAddress.address}, ${ret.order.deliveryAddress.city}` : "N/A"),
+        productName: ret.orderItem?.productName || "Unknown Item",
+        quantity: ret.quantity,
+        totalAmount: ret.orderItem?.total || 0,
+        status: ret.status,
+        deliveryBoyStatus: ret.deliveryBoyStatus,
+        reason: ret.reason,
+        description: ret.description,
+        images: ret.images || [],
+        createdAt: ret.createdAt
+    }));
+
+    return res.status(200).json({
+        success: true,
+        data: formattedReturns
+    });
+});
+
+/**
+ * Accept Return Pickup (Rider self-assignment)
+ */
+export const acceptReturnPickup = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params; // Return Request ID
+    const deliveryId = req.user?.userId;
+
+    const returnRequest = await Return.findById(id);
+    if (!returnRequest) {
+        return res.status(404).json({ success: false, message: "Return request not found" });
+    }
+
+    if (returnRequest.deliveryBoy) {
+        return res.status(400).json({ success: false, message: "This pickup is already assigned to another rider" });
+    }
+
+    if (returnRequest.status !== "Approved") {
+        return res.status(400).json({ success: false, message: "This return request is not approved yet" });
+    }
+
+    returnRequest.deliveryBoy = deliveryId as any;
+    returnRequest.deliveryBoyStatus = "Accepted";
+    returnRequest.pickupScheduled = new Date();
+    await returnRequest.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "You have accepted this return pickup request",
+        data: returnRequest
+    });
+});
+
+/**
+ * Update Return Pickup Status by Rider
+ */
+export const updateReturnPickupStatus = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params; // Return Request ID
+    const { status } = req.body; // "Picked Up" or "Completed" (Rider delivered back to seller)
+    const deliveryId = req.user?.userId;
+
+    if (!["Picked Up", "Completed"].includes(status)) {
+        return res.status(400).json({ success: false, message: "Invalid status. Must be Picked Up or Completed" });
+    }
+
+    const returnRequest = await Return.findById(id);
+    if (!returnRequest) {
+        return res.status(404).json({ success: false, message: "Return request not found" });
+    }
+
+    if (returnRequest.deliveryBoy?.toString() !== deliveryId) {
+        return res.status(403).json({ success: false, message: "You are not assigned to this pickup request" });
+    }
+
+    returnRequest.deliveryBoyStatus = status as any;
+
+    if (status === "Completed") {
+        // When rider confirms they delivered it back to the seller:
+        returnRequest.status = "Completed"; // Mark return request status as Completed (Admin can now refund)
+        returnRequest.pickupCompleted = new Date();
+    }
+
+    await returnRequest.save();
+
+    return res.status(200).json({
+        success: true,
+        message: `Pickup status updated to ${status} successfully`,
+        data: returnRequest
     });
 });

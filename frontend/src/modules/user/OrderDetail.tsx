@@ -13,7 +13,10 @@ import {
   updateOrderNotes,
   getSellerLocationsForOrder,
   refreshDeliveryOtp,
+  createReturnRequest,
+  getMyReturnRequests,
 } from "../../services/api/customerOrderService";
+import { uploadImage } from "../../services/api/uploadService";
 import ReviewModal from "./components/ReviewModal";
 
 // Icon Components
@@ -500,6 +503,25 @@ export default function OrderDetail() {
   const [selectedTip, setSelectedTip] = useState<number | "other" | null>(null);
   const [customTip, setCustomTip] = useState("");
 
+  // Return States
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnItem, setReturnItem] = useState<any | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnDescription, setReturnDescription] = useState("");
+  const [refundMethod, setRefundMethod] = useState<"UPI" | "Bank">("UPI");
+  const [upiId, setUpiId] = useState("");
+  const [bankAccountInfo, setBankAccountInfo] = useState({
+    accountNumber: "",
+    ifscCode: "",
+    accountHolderName: "",
+    bankName: "",
+  });
+  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [agreeCondition, setAgreeCondition] = useState(false);
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [returnError, setReturnError] = useState("");
+
   // Real-time delivery tracking via WebSocket
   const {
     deliveryLocation,
@@ -517,6 +539,26 @@ export default function OrderDetail() {
   // Seller locations for the order
   const [sellerLocations, setSellerLocations] = useState<any[]>([]);
   const [loadingSellerLocations, setLoadingSellerLocations] = useState(false);
+  const [returnRequests, setReturnRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchOrderReturns = async () => {
+      try {
+        const response = await getMyReturnRequests();
+        if (response.success && response.data) {
+          const orderReturns = response.data.filter((ret: any) => 
+            (ret.order?._id || ret.order) === id
+          );
+          setReturnRequests(orderReturns);
+        }
+      } catch (err) {
+        console.error("Error fetching returns for order:", err);
+      }
+    };
+    if (id) {
+      fetchOrderReturns();
+    }
+  }, [id, orderStatus]);
 
   // Fetch order if not in context
   useEffect(() => {
@@ -703,6 +745,106 @@ export default function OrderDetail() {
     } catch (error) {
       console.error("Error cancelling order:", error);
       alert("Failed to cancel order");
+    }
+  };
+
+  const handleReturnImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    setReturnError("");
+    try {
+      const uploadResult = await uploadImage(file, "Speedoo/returns");
+      if (uploadResult && uploadResult.secureUrl) {
+        setReturnImages(prev => [...prev, uploadResult.secureUrl]);
+      } else {
+        setReturnError("Failed to upload image. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Image upload error:", err);
+      setReturnError(err.message || "Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleReturnSubmit = async () => {
+    setReturnError("");
+
+    if (!returnReason) {
+      setReturnError("Please select a return reason");
+      return;
+    }
+
+    if (returnImages.length === 0) {
+      setReturnError("Please upload at least one product image");
+      return;
+    }
+
+    if (refundMethod === "UPI") {
+      if (!upiId.trim()) {
+        setReturnError("Please enter your UPI ID");
+        return;
+      }
+      if (!/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiId.trim())) {
+        setReturnError("Please enter a valid UPI ID (e.g. user@upi)");
+        return;
+      }
+    } else {
+      const { accountNumber, ifscCode, accountHolderName, bankName } = bankAccountInfo;
+      if (!accountNumber.trim() || !ifscCode.trim() || !accountHolderName.trim() || !bankName.trim()) {
+        setReturnError("Please fill in all bank details");
+        return;
+      }
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.trim().toUpperCase())) {
+        setReturnError("Please enter a valid 11-digit IFSC code (e.g. SBIN0001234)");
+        return;
+      }
+    }
+
+    if (!agreeCondition) {
+      setReturnError("You must agree that the item is in the same condition as received");
+      return;
+    }
+
+    if (!id || !returnItem) return;
+
+    try {
+      setSubmittingReturn(true);
+      await createReturnRequest({
+        orderId: id,
+        orderItemId: returnItem._id || returnItem.id,
+        reason: returnReason,
+        description: returnDescription,
+        refundMethod,
+        bankAccountInfo: refundMethod === "Bank" ? {
+          accountNumber: bankAccountInfo.accountNumber.trim(),
+          ifscCode: bankAccountInfo.ifscCode.trim().toUpperCase(),
+          accountHolderName: bankAccountInfo.accountHolderName.trim(),
+          bankName: bankAccountInfo.bankName.trim()
+        } : undefined,
+        upiId: refundMethod === "UPI" ? upiId.trim() : undefined,
+        images: returnImages,
+      });
+
+      alert("Return request submitted successfully");
+      setShowReturnModal(false);
+      // Reset state
+      setReturnReason("");
+      setReturnDescription("");
+      setUpiId("");
+      setBankAccountInfo({ accountNumber: "", ifscCode: "", accountHolderName: "", bankName: "" });
+      setReturnImages([]);
+      setAgreeCondition(false);
+      
+      // Refresh order details to update status
+      handleRefresh();
+    } catch (err: any) {
+      console.error("Return submission error:", err);
+      setReturnError(err.message || "Failed to submit return request");
+    } finally {
+      setSubmittingReturn(false);
     }
   };
 
@@ -1181,6 +1323,83 @@ export default function OrderDetail() {
 
 
 
+        {/* Return Requests Status Card */}
+        {returnRequests.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100 space-y-4 font-sans"
+          >
+            <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Return & Refund Status</h3>
+            <div className="space-y-4 divide-y divide-neutral-100">
+              {returnRequests.map((ret: any, index: number) => (
+                <div key={index} className="pt-3 first:pt-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-neutral-800">
+                        {ret.product?.productName || "Product"}
+                      </p>
+                      {ret.variant && (
+                        <p className="text-xs text-neutral-500 mt-0.5">Variant: {ret.variant}</p>
+                      )}
+                      <p className="text-xs text-neutral-400 mt-0.5">Reason: {ret.reason}</p>
+                    </div>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${
+                      ret.status === "Pending" ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
+                      ret.status === "Approved" ? "bg-blue-50 text-blue-700 border-blue-100" :
+                      ret.status === "Rejected" ? "bg-red-50 text-red-700 border-red-100" :
+                      ret.status === "Completed" ? "bg-indigo-50 text-indigo-700 border-indigo-100" :
+                      ret.status === "Refunded" ? "bg-green-50 text-green-700 border-green-100" : "bg-neutral-50 text-neutral-700 border-neutral-100"
+                    }`}>
+                      {ret.status}
+                    </span>
+                  </div>
+
+                  {/* Delivery partner info if picking up */}
+                  {ret.deliveryBoy && ret.deliveryBoyStatus && ret.deliveryBoyStatus !== "Completed" && (
+                    <div className="mt-3 p-3 bg-indigo-50/40 border border-indigo-100/40 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">🚴</span>
+                        <div>
+                          <p className="text-xs font-bold text-indigo-900">Pickup Partner Assigned</p>
+                          <p className="text-[11px] text-indigo-700 font-medium">
+                            {ret.deliveryBoy.name || "Rider"} is picking up item ({ret.deliveryBoyStatus})
+                          </p>
+                        </div>
+                      </div>
+                      {ret.deliveryBoy.phone && (
+                        <a href={`tel:${ret.deliveryBoy.phone}`} className="text-xs font-bold text-indigo-600 bg-white border border-indigo-100 shadow-sm px-2.5 py-1 rounded-lg">
+                          Call
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Offline Refund Transaction ID */}
+                  {ret.status === "Refunded" && (
+                    <div className="mt-3 p-3 bg-green-50/50 border border-green-100/50 rounded-xl space-y-1">
+                      <p className="text-xs font-bold text-green-900 uppercase tracking-wider">Refund Details</p>
+                      <p className="text-xs text-green-800 font-medium">
+                        Refund Method: <span className="font-semibold">{ret.refundMethod === "UPI" ? "UPI Account" : "Bank Transfer"}</span>
+                      </p>
+                      {ret.transactionId && (
+                        <p className="text-xs text-green-800 font-medium break-all select-all">
+                          Transaction ID: <span className="font-mono font-bold bg-white border border-green-100 px-1 py-0.5 rounded text-[11px]">{ret.transactionId}</span>
+                        </p>
+                      )}
+                      {ret.refundedAt && (
+                        <p className="text-[10px] text-green-600">
+                          Date: {new Date(ret.refundedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* Contact & Address Section */}
         <motion.div
           className="bg-white rounded-xl shadow-sm overflow-hidden"
@@ -1250,20 +1469,48 @@ export default function OrderDetail() {
                           {item.product?.name || item.productName || "Product"}
                         </span>
                       </div>
-                      {orderStatus === "Delivered" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReviewProduct({
-                              id: item.product?._id || item.product,
-                              name: item.product?.name || item.productName || "Product",
-                            });
-                          }}
-                          className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full hover:bg-purple-100 transition-colors uppercase tracking-wide border border-purple-100 shrink-0"
-                        >
-                          Rate & Review
-                        </button>
-                      )}
+                      {(() => {
+                        const deliveredAt = order.deliveredAt || order.updatedAt;
+                        const daysSinceDelivery = deliveredAt ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 3600 * 24) : 0;
+                        const isWithinReturnWindow = daysSinceDelivery <= (item.product?.maxReturnDays || 0);
+                        const canReturn = item.status !== "Returned" && item.product?.isReturnable && isWithinReturnWindow;
+                        
+                        return (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {orderStatus === "Delivered" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewProduct({
+                                    id: item.product?._id || item.product,
+                                    name: item.product?.name || item.productName || "Product",
+                                  });
+                                }}
+                                className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full hover:bg-purple-100 transition-colors uppercase tracking-wide border border-purple-100"
+                              >
+                                Rate
+                              </button>
+                            )}
+                            {orderStatus === "Delivered" && canReturn && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReturnItem(item);
+                                  setShowReturnModal(true);
+                                }}
+                                className="text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 transition-colors uppercase tracking-wide border border-red-100"
+                              >
+                                Return
+                              </button>
+                            )}
+                            {item.status === "Returned" && (
+                              <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200 uppercase tracking-wide">
+                                Returned
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -1443,20 +1690,49 @@ export default function OrderDetail() {
                         {item.total?.toFixed(0) ||
                           (item.unitPrice * item.quantity).toFixed(0)}
                       </p>
-                      {orderStatus === "Delivered" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReviewProduct({
-                              id: item.product?._id || item.product,
-                              name: item.product?.name || item.productName || "Product",
-                            });
-                          }}
-                          className="mt-2 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full hover:bg-purple-100 transition-colors"
-                        >
-                          Write a Review
-                        </button>
-                      )}
+                      {(() => {
+                        const deliveredAt = order.deliveredAt || order.updatedAt;
+                        const daysSinceDelivery = deliveredAt ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 3600 * 24) : 0;
+                        const isWithinReturnWindow = daysSinceDelivery <= (item.product?.maxReturnDays || 0);
+                        const canReturn = item.status !== "Returned" && item.product?.isReturnable && isWithinReturnWindow;
+                        
+                        return (
+                          <div className="flex items-center gap-2 mt-2">
+                            {orderStatus === "Delivered" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewProduct({
+                                    id: item.product?._id || item.product,
+                                    name: item.product?.name || item.productName || "Product",
+                                  });
+                                }}
+                                className="text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-full hover:bg-purple-100 transition-colors"
+                              >
+                                Write a Review
+                              </button>
+                            )}
+                            {orderStatus === "Delivered" && canReturn && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReturnItem(item);
+                                  setShowReturnModal(true);
+                                  setShowItemsModal(false); // Close items list modal
+                                }}
+                                className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded-full hover:bg-red-100 transition-colors"
+                              >
+                                Return Item
+                              </button>
+                            )}
+                            {item.status === "Returned" && (
+                              <span className="text-xs font-bold text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-full border border-neutral-200 uppercase tracking-wide">
+                                Returned
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -1514,6 +1790,259 @@ export default function OrderDetail() {
                   className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
                   onClick={handleSaveSpecialRequests}>
                   Save
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Return Order Item Modal */}
+      <AnimatePresence>
+        {showReturnModal && returnItem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setShowReturnModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl relative my-8"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowReturnModal(false)}
+                className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-600 rounded-full hover:bg-neutral-100 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Return Item</h2>
+              <p className="text-xs text-neutral-500 mb-4">
+                Returning: <span className="font-semibold text-neutral-800">{returnItem.product?.name || returnItem.productName}</span> ({returnItem.quantity} qty)
+              </p>
+
+              {returnError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+                  {returnError}
+                </div>
+              )}
+
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {/* Reason */}
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
+                    Reason for Return <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full border border-neutral-300 rounded-xl p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                  >
+                    <option value="">-- Select Reason --</option>
+                    <option value="Damaged Product">Damaged Product received</option>
+                    <option value="Wrong Product Delivered">Wrong Product / Variant delivered</option>
+                    <option value="Product Defective">Product is defective / not working</option>
+                    <option value="Item Expired">Item is expired</option>
+                    <option value="Other">Other reason</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
+                    Description / Comments (Optional)
+                  </label>
+                  <textarea
+                    className="w-full border border-neutral-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    rows={3}
+                    placeholder="Provide more details about the issue..."
+                    value={returnDescription}
+                    onChange={(e) => setReturnDescription(e.target.value)}
+                  />
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
+                    Upload Product Images <span className="text-red-500">* (Min 1 image)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2.5 items-center">
+                    {returnImages.map((img, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-xl border border-neutral-200 overflow-hidden">
+                        <img src={img} alt="preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setReturnImages(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {uploadingImage ? (
+                      <div className="w-16 h-16 rounded-xl border border-dashed border-neutral-300 flex items-center justify-center bg-neutral-50">
+                        <div className="w-5 h-5 border-2 border-t-transparent border-purple-600 rounded-full animate-spin"></div>
+                      </div>
+                    ) : (
+                      <label className="w-16 h-16 rounded-xl border border-dashed border-neutral-300 hover:border-purple-500 cursor-pointer flex flex-col items-center justify-center bg-neutral-50 transition-colors">
+                        <span className="text-xl text-neutral-400">+</span>
+                        <span className="text-[9px] text-neutral-400 font-medium">Add Image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleReturnImageChange}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Refund Method */}
+                <div>
+                  <label className="block text-sm font-semibold text-neutral-700 mb-1.5">
+                    Refund Payment Method <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="refundMethod"
+                        value="UPI"
+                        checked={refundMethod === "UPI"}
+                        onChange={() => setRefundMethod("UPI")}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      UPI Account
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="refundMethod"
+                        value="Bank"
+                        checked={refundMethod === "Bank"}
+                        onChange={() => setRefundMethod("Bank")}
+                        className="text-purple-600 focus:ring-purple-500"
+                      />
+                      Bank Account Details
+                    </label>
+                  </div>
+                </div>
+
+                {/* Dynamic Payment Fields */}
+                {refundMethod === "UPI" ? (
+                  <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-600 mb-1">
+                        UPI ID / VPA <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="username@bank"
+                        className="w-full border border-neutral-300 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-600 mb-1">
+                          Account Holder Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="John Doe"
+                          className="w-full border border-neutral-300 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                          value={bankAccountInfo.accountHolderName}
+                          onChange={(e) => setBankAccountInfo({ ...bankAccountInfo, accountHolderName: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-600 mb-1">
+                          Bank Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="SBI, HDFC etc."
+                          className="w-full border border-neutral-300 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                          value={bankAccountInfo.bankName}
+                          onChange={(e) => setBankAccountInfo({ ...bankAccountInfo, bankName: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-600 mb-1">
+                          Account Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Account Number"
+                          className="w-full border border-neutral-300 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                          value={bankAccountInfo.accountNumber}
+                          onChange={(e) => setBankAccountInfo({ ...bankAccountInfo, accountNumber: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-neutral-600 mb-1">
+                          IFSC Code <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="SBIN0001234"
+                          className="w-full border border-neutral-300 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                          value={bankAccountInfo.ifscCode}
+                          onChange={(e) => setBankAccountInfo({ ...bankAccountInfo, ifscCode: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Condition Policy */}
+                <div className="flex gap-2.5 items-start bg-yellow-50 p-3.5 border border-yellow-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="agreeReturn"
+                    checked={agreeCondition}
+                    onChange={(e) => setAgreeCondition(e.target.checked)}
+                    className="mt-1 text-purple-600 focus:ring-purple-500 rounded cursor-pointer"
+                  />
+                  <label htmlFor="agreeReturn" className="text-xs text-yellow-800 leading-relaxed cursor-pointer font-medium select-none">
+                    <span className="font-bold">Important Note:</span> I agree that the item will be returned in the original, same condition as received, with all accessories, brand tags, and packaging intact.
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6 pt-4 border-t border-neutral-100">
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-xl"
+                  onClick={() => setShowReturnModal(false)}
+                  disabled={submittingReturn}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl"
+                  onClick={handleReturnSubmit}
+                  disabled={submittingReturn || uploadingImage}
+                >
+                  {submittingReturn ? "Submitting..." : "Submit Return"}
                 </Button>
               </div>
             </motion.div>

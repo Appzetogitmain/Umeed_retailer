@@ -249,3 +249,40 @@ export const deleteDeliveryAccount = async () => {
         throw handleApiError(error);
     }
 };
+
+// --- Return Pickups ---
+export const getAvailableReturnPickups = async (): Promise<any[]> => {
+    try {
+        const response = await api.get(`${BASE_URL}/returns/available`);
+        return response.data.data;
+    } catch (error) {
+        throw handleApiError(error);
+    }
+};
+
+export const getActiveReturnPickups = async (): Promise<any[]> => {
+    try {
+        const response = await api.get(`${BASE_URL}/returns/active`);
+        return response.data.data;
+    } catch (error) {
+        throw handleApiError(error);
+    }
+};
+
+export const acceptReturnPickup = async (id: string): Promise<any> => {
+    try {
+        const response = await api.put(`${BASE_URL}/returns/${id}/accept`);
+        return response.data;
+    } catch (error) {
+        throw handleApiError(error);
+    }
+};
+
+export const updateReturnPickupStatus = async (id: string, status: "Picked Up" | "Completed"): Promise<any> => {
+    try {
+        const response = await api.put(`${BASE_URL}/returns/${id}/status`, { status });
+        return response.data;
+    } catch (error) {
+        throw handleApiError(error);
+    }
+};

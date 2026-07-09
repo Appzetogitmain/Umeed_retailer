@@ -152,6 +152,12 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
         estimatedDeliveryTime: order.estimatedDeliveryDate ? new Date(order.estimatedDeliveryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
     }));
 
+    const ReturnModel = require("../../../models/Return").default;
+    const activeReturnPickupsCount = await ReturnModel.countDocuments({
+        deliveryBoy: deliveryId,
+        deliveryBoyStatus: { $in: ["Accepted", "Picked Up"] }
+    });
+
     return res.status(200).json({
         success: true,
         data: {
@@ -160,7 +166,7 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
             pendingOrders: result.pendingOrders,
             allOrders: result.allOrdersToday,
             returnOrders: result.returnOrdersToday,
-            returnItems: 0, // Need 'OrderItem' logic for this, keeping 0 for now
+            returnItems: activeReturnPickupsCount, // Return actual count of return pickups
             todayEarning: todayEarning,
             totalEarning: totalEarning,
             pendingOrdersList: formattedPendingList
