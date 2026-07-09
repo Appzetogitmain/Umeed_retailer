@@ -1,27 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPolicyByType } from '../../../services/api/policyService';
+import { getPolicyByType, getPublicSettings, PublicSettings } from '../../../services/api/policyService';
 import { Policy } from '../../../services/api/admin/adminPolicyService';
 
 export default function DeliveryPrivacyPolicy() {
   const navigate = useNavigate();
   const [policy, setPolicy] = useState<Policy | null>(null);
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchPolicy = async () => {
+    const fetchData = async () => {
       try {
-        const response = await getPolicyByType('delivery_privacy_policy');
-        if (response.success) {
-          setPolicy(response.data);
-        }
+        const [policyRes, settingsRes] = await Promise.all([
+          getPolicyByType('delivery_privacy_policy'),
+          getPublicSettings()
+        ]);
+        if (policyRes.success) setPolicy(policyRes.data);
+        if (settingsRes.success) setSettings(settingsRes.data);
       } catch (err) {
-        console.error('Failed to fetch delivery privacy policy:', err);
+        console.error('Failed to fetch data:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchPolicy();
+    fetchData();
   }, []);
 
   return (
@@ -76,7 +79,11 @@ export default function DeliveryPrivacyPolicy() {
               <div className="mt-6">
                 <div className="bg-neutral-50 rounded-2xl p-6 text-center">
                   <p className="text-sm text-neutral-500 italic mb-4">
-                    If you have any questions regarding this policy, please contact our delivery support team.
+                    If you have any questions regarding this policy, please contact our delivery support team at:
+                    <br />
+                    <strong>Email:</strong> {settings?.supportEmail || settings?.contactEmail || 'support@speedoo.com'}
+                    <br />
+                    <strong>Phone:</strong> {settings?.supportPhone || settings?.contactPhone || 'N/A'}
                   </p>
                   <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.3em]">
                     © 2026 Speedoo Your order our priority. All rights reserved.
