@@ -15,7 +15,7 @@ export const getSocketBaseURL = (): string => {
   // Remove /api/v1 or /api and any trailing slash from the end
   const socketUrl = apiBaseUrl.replace(/\/api\/v\d+\/?$|\/api\/?$|\/$/, '');
 
-  return socketUrl || "http://localhost:5000";
+  return socketUrl || (typeof window !== 'undefined' ? window.location.origin : "http://localhost:5000");
 };
 
 // Log the API base URL for debugging (only in development or if there's an issue)
