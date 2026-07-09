@@ -69,18 +69,27 @@ export default function PrivacyPolicy() {
 
 
 
-              <div className="mt-6">
-                <div className="bg-neutral-50 rounded-2xl p-6 text-center">
-                  <p className="text-sm text-neutral-500 italic mb-4">
-                    If you have any questions regarding this policy, please contact our legal team at:
-                    <br />
-                    <strong>Email:</strong> {settings?.supportEmail || settings?.contactEmail || 'support@speedoo.com'}
-                    <br />
-                    <strong>Phone:</strong> {settings?.supportPhone || settings?.contactPhone || 'N/A'}
+              <div className="mt-8">
+                <div className="bg-purple-50 rounded-2xl p-6 text-center border border-purple-100 shadow-sm">
+                  <h4 className="text-purple-900 font-bold mb-2">Need Help?</h4>
+                  <p className="text-sm text-purple-700 mb-6">
+                    If you have any questions regarding this policy, please contact our legal support team.
                   </p>
-                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.3em]">
-                    © 2026 Speedoo Tech Solutions. All rights reserved.
-                  </p>
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4 text-sm font-bold text-purple-900 mb-8">
+                    <div className="flex items-center gap-2 bg-white px-5 py-3 rounded-xl shadow-[0_2px_10px_-4px_rgba(144,72,165,0.2)] border border-purple-50 w-full sm:w-auto transition-transform hover:scale-105">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#9048A5]"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                      {settings?.supportEmail || settings?.contactEmail || 'support@speedoo.com'}
+                    </div>
+                    <div className="flex items-center gap-2 bg-white px-5 py-3 rounded-xl shadow-[0_2px_10px_-4px_rgba(144,72,165,0.2)] border border-purple-50 w-full sm:w-auto transition-transform hover:scale-105">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#9048A5]"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                      {settings?.supportPhone || settings?.contactPhone || 'N/A'}
+                    </div>
+                  </div>
+                  <div className="pt-6 border-t border-purple-200/50">
+                    <p className="text-[10px] font-bold text-purple-400 uppercase tracking-[0.3em]">
+                      © 2026 Speedoo Tech Solutions. All rights reserved.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
