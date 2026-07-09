@@ -64,12 +64,6 @@ export default function SellerPrivacyPolicy() {
                 <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
                   {policy.title}
                 </h2>
-                <div className="bg-purple-50 px-4 py-2 rounded-xl border border-purple-100">
-                  <span className="text-xs text-neutral-500 block mb-0.5">Last Revised</span>
-                  <span className="text-sm font-bold text-[#7A3E8E]">
-                    {new Date(policy.updatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </span>
-                </div>
               </div>
               
               <div className="text-neutral-700 leading-relaxed text-base sm:text-lg whitespace-pre-wrap font-medium">

@@ -67,14 +67,7 @@ export default function DeliveryPrivacyPolicy() {
                 {policy.content}
               </div>
 
-              <div className="mt-16 pt-8 border-t border-neutral-100 flex justify-center">
-                <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 inline-block text-center">
-                  <span className="text-xs text-neutral-500 block mb-0.5">Last Revised</span>
-                  <span className="text-sm font-bold text-blue-600">
-                    {new Date(policy.updatedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </span>
-                </div>
-              </div>
+
 
               <div className="mt-6">
                 <div className="bg-neutral-50 rounded-2xl p-6 text-center">
