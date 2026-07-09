@@ -113,7 +113,7 @@ router.get("/customer/orders/:id", authenticate, requireUserType("Customer"), ge
 router.post("/customer/orders/:id/cancel", authenticate, requireUserType("Customer"), cancelOrder);
 router.patch("/customer/orders/:id/notes", authenticate, requireUserType("Customer"), updateOrderNotes);
 
-// Customer Return routes
+// Customer Return routes (Added dummy comment to force fresh commit)
 router.post("/customer/returns", authenticate, requireUserType("Customer"), customerCreateReturnRequest);
 router.get("/customer/returns", authenticate, requireUserType("Customer"), customerGetMyReturnRequests);
 router.get("/customer/returns/:id", authenticate, requireUserType("Customer"), customerGetReturnRequestById);
