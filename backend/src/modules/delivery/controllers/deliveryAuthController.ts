@@ -126,6 +126,7 @@ export const verifySmsOtp = asyncHandler(async (req: Request, res: Response) => 
       token,
       user: {
         id: delivery._id,
+        userType: "Delivery",
         name: delivery.name,
         mobile: delivery.mobile,
         email: delivery.email,
@@ -225,6 +226,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
       token,
       user: {
         id: delivery._id,
+        userType: "Delivery",
         name: delivery.name,
         mobile: delivery.mobile,
         email: delivery.email,
