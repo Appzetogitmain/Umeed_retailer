@@ -96,21 +96,29 @@ async function seed() {
     if (count < 5) {
       order.deliveryBoy = delivery._id;
       order.deliveryBoyStatus = 'Assigned';
-      order.status = 'Pending';
+      order.status = 'Out for Delivery'; // Fixed status to match dashboard query
       order.assignedAt = new Date();
+      order.updatedAt = new Date();
     } else if (count < 10) {
       order.deliveryBoy = delivery._id;
       order.deliveryBoyStatus = 'Delivered';
       order.status = 'Delivered';
       order.assignedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
       order.deliveredAt = new Date();
+      order.updatedAt = new Date();
+    } else if (count < 13) {
+      order.deliveryBoy = delivery._id;
+      order.deliveryBoyStatus = 'Failed';
+      order.status = 'Returned'; // For Today's Return Order
+      order.assignedAt = new Date();
+      order.updatedAt = new Date();
     } else {
       break;
     }
     await order.save();
     count++;
   }
-  console.log(`Assigned ${Math.min(count, 10)} orders to delivery boy.`);
+  console.log(`Assigned ${Math.min(count, 13)} orders to delivery boy.`);
 
   // 5. Assign Return Orders
   const existingReturns = await Return.find().limit(10);
@@ -120,7 +128,7 @@ async function seed() {
   for (const ret of existingReturns) {
     if (count < 3) {
       ret.deliveryBoy = delivery._id;
-      ret.deliveryBoyStatus = 'Pending';
+      ret.deliveryBoyStatus = 'Accepted'; // For active return items
       ret.pickupScheduled = new Date();
       await ret.save();
       count++;
@@ -145,7 +153,7 @@ async function seed() {
                 refundMethod: "Bank",
                 quantity: 1,
                 deliveryBoy: delivery._id,
-                deliveryBoyStatus: "Pending",
+                deliveryBoyStatus: "Accepted",
                 pickupScheduled: new Date()
             });
             await newReturn.save();
