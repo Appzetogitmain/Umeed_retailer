@@ -26,6 +26,8 @@ export default function AdminManageDeliveryBoy() {
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedDeliveryBoy, setSelectedDeliveryBoy] = useState<DeliveryBoy | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [showRejectInput, setShowRejectInput] = useState(false);
 
     // Debounce search term and fetch delivery boys
     useEffect(() => {
@@ -108,10 +110,10 @@ export default function AdminManageDeliveryBoy() {
         setCurrentPage(1); // Reset to first page when sorting changes
     };
 
-    const handleStatusChange = async (deliveryBoyId: string, newStatus: 'Active' | 'Inactive') => {
+    const handleStatusChange = async (deliveryBoyId: string, newStatus: 'Active' | 'Inactive' | 'Rejected', reason?: string) => {
         try {
             setProcessing(deliveryBoyId);
-            const response = await updateDeliveryBoyStatus(deliveryBoyId, newStatus);
+            const response = await updateDeliveryBoyStatus(deliveryBoyId, newStatus, reason);
 
             if (response.success) {
                 // Update local state
@@ -783,6 +785,31 @@ export default function AdminManageDeliveryBoy() {
                                 </div>
                             </div>
 
+                            {/* Vehicle & Commission Details */}
+                            <div>
+                                <h4 className="text-teal-700 font-bold border-b border-teal-100 pb-2 mb-4 flex items-center gap-2">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                                        <polyline points="17 2 12 7 7 2"></polyline>
+                                    </svg>
+                                    Vehicle & Commission Details
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+                                    <div>
+                                        <p className="text-xs text-neutral-500 uppercase font-bold tracking-wider">Vehicle Type</p>
+                                        <p className="text-neutral-800 font-medium">{selectedDeliveryBoy.vehicleType || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-neutral-500 uppercase font-bold tracking-wider">Vehicle Number</p>
+                                        <p className="text-neutral-800 font-medium">{selectedDeliveryBoy.vehicleNumber || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-neutral-500 uppercase font-bold tracking-wider">Bonus Type</p>
+                                        <p className="text-neutral-800 font-medium">{selectedDeliveryBoy.bonusType || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Bank Info Section */}
                             <div>
                                 <h4 className="text-teal-700 font-bold border-b border-teal-100 pb-2 mb-4 flex items-center gap-2">
@@ -924,27 +951,79 @@ export default function AdminManageDeliveryBoy() {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-3">
-                                    <button
-                                        onClick={() => {
-                                            handleStatusChange(selectedDeliveryBoy._id, selectedDeliveryBoy.status === 'Active' ? 'Inactive' : 'Active');
-                                            // Status update happens asynchronously, so we don't close modal here to allow feedback
-                                        }}
-                                        disabled={processing === selectedDeliveryBoy._id}
-                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-sm ${
-                                            selectedDeliveryBoy.status === 'Active' 
-                                            ? 'bg-red-600 text-white hover:bg-red-700' 
-                                            : 'bg-green-600 text-white hover:bg-green-700'
-                                        }`}
-                                    >
-                                        {selectedDeliveryBoy.status === 'Active' ? 'Deactivate Rider' : 'Approve & Activate'}
-                                    </button>
-                                    <button
-                                        onClick={() => handleAvailabilityChange(selectedDeliveryBoy._id, selectedDeliveryBoy.available === 'Available' ? 'Not Available' : 'Available')}
-                                        disabled={processing === selectedDeliveryBoy._id}
-                                        className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all shadow-sm"
-                                    >
-                                        Toggle Availability
-                                    </button>
+                                    {showRejectInput ? (
+                                        <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                            <input 
+                                                type="text"
+                                                placeholder="Enter rejection reason..."
+                                                value={rejectionReason}
+                                                onChange={(e) => setRejectionReason(e.target.value)}
+                                                className="px-3 py-2 border border-neutral-300 rounded focus:outline-none focus:border-red-500 text-sm"
+                                            />
+                                            <div className="flex gap-2 justify-end">
+                                                <button
+                                                    onClick={() => setShowRejectInput(false)}
+                                                    className="px-3 py-1 bg-neutral-200 text-neutral-700 rounded hover:bg-neutral-300 text-sm font-bold transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (!rejectionReason.trim()) {
+                                                            alert("Please provide a reason for rejection.");
+                                                            return;
+                                                        }
+                                                        handleStatusChange(selectedDeliveryBoy._id, 'Rejected', rejectionReason);
+                                                        setShowRejectInput(false);
+                                                    }}
+                                                    disabled={processing === selectedDeliveryBoy._id}
+                                                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-bold transition-colors"
+                                                >
+                                                    Confirm Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {selectedDeliveryBoy.status === 'Active' && (
+                                                <button
+                                                    onClick={() => handleStatusChange(selectedDeliveryBoy._id, 'Inactive')}
+                                                    disabled={processing === selectedDeliveryBoy._id}
+                                                    className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold text-sm hover:bg-amber-600 transition-all shadow-sm"
+                                                >
+                                                    Deactivate Rider
+                                                </button>
+                                            )}
+                                            {(selectedDeliveryBoy.status === 'Inactive' || selectedDeliveryBoy.status === 'Rejected') && (
+                                                <button
+                                                    onClick={() => handleStatusChange(selectedDeliveryBoy._id, 'Active')}
+                                                    disabled={processing === selectedDeliveryBoy._id}
+                                                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 transition-all shadow-sm"
+                                                >
+                                                    Approve & Activate
+                                                </button>
+                                            )}
+                                            {selectedDeliveryBoy.status !== 'Rejected' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setRejectionReason('');
+                                                        setShowRejectInput(true);
+                                                    }}
+                                                    disabled={processing === selectedDeliveryBoy._id}
+                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 transition-all shadow-sm"
+                                                >
+                                                    Reject Rider
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleAvailabilityChange(selectedDeliveryBoy._id, selectedDeliveryBoy.available === 'Available' ? 'Not Available' : 'Available')}
+                                                disabled={processing === selectedDeliveryBoy._id}
+                                                className="px-4 py-2 bg-neutral-600 text-white rounded-lg font-bold text-sm hover:bg-neutral-700 transition-all shadow-sm"
+                                            >
+                                                Toggle Availability
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>

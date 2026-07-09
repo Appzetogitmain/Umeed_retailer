@@ -26,8 +26,11 @@ export interface DeliveryBoy {
   maxAmount?: number;
   balance: number;
   cashCollected: number;
-  status: "Active" | "Inactive";
+  status: "Active" | "Inactive" | "Rejected";
+  rejectionReason?: string;
   available: "Available" | "Not Available";
+  vehicleNumber?: string;
+  vehicleType?: string;
   currentLocation?: {
     latitude: number;
     longitude: number;
@@ -185,11 +188,14 @@ export const deleteDeliveryBoy = async (
 
 export const updateDeliveryBoyStatus = async (
   id: string,
-  status: "Active" | "Inactive"
+  status: "Active" | "Inactive" | "Rejected",
+  rejectionReason?: string
 ): Promise<ApiResponse<DeliveryBoy>> => {
+  const payload: any = { status };
+  if (rejectionReason) payload.rejectionReason = rejectionReason;
   const response = await api.patch<ApiResponse<DeliveryBoy>>(
     `/admin/delivery/${id}/status`,
-    { status }
+    payload
   );
   return response.data;
 };

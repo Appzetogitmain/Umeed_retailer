@@ -2,6 +2,9 @@
 // config (server.ts) and the Socket.io CORS config (socketService.ts) so the
 // two policies can't drift out of sync.
 export const PRODUCTION_ALLOWED_ORIGINS = [
+  "https://app.umeedretailers.com",
+  "https://www.umeedretailers.com",
+  "https://umeedretailers.com",
   "https://www.kosil.com",
   "https://kosil.com",
   "https://kosil-frontend.onrender.com",

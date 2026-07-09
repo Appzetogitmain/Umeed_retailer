@@ -116,6 +116,15 @@ export const verifySmsOtp = asyncHandler(async (req: Request, res: Response) => 
     });
   }
 
+  if (delivery.status === "Rejected") {
+    return res.status(403).json({
+      success: false,
+      message: delivery.rejectionReason 
+        ? `Your application has been rejected. Reason: ${delivery.rejectionReason}`
+        : "Your application has been rejected.",
+    });
+  }
+
   // Generate JWT token
   const token = generateToken(delivery._id.toString(), "Delivery");
 

@@ -29,7 +29,8 @@ export interface IDelivery extends Document {
   // Commission & Payment
   bonusType?: string; // 'Fixed' | 'Salaried' | 'Commission Based'
   commissionRate?: number; // Individual commission rate (overrides global setting)
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Inactive' | 'Rejected';
+  rejectionReason?: string;
   isOnline: boolean; // Availability status
   location?: {
     type: "Point";
@@ -167,8 +168,12 @@ const DeliverySchema = new Schema<IDelivery>(
     },
     status: {
       type: String,
-      enum: ['Active', 'Inactive'],
-      default: 'Inactive', // New delivery partners start as Inactive until approved
+      enum: ['Active', 'Inactive', 'Rejected'],
+      default: 'Inactive',
+    },
+    rejectionReason: {
+      type: String,
+      required: false,
     },
     isOnline: {
       type: Boolean,

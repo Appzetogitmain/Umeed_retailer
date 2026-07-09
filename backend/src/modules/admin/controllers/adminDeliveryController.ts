@@ -273,18 +273,25 @@ export const deleteDeliveryBoy = asyncHandler(
 export const updateDeliveryStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, rejectionReason } = req.body;
 
-    if (!["Active", "Inactive"].includes(status)) {
+    if (!["Active", "Inactive", "Rejected"].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Status must be Active or Inactive",
+        message: "Status must be Active, Inactive, or Rejected",
       });
+    }
+
+    const updateData: any = { status };
+    if (status === "Rejected" && rejectionReason) {
+      updateData.rejectionReason = rejectionReason;
+    } else if (status !== "Rejected") {
+      updateData.rejectionReason = ""; // Clear reason if they are re-activated
     }
 
     const deliveryBoy = await Delivery.findByIdAndUpdate(
       id,
-      { status },
+      updateData,
       { new: true, runValidators: true }
     ).select("-password");
 
