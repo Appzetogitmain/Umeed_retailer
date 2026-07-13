@@ -682,7 +682,7 @@ export default function AdminSubCategory() {
                     return (
                       <tr key={subCategory._id} className="hover:bg-neutral-50">
                         <td className="px-4 sm:px-6 py-3 text-sm text-neutral-900">
-                          {subCategory._id.slice(-6)}
+                          {subCategory.subCategoryId || subCategory._id.slice(-6)}
                         </td>
                         <td className="px-4 sm:px-6 py-3 text-sm text-neutral-900 font-medium">
                           {categoryName}

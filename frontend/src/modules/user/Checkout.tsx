@@ -91,7 +91,7 @@ export default function Checkout() {
   const [giftPackaging, setGiftPackaging] = useState<boolean>(false);
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"COD" | "Online">("Online");
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "Online">("COD");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Profile completion modal state
@@ -152,7 +152,7 @@ export default function Checkout() {
             name: addr.fullName,
             phone: addr.phone,
             flat: "",
-            street: addr.address,
+            street: addr.address ? addr.address.replace(/^[\s,]+/, '') : "",
             city: addr.city,
             state: addr.state,
             pincode: addr.pincode,
@@ -1926,7 +1926,7 @@ export default function Checkout() {
         <h3 className="text-sm font-bold text-neutral-900 mb-2">Payment Method</h3>
         <div className="space-y-2">
           {/* Online Payment Option */}
-          <div
+          {/* <div
             onClick={() => setPaymentMethod("Online")}
             className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
             style={paymentMethod === "Online" 
@@ -1960,7 +1960,7 @@ export default function Checkout() {
                 </svg>
               </div>
             )}
-          </div>
+          </div> */}
 
           {/* COD Option */}
           <div

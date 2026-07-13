@@ -9,6 +9,7 @@ export interface ApiResponse<T> {
 
 export interface Category {
   _id: string;
+  categoryId?: string;
   name: string;
   image?: string;
   parentId?: string;
@@ -24,6 +25,7 @@ export interface Category {
 
 export interface SubCategory {
   _id: string;
+  subCategoryId?: string;
   id?: string;
   categoryName: string;
   subcategoryName: string;

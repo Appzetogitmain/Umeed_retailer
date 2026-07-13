@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface ISubCategory extends Document {
+  subCategoryId?: string;
   name: string;
   category: mongoose.Types.ObjectId;
   image?: string;
@@ -12,6 +13,11 @@ export interface ISubCategory extends Document {
 
 const SubCategorySchema = new Schema<ISubCategory>(
   {
+    subCategoryId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     name: {
       type: String,
       required: [true, "Subcategory name is required"],
@@ -46,6 +52,19 @@ const SubCategorySchema = new Schema<ISubCategory>(
 // Index for faster queries
 SubCategorySchema.index({ category: 1, order: 1 });
 // SubCategorySchema.index({ name: 1 });
+
+// Pre-save middleware to auto-generate subCategoryId if not provided
+SubCategorySchema.pre("save", async function (next) {
+  if (!this.subCategoryId) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'SUB-';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    this.subCategoryId = result;
+  }
+  next();
+});
 
 const SubCategory = mongoose.model<ISubCategory>(
   "SubCategory",

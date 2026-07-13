@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { getProducts, updateStock, Product } from '../../../services/api/productService';
 import { getCategories } from '../../../services/api/categoryService';
 import { useAuth } from '../../../context/AuthContext';
@@ -213,7 +213,7 @@ export default function SellerStockManagement() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold text-neutral-800">Stock Management</h1>
                 <div className="text-sm text-blue-500">
-                    <span className="cursor-pointer hover:underline">Home</span> <span className="text-neutral-400">/</span> <span className="text-neutral-600">Dashboard</span>
+                    <Link to="/" className="hover:underline">Home</Link> <span className="text-neutral-400">/</span> <Link to="/seller" className="text-neutral-600 hover:underline">Dashboard</Link>
                 </div>
             </div>
 

@@ -622,6 +622,7 @@ export const getSubCategories = asyncHandler(
       ...oldSubcategories.map(sub => sub.toObject()),
       ...newSubcategories.map(cat => ({
         ...cat.toObject(),
+        subCategoryId: cat.categoryId,
         category: cat.parentId,
       }))
     ];

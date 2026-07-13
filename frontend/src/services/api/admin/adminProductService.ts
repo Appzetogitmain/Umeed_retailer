@@ -5,6 +5,7 @@ import { ApiResponse } from "./types";
 // ==================== Category Interfaces ====================
 export interface Category {
   _id: string;
+  categoryId?: string;
   name: string;
   image?: string;
   order: number;
@@ -62,6 +63,7 @@ export interface UpdateProductOrderData {
 // ==================== SubCategory Interfaces ====================
 export interface SubCategory {
   _id: string;
+  subCategoryId?: string;
   name: string;
   category: string | Category;
   image?: string;

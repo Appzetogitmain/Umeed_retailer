@@ -244,7 +244,7 @@ export default function SellerCategory() {
                                 ) : (
                                     currentCategories.map((category) => (
                                     <tr key={category._id} className="hover:bg-neutral-50 transition-colors text-sm text-neutral-700">
-                                        <td className="p-4 align-middle border border-neutral-200">{category._id}</td>
+                                        <td className="p-4 align-middle border border-neutral-200">{category.categoryId || category._id}</td>
                                         <td className="p-4 align-middle border border-neutral-200">{category.name}</td>
                                         <td className="p-4 border border-neutral-200">
                                             <div className="w-16 h-12 bg-white border border-neutral-200 rounded p-1 flex items-center justify-center mx-auto">

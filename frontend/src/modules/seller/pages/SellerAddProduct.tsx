@@ -171,14 +171,16 @@ export default function SellerAddProduct() {
                 product.headerCategory ||
                 "",
               category:
-                (product.category as any)?._id || product.categoryId || "",
+                (product.category as any)?._id || product.categoryId || product.category || "",
               subcategory:
                 (product.subcategory as any)?._id ||
                 product.subcategoryId ||
+                product.subcategory ||
                 "",
               subSubCategory:
                 (product.subSubCategory as any)?._id ||
                 (product as any).subSubCategoryId ||
+                product.subSubCategory ||
                 "",
               publish: product.publish ? "Yes" : "No",
               brand: (product.brand as any)?._id || product.brandId || "",
@@ -191,7 +193,7 @@ export default function SellerAddProduct() {
               variationType: product.variationType || "",
               manufacturer: product.manufacturer || "",
               madeIn: product.madeIn || "",
-              tax: (product.tax as any)?._id || product.taxId || "",
+              tax: (product.tax as any)?._id || product.taxId || (typeof product.tax === 'string' ? product.tax : ""),
               isReturnable: product.isReturnable ? "Yes" : "No",
               maxReturnDays: product.maxReturnDays?.toString() || "",
               fssaiLicNo: product.fssaiLicNo ? product.fssaiLicNo.replace('FSSAI Lic. No. ', '') : "",
@@ -226,79 +228,35 @@ export default function SellerAddProduct() {
 
   useEffect(() => {
     const fetchSubs = async () => {
-      if (formData.category) {
-        try {
-          const res = await getSubcategories(formData.category);
-          if (res.success) setSubcategories(res.data);
-        } catch (err) {
-          console.error("Error fetching subcategories:", err);
-        }
-      } else {
-        setSubcategories([]);
-        // Clear subcategory selection when category is cleared
-        setFormData((prev) => ({ ...prev, subcategory: "" }));
+      try {
+        const res = await getSubcategories(formData.category);
+        if (res.success) setSubcategories(res.data);
+      } catch (err) {
+        console.error("Error fetching subcategories:", err);
       }
     };
-    // Only fetch if category changed and user is interacting (or initial load)
-    // For edit mode, we want to load subcategories for the selected category
     if (formData.category) {
       fetchSubs();
+    } else {
+      setSubcategories([]);
     }
   }, [formData.category]);
 
   useEffect(() => {
     const fetchSubSubs = async () => {
-      if (formData.subcategory) {
-        try {
-          const res = await getSubSubCategories(formData.subcategory);
-          if (res.success) setSubSubCategories(res.data);
-        } catch (err) {
-          console.error("Error fetching sub-subcategories:", err);
-        }
-      } else {
-        setSubSubCategories([]);
-        setFormData((prev) => ({ ...prev, subSubCategory: "" }));
+      try {
+        const res = await getSubSubCategories(formData.subcategory);
+        if (res.success) setSubSubCategories(res.data);
+      } catch (err) {
+        console.error("Error fetching sub-subcategories:", err);
       }
     };
     if (formData.subcategory) {
       fetchSubSubs();
+    } else {
+      setSubSubCategories([]);
     }
   }, [formData.subcategory]);
-
-  // Clear category and subcategory when header category changes
-  useEffect(() => {
-    if (formData.headerCategory) {
-      // Header category selected - check if current category belongs to it
-      const currentCategory = categories.find(
-        (cat: any) => (cat._id || cat.id) === formData.category
-      );
-      if (currentCategory) {
-        const catHeaderId =
-          typeof currentCategory.headerCategoryId === "string"
-            ? currentCategory.headerCategoryId
-            : currentCategory.headerCategoryId?._id;
-        // If current category doesn't belong to selected header category, clear it
-        if (catHeaderId !== formData.headerCategory) {
-          setFormData((prev) => ({
-            ...prev,
-            category: "",
-            subcategory: "",
-            subSubCategory: "",
-          }));
-          setSubcategories([]);
-          setSubSubCategories([]);
-        }
-      }
-    } else {
-      // Header category cleared - clear category and subcategory
-      setFormData((prev) => ({
-        ...prev,
-        category: "",
-        subcategory: "",
-      }));
-      setSubcategories([]);
-    }
-  }, [formData.headerCategory, categories]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -306,7 +264,23 @@ export default function SellerAddProduct() {
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updates = { ...prev, [name]: value };
+      
+      // Clear dependent fields when a parent category changes
+      if (name === "headerCategory") {
+        updates.category = "";
+        updates.subcategory = "";
+        updates.subSubCategory = "";
+      } else if (name === "category") {
+        updates.subcategory = "";
+        updates.subSubCategory = "";
+      } else if (name === "subcategory") {
+        updates.subSubCategory = "";
+      }
+      
+      return updates;
+    });
   };
 
   const handleMainImageChange = async (
@@ -516,11 +490,11 @@ export default function SellerAddProduct() {
 
       const productData = {
         productName: formData.productName,
-        headerCategoryId: formData.headerCategory || undefined,
-        categoryId: formData.category || undefined,
-        subcategoryId: formData.subcategory || undefined,
-        subSubCategoryId: formData.subSubCategory || undefined,
-        brandId: formData.brand || undefined,
+        headerCategoryId: formData.headerCategory || null,
+        categoryId: formData.category || null,
+        subcategoryId: formData.subcategory || null,
+        subSubCategoryId: formData.subSubCategory || null,
+        brandId: formData.brand || null,
         publish: formData.publish === "Yes",
         seoTitle: formData.seoTitle || undefined,
         seoKeywords: formData.seoKeywords || undefined,
@@ -640,8 +614,7 @@ export default function SellerAddProduct() {
                     placeholder="Enter Product Name"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   />
-                  <div className="flex justify-between items-center mt-1">
-                    <p className="text-xs text-red-500">This will help for search</p>
+                  <div className="flex justify-end items-center mt-1">
                     <p className="text-xs text-neutral-500">{formData.productName.length}/100</p>
                   </div>
                 </div>

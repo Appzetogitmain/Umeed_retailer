@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema, Model } from "mongoose";
 
 export interface ICategory extends Document {
+  categoryId?: string;
   name: string;
   slug: string;
   image?: string;
@@ -27,6 +28,11 @@ export interface ICategoryModel extends Model<ICategory> {
 
 const CategorySchema = new Schema<ICategory>(
   {
+    categoryId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     name: {
       type: String,
       required: [true, "Category name is required"],
@@ -122,8 +128,17 @@ CategorySchema.virtual("children", {
 CategorySchema.set("toJSON", { virtuals: true });
 CategorySchema.set("toObject", { virtuals: true });
 
-// Pre-save middleware to auto-generate slug if not provided
+// Pre-save middleware to auto-generate slug and categoryId if not provided
 CategorySchema.pre("save", async function (next) {
+  if (!this.categoryId) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'CAT-';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    this.categoryId = result;
+  }
+
   if (!this.slug && this.name) {
     this.slug = this.name
       .toLowerCase()

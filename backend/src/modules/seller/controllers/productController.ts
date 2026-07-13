@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Product from "../../../models/Product";
 import Shop from "../../../models/Shop";
 import Category from "../../../models/Category";
+import SubCategory from "../../../models/SubCategory";
 import { asyncHandler } from "../../../utils/asyncHandler";
 
 /**
@@ -27,6 +28,7 @@ export const createProduct = asyncHandler(
       headerCategoryId: productData.headerCategoryId, // Map headerCategoryId
       category: productData.categoryId, // Map categoryId to category
       subcategory: productData.subcategoryId,
+      subSubCategory: productData.subSubCategoryId,
       brand: productData.brandId,
       mainImage: productData.mainImageUrl, // Map mainImageUrl to mainImage
       galleryImages: productData.galleryImageUrls,
@@ -204,11 +206,13 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   const products = await Product.find(query)
     .populate("category", "name")
     .populate("subcategory", "name")
+    .populate("subSubCategory", "name")
     .populate("brand", "name")
-    .populate("tax", "name rate")
+    .populate("tax", "name percentage")
     .sort(sort)
     .skip(skip)
-    .limit(limitNum);
+    .limit(limitNum)
+    .lean();
 
   const total = await Product.countDocuments(query);
 
@@ -249,10 +253,10 @@ export const getProductById = asyncHandler(
 
     const product = await Product.findOne(query)
       .populate("category", "name")
-      .populate("subcategory", "subcategoryName")
       .populate("headerCategoryId", "name slug")
       .populate("brand", "name")
-      .populate("tax", "name rate");
+      .populate("tax", "name percentage")
+      .lean();
 
     if (!product) {
       return res.status(404).json({
@@ -289,13 +293,17 @@ export const updateProduct = asyncHandler(
       // Allow null/empty to clear header category
       updateData.headerCategoryId = updateData.headerCategoryId || null;
     }
-    if (updateData.categoryId) {
-      updateData.category = updateData.categoryId;
+    if (updateData.categoryId !== undefined) {
+      updateData.category = updateData.categoryId || null;
       delete updateData.categoryId;
     }
-    if (updateData.subcategoryId) {
-      updateData.subcategory = updateData.subcategoryId;
+    if (updateData.subcategoryId !== undefined) {
+      updateData.subcategory = updateData.subcategoryId || null;
       delete updateData.subcategoryId;
+    }
+    if (updateData.subSubCategoryId !== undefined) {
+      updateData.subSubCategory = updateData.subSubCategoryId || null;
+      delete updateData.subSubCategoryId;
     }
     if (updateData.brandId) {
       updateData.brand = updateData.brandId;
@@ -401,10 +409,9 @@ export const updateProduct = asyncHandler(
     // Re-populate for response
     const populatedProduct = await Product.findById(product._id)
       .populate("category", "name")
-      .populate("subcategory", "subcategoryName")
       .populate("headerCategoryId", "name slug")
       .populate("brand", "name")
-      .populate("tax", "name rate");
+      .populate("tax", "name percentage");
 
     console.log("DEBUG updateProduct: product updated successfully");
 

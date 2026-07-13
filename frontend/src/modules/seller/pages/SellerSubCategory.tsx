@@ -237,7 +237,7 @@ export default function SellerSubCategory() {
                         <tbody>
                             {displayedSubcategories.map((subcategory) => (
                                 <tr key={subcategory._id || subcategory.id} className="hover:bg-neutral-50 transition-colors text-sm text-neutral-700">
-                                    <td className="p-4 align-middle border border-neutral-200">{subcategory._id || subcategory.id}</td>
+                                    <td className="p-4 align-middle border border-neutral-200">{subcategory.subCategoryId || subcategory._id || subcategory.id}</td>
                                     <td className="p-4 align-middle border border-neutral-200">{subcategory.categoryName}</td>
                                     <td className="p-4 align-middle border border-neutral-200">{subcategory.subcategoryName}</td>
                                     <td className="p-4 border border-neutral-200">

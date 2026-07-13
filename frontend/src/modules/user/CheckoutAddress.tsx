@@ -214,7 +214,7 @@ export default function CheckoutAddress() {
         landmark: address.landmark,
         type: addressType.charAt(0).toUpperCase() + addressType.slice(1) as 'Home' | 'Work' | 'Hotel' | 'Other', // Capitalize
         isDefault: true, // Auto set as default for now
-        address: `${address.flat}, ${address.street}`, // Fallback combined string
+        address: [address.flat, address.street].filter(Boolean).join(', '), // Fallback combined string
         latitude: finalLat,
         longitude: finalLng,
       };

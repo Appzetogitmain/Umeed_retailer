@@ -171,6 +171,7 @@ export const getSubcategories = asyncHandler(
     const allSubcategories = [
       ...categorySubcategories.map((cat) => ({
         _id: cat._id,
+        subCategoryId: cat.categoryId,
         name: cat.name,
         subcategoryName: cat.name, // Map name to subcategoryName for frontend compatibility
         categoryName: parentCategory.name,
@@ -182,6 +183,7 @@ export const getSubcategories = asyncHandler(
       })),
       ...oldSubcategories.map((sub) => ({
         _id: sub._id,
+        subCategoryId: sub.subCategoryId,
         name: sub.name,
         subcategoryName: sub.name,
         categoryName: parentCategory.name,
@@ -348,26 +350,31 @@ export const getAllSubcategories = asyncHandler(
     console.log("getAllSubcategories -> categoryQuery:", categoryQuery);
     
     // Fetch from both models
-    const newSubs = await Category.find(categoryQuery).populate("parentId", "name image");
-    const oldSubs = await SubCategory.find(query).populate("category", "name image");
+    const newSubs = await Category.find(categoryQuery).populate("parentId", "name image").lean();
+    const oldSubs = await SubCategory.find(query).populate("category", "name image").lean();
     
     console.log("newSubs.length:", newSubs.length, "oldSubs.length:", oldSubs.length);
 
     // Format new model subcategories
-    const formattedNewSubs = newSubs.map(cat => ({
-        id: cat._id,
-        _id: cat._id,
-        categoryName: (cat.parentId as any)?.name || "Unknown",
-        subcategoryName: cat.name,
-        subcategoryImage: cat.image || "",
-        isNewModel: true,
-        totalProduct: 0
-    }));
+    const formattedNewSubs = newSubs.map(cat => {
+        console.log("cat.categoryId is:", cat.categoryId);
+        return {
+            id: cat._id,
+            _id: cat._id,
+            subCategoryId: cat.categoryId,
+            categoryName: (cat.parentId as any)?.name || "Unknown",
+            subcategoryName: cat.name,
+            subcategoryImage: cat.image || "",
+            isNewModel: true,
+            totalProduct: 0
+        };
+    });
 
     // Format old model subcategories
     const formattedOldSubs = oldSubs.map(sub => ({
         id: sub._id,
         _id: sub._id,
+        subCategoryId: sub.subCategoryId,
         categoryName: (sub.category as any)?.name || "Unknown",
         subcategoryName: sub.name,
         subcategoryImage: sub.image || "",
