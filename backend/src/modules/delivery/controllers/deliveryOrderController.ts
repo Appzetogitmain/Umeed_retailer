@@ -413,6 +413,12 @@ export const sendDeliveryOtp = asyncHandler(async (req: Request, res: Response) 
                 orderNumber: order.orderNumber,
                 message: 'Delivery OTP sent to customer',
             });
+            // Also emit to customer tracking page
+            io.to(`order-${id}`).emit('otp-sent', {
+                orderId: id,
+                orderNumber: order.orderNumber,
+                message: 'Delivery partner has requested OTP',
+            });
         }
 
         return res.status(200).json({

@@ -1,6 +1,19 @@
 import api from './config';
 
 /**
+ * Get seller payment details
+ */
+export const getSellerPaymentDetails = async () => {
+    try {
+        const response = await api.get('/seller/wallet/payment-details');
+        return response.data;
+    } catch (error: any) {
+        console.error('Error getting payment details:', error);
+        throw error;
+    }
+};
+
+/**
  * Get wallet balance (for sellers)
  */
 export const getSellerWalletBalance = async () => {
@@ -31,11 +44,13 @@ export const getSellerWalletTransactions = async (page: number = 1, limit: numbe
 /**
  * Request withdrawal (for sellers)
  */
-export const requestSellerWithdrawal = async (amount: number, paymentMethod: 'Bank Transfer' | 'UPI') => {
+export const requestSellerWithdrawal = async (amount: number, paymentMethod: 'Bank Transfer' | 'UPI', bankDetails?: any, upiDetails?: any) => {
     try {
         const response = await api.post('/seller/wallet/withdraw', {
             amount,
             paymentMethod,
+            bankDetails,
+            upiDetails
         });
         return response.data;
     } catch (error: any) {

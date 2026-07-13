@@ -159,7 +159,7 @@ export default function SellerOrderDetail() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Speedoo - 10 Minute App", margin + 5, yPos + 10);
+    doc.text("Speedoo - your order our priority", margin + 5, yPos + 10);
 
     yPos += 20;
 
@@ -167,16 +167,16 @@ export default function SellerOrderDetail() {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Speedoo - 10 Minute App", margin, yPos);
+    doc.text("Speedoo - your order our priority", margin, yPos);
     yPos += 7;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("From: Speedoo - 10 Minute App", margin, yPos);
+    doc.text("From: Speedoo - your order our priority", margin, yPos);
     yPos += 6;
-    doc.text("Phone: 8956656429", margin, yPos);
+    doc.text(`Phone: ${orderDetail.appInfo?.phone || '8956656429'}`, margin, yPos);
     yPos += 6;
-    doc.text("Email: info@Speedoo.com", margin, yPos);
+    doc.text(`Email: ${orderDetail.appInfo?.email || 'info@Speedoo.com'}`, margin, yPos);
     yPos += 6;
     doc.text("Website: https://Speedoo.com", margin, yPos);
     yPos += 12;
@@ -195,7 +195,7 @@ export default function SellerOrderDetail() {
     });
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Order ID: ${orderDetail.id}`, rightX, yPos - 14, {
+    doc.text(`Order ID: ${orderDetail.orderNumber || orderDetail.id}`, rightX, yPos - 14, {
       align: "right",
     });
     doc.text(
@@ -204,9 +204,6 @@ export default function SellerOrderDetail() {
       yPos - 8,
       { align: "right" }
     );
-    doc.text(`Time Slot: ${orderDetail.timeSlot}`, rightX, yPos - 2, {
-      align: "right",
-    });
 
     // Status badge
     const statusWidth = doc.getTextWidth(orderStatus) + 8;
@@ -527,17 +524,17 @@ export default function SellerOrderDetail() {
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-2">
-                Speedoo - 10 Minute App
+                Speedoo - your order our priority
               </h1>
               <div className="text-sm text-neutral-600 mb-1">
-                <span className="font-medium">From:</span> Speedoo - 10 Minute App
+                <span className="font-medium">From:</span> Speedoo - your order our priority
               </div>
               <div className="text-sm text-neutral-600 space-y-1">
                 <div>
-                  <span className="font-medium">Phone:</span> 8956656429
+                  <span className="font-medium">Phone:</span> {orderDetail.appInfo?.phone || '8956656429'}
                 </div>
                 <div>
-                  <span className="font-medium">Email:</span> info@Speedoo.com
+                  <span className="font-medium">Email:</span> {orderDetail.appInfo?.email || 'info@Speedoo.com'}
                 </div>
                 <div>
                   <span className="font-medium">Website:</span>{" "}
@@ -556,15 +553,11 @@ export default function SellerOrderDetail() {
                 Invoice #{orderDetail.invoiceNumber}
               </div>
               <div className="text-sm text-neutral-600 mb-1">
-                <span className="font-medium">Order ID:</span> {orderDetail.id}
-              </div>
-              <div className="text-sm text-neutral-600 mb-1">
-                <span className="font-medium">Delivery Date:</span>{" "}
-                {formatDate(orderDetail.deliveryDate)}
+                <span className="font-medium">Order ID:</span> {orderDetail.orderNumber || orderDetail.id}
               </div>
               <div className="text-sm text-neutral-600 mb-3">
-                <span className="font-medium">Time Slot:</span>{" "}
-                {orderDetail.timeSlot}
+                <span className="font-medium">Delivery Date:</span>{" "}
+                {formatDate(orderDetail.deliveryDate)}
               </div>
               <div className="flex items-center gap-2 lg:justify-end">
                 <span className="text-sm font-medium text-neutral-700">

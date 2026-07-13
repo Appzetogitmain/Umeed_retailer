@@ -150,7 +150,7 @@ export default function SellerProductList() {
     // If product has no variations, create a default one
     if (!product.variations || product.variations.length === 0) {
       return [{
-        variationId: `${product._id}-default`,
+        variationId: `${product.productId || product._id}-default`,
         productName: product.productName,
         sellerName: user?.storeName || "",
         productImage:
@@ -164,12 +164,12 @@ export default function SellerProductList() {
         discPrice: (product as any).discPrice || 0,
         variation: "Default",
         isPopular: product.popular,
-        productId: product._id,
+        productId: product.productId || product._id,
       }];
     }
     // If product has variations, map them
     return product.variations.map((variation, index) => ({
-      variationId: variation._id || `${product._id}-${index}`,
+      variationId: variation.variationId || variation._id || `${product.productId || product._id}-${index}`,
       productName: product.productName,
       sellerName: user?.storeName || "",
       productImage:
@@ -184,7 +184,7 @@ export default function SellerProductList() {
       variation:
         variation.title || variation.value || variation.name || "Default",
       isPopular: product.popular,
-      productId: product._id,
+      productId: product.productId || product._id,
     }));
   });
 
@@ -547,7 +547,7 @@ export default function SellerProductList() {
                   displayedVariations[index - 1].productId !==
                     variation.productId;
                 const product = products.find(
-                  (p) => p._id === variation.productId
+                  (p) => (p.productId || p._id) === variation.productId
                 );
                 const hasMultipleVariations =
                   product && product.variations.length > 1;
@@ -630,7 +630,7 @@ export default function SellerProductList() {
                     <td className="p-4 align-middle border border-neutral-200">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => handleEdit(variation.productId)}
+                          onClick={() => handleEdit(product ? product._id : variation.productId)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           title="Edit Product">
                           <svg
@@ -647,7 +647,7 @@ export default function SellerProductList() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => handleDelete(variation.productId)}
+                          onClick={() => handleDelete(product ? product._id : variation.productId)}
                           className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                           title="Delete Product">
                           <svg

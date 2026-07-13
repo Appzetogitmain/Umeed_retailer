@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '../../../context/ToastContext';
 import {
@@ -7,6 +8,7 @@ import {
   requestSellerWithdrawal,
   getSellerWithdrawals,
   getSellerCommissions,
+  getSellerPaymentDetails
 } from '../../../services/api/sellerWalletService';
 
 type Tab = 'transactions' | 'withdrawals' | 'commissions';
@@ -24,6 +26,45 @@ export default function SellerWallet() {
   const [paymentMethod, setPaymentMethod] = useState<'Bank Transfer' | 'UPI'>('Bank Transfer');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [savedPaymentDetails, setSavedPaymentDetails] = useState<any>(null);
+  const [useSavedDetails, setUseSavedDetails] = useState(true);
+
+  const [bankDetails, setBankDetails] = useState({
+    accountName: '',
+    bankName: '',
+    branch: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifsc: ''
+  });
+
+  const [upiDetails, setUpiDetails] = useState({
+    upiId: '',
+    confirmUpiId: ''
+  });
+
+  // Lock ALL scroll containers when modal is open
+  useEffect(() => {
+    const mainEl = document.getElementById('seller-main-content');
+    const htmlEl = document.documentElement;
+    if (showWithdrawModal) {
+      // Use setProperty with 'important' to forcefully override Tailwind classes
+      document.body.style.setProperty('overflow', 'hidden', 'important');
+      htmlEl.style.setProperty('overflow', 'hidden', 'important');
+      if (mainEl) mainEl.style.setProperty('overflow', 'hidden', 'important');
+    } else {
+      document.body.style.removeProperty('overflow');
+      htmlEl.style.removeProperty('overflow');
+      if (mainEl) mainEl.style.removeProperty('overflow');
+    }
+    return () => {
+      document.body.style.removeProperty('overflow');
+      htmlEl.style.removeProperty('overflow');
+      if (mainEl) mainEl.style.removeProperty('overflow');
+    };
+  }, [showWithdrawModal]);
+
+
   useEffect(() => {
     fetchWalletData();
   }, []);
@@ -31,17 +72,19 @@ export default function SellerWallet() {
   const fetchWalletData = async () => {
     try {
       setLoading(true);
-      const [balanceRes, transactionsRes, withdrawalsRes, commissionsRes] = await Promise.all([
+      const [balanceRes, transactionsRes, withdrawalsRes, commissionsRes, paymentDetailsRes] = await Promise.all([
         getSellerWalletBalance(),
         getSellerWalletTransactions(),
         getSellerWithdrawals(),
         getSellerCommissions(),
+        getSellerPaymentDetails()
       ]);
 
       if (balanceRes.success) setBalance(balanceRes.data.balance);
       if (transactionsRes.success) setTransactions(transactionsRes.data.transactions || []);
       if (withdrawalsRes.success) setWithdrawals(withdrawalsRes.data || []);
       if (commissionsRes.success) setCommissions(commissionsRes.data);
+      if (paymentDetailsRes.success) setSavedPaymentDetails(paymentDetailsRes.data);
     } catch (error: any) {
       showToast(error.response?.data?.message || 'Failed to load wallet data', 'error');
     } finally {
@@ -62,12 +105,57 @@ export default function SellerWallet() {
         return;
       }
 
+      let payloadBankDetails = undefined;
+      let payloadUpiDetails = undefined;
+
+      if (paymentMethod === 'Bank Transfer') {
+        if (!useSavedDetails || !savedPaymentDetails?.bankDetails) {
+          if (!bankDetails.accountName || !bankDetails.bankName || !bankDetails.branch || !bankDetails.accountNumber || !bankDetails.ifsc) {
+            showToast('Please fill all bank details', 'error');
+            return;
+          }
+          if (!/^\d{9,18}$/.test(bankDetails.accountNumber)) {
+            showToast('Account number must be between 9 and 18 digits', 'error');
+            return;
+          }
+          if (bankDetails.accountNumber !== bankDetails.confirmAccountNumber) {
+            showToast('Account numbers do not match', 'error');
+            return;
+          }
+          if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankDetails.ifsc)) {
+            showToast('Invalid IFSC code format (e.g., HDFC0001234)', 'error');
+            return;
+          }
+          payloadBankDetails = bankDetails;
+        }
+      } else if (paymentMethod === 'UPI') {
+        if (!useSavedDetails || !savedPaymentDetails?.upiDetails) {
+          if (!upiDetails.upiId) {
+            showToast('Please enter UPI ID', 'error');
+            return;
+          }
+          if (upiDetails.upiId !== upiDetails.confirmUpiId) {
+            showToast('UPI IDs do not match', 'error');
+            return;
+          }
+          if (!/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(upiDetails.upiId)) {
+            showToast('Invalid UPI ID format (e.g., name@bank)', 'error');
+            return;
+          }
+          payloadUpiDetails = upiDetails;
+        }
+      }
+
       setIsSubmitting(true);
-      const response = await requestSellerWithdrawal(amount, paymentMethod);
+      const response = await requestSellerWithdrawal(amount, paymentMethod, payloadBankDetails, payloadUpiDetails);
       if (response.success) {
         showToast('Withdrawal request submitted successfully', 'success');
         setShowWithdrawModal(false);
         setWithdrawAmount('');
+        // Reset form
+        setBankDetails({ accountName: '', bankName: '', branch: '', accountNumber: '', confirmAccountNumber: '', ifsc: '' });
+        setUpiDetails({ upiId: '', confirmUpiId: '' });
+        setUseSavedDetails(true);
         fetchWalletData();
       }
     } catch (error: any) {
@@ -300,67 +388,206 @@ export default function SellerWallet() {
         </div>
       </div>
 
-      {/* Withdrawal Modal */}
-      {
-        showWithdrawModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl p-6 max-w-md w-full"
-            >
-              <h2 className="text-2xl font-bold mb-4">Request Withdrawal</h2>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
-                  <input
-                    type="number"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter amount"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Available: ₹{balance.toFixed(2)}</p>
+      {/* Withdrawal Modal - rendered via Portal to escape the scrollable main container */}
+      {showWithdrawModal && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full"
+          >
+            <h2 className="text-2xl font-bold mb-4">Request Withdrawal</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                <input
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter amount"
+                  min="0"
+                  step="0.01"
+                />
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Cash">Cash</option>
-                </select>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowWithdrawModal(false);
-                    setWithdrawAmount('');
-                  }}
-                  className="flex-1 border border-gray-300 rounded-lg py-2.5 font-semibold hover:bg-gray-50 transition"
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleWithdrawRequest}
-                  className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )
-      }
+              <p className="text-xs text-gray-500 mt-1">Available: ₹{balance.toFixed(2)}</p>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => {
+                  setPaymentMethod(e.target.value as any);
+                  setUseSavedDetails(true);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+              </select>
+            </div>
+
+            {/* Dynamic Payment Details Area */}
+            <div className="mb-6 max-h-[40vh] overflow-y-auto px-1 pb-1">
+              {paymentMethod === 'Bank Transfer' && (
+                <>
+                  {savedPaymentDetails?.bankDetails && useSavedDetails ? (
+                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                      <p className="text-sm font-semibold text-blue-900 mb-1">Saved Bank Account</p>
+                      <p className="text-sm text-blue-800">{savedPaymentDetails.bankDetails.bankName}</p>
+                      <p className="text-sm font-mono text-blue-800 mt-1">{savedPaymentDetails.bankDetails.accountNumber}</p>
+                      <p className="text-xs text-blue-600 mt-1">IFSC: {savedPaymentDetails.bankDetails.ifsc}</p>
+                      <button 
+                        onClick={() => setUseSavedDetails(false)}
+                        className="text-xs font-bold text-blue-700 hover:text-blue-900 underline mt-3 inline-block"
+                      >
+                        Use a different bank account
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-bold text-gray-800 border-b pb-2">Enter Bank Details</p>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Account Name</label>
+                        <input
+                          type="text"
+                          value={bankDetails.accountName}
+                          onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Bank Name</label>
+                          <input
+                            type="text"
+                            value={bankDetails.bankName}
+                            onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Branch</label>
+                          <input
+                            type="text"
+                            value={bankDetails.branch}
+                            onChange={(e) => setBankDetails({ ...bankDetails, branch: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Account Number</label>
+                        <input
+                          type="password" // obfuscate for security feeling
+                          value={bankDetails.accountNumber}
+                          onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Account Number</label>
+                        <input
+                          type="text"
+                          value={bankDetails.confirmAccountNumber}
+                          onChange={(e) => setBankDetails({ ...bankDetails, confirmAccountNumber: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">IFSC Code</label>
+                        <input
+                          type="text"
+                          value={bankDetails.ifsc}
+                          onChange={(e) => setBankDetails({ ...bankDetails, ifsc: e.target.value.toUpperCase() })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                        />
+                      </div>
+                      {savedPaymentDetails?.bankDetails && (
+                        <button 
+                          onClick={() => setUseSavedDetails(true)}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-700 underline mt-2"
+                        >
+                          Cancel and use saved details
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {paymentMethod === 'UPI' && (
+                <>
+                  {savedPaymentDetails?.upiDetails && useSavedDetails ? (
+                    <div className="bg-purple-50 border border-purple-100 p-4 rounded-lg">
+                      <p className="text-sm font-semibold text-purple-900 mb-1">Saved UPI ID</p>
+                      <p className="text-sm font-mono text-purple-800">{savedPaymentDetails.upiDetails.upiId}</p>
+                      <button 
+                        onClick={() => setUseSavedDetails(false)}
+                        className="text-xs font-bold text-purple-700 hover:text-purple-900 underline mt-3 inline-block"
+                      >
+                        Use a different UPI ID
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-bold text-gray-800 border-b pb-2">Enter UPI Details</p>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">UPI ID</label>
+                        <input
+                          type="password"
+                          value={upiDetails.upiId}
+                          onChange={(e) => setUpiDetails({ ...upiDetails, upiId: e.target.value.toLowerCase() })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Confirm UPI ID</label>
+                        <input
+                          type="text"
+                          value={upiDetails.confirmUpiId}
+                          onChange={(e) => setUpiDetails({ ...upiDetails, confirmUpiId: e.target.value.toLowerCase() })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      {savedPaymentDetails?.upiDetails && (
+                        <button 
+                          onClick={() => setUseSavedDetails(true)}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-700 underline mt-2"
+                        >
+                          Cancel and use saved details
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowWithdrawModal(false);
+                  setWithdrawAmount('');
+                }}
+                className="flex-1 border border-gray-300 rounded-lg py-2.5 font-semibold hover:bg-gray-50 transition"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleWithdrawRequest}
+                className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
     </div >
   );
 }

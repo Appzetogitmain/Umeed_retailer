@@ -89,11 +89,27 @@ export const requestWithdrawal = async (req: Request, res: Response) => {
             });
         }
 
+        const deliveryBoy = await Delivery.findById(deliveryBoyId);
+        if (!deliveryBoy) {
+            return res.status(404).json({ success: false, message: 'Delivery boy not found' });
+        }
+
+        const ifsc = (deliveryBoy as any).ifsc || (deliveryBoy as any).ifscCode;
+        if (!deliveryBoy.accountNumber || !ifsc || !deliveryBoy.bankName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please complete your bank account details before requesting withdrawal',
+            });
+        }
+
+        const accountDetails = `${deliveryBoy.bankName} - ${deliveryBoy.accountNumber} (${ifsc})`;
+
         const result = await createWithdrawalRequest(
             deliveryBoyId,
             'DELIVERY_BOY',
             amount,
-            paymentMethod
+            paymentMethod,
+            accountDetails
         );
 
         if (!result.success) {

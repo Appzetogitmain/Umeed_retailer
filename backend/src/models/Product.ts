@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IProduct extends Document {
   // Basic Info
+  productId?: string;
   productName: string;
   smallDescription?: string;
   description?: string;
@@ -31,6 +32,7 @@ export interface IProduct extends Document {
   // Variations
   variationType?: string; // e.g., 'Size', 'Color', 'Weight'
   variations?: Array<{
+    variationId?: string;
     name: string;
     value: string;
     price?: number;
@@ -97,14 +99,21 @@ export interface IProduct extends Document {
 const ProductSchema = new Schema<IProduct>(
   {
     // Basic Info
+    productId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     productName: {
       type: String,
       required: [true, "Product name is required"],
       trim: true,
+      maxlength: [100, "Product name cannot exceed 100 characters"],
     },
     smallDescription: {
       type: String,
       trim: true,
+      maxlength: [500, "Small description cannot exceed 500 characters"],
     },
     description: {
       type: String,
@@ -196,6 +205,7 @@ const ProductSchema = new Schema<IProduct>(
     variations: {
       type: [
         {
+          variationId: String,
           name: String,
           value: String,
           price: Number,
@@ -247,6 +257,13 @@ const ProductSchema = new Schema<IProduct>(
     fssaiLicNo: {
       type: String,
       trim: true,
+      validate: {
+        validator: function(v: string) {
+          if (!v) return true; // Optional field
+          return /^FSSAI Lic\. No\. \d{14}$/.test(v);
+        },
+        message: "FSSAI License Number must be in the format 'FSSAI Lic. No. [14 digits]'"
+      }
     },
     totalAllowedQuantity: {
       type: Number,
@@ -342,8 +359,29 @@ ProductSchema.virtual("mrp").get(function () {
 
 // Calculate discount and sync stock/price from variations before saving
 ProductSchema.pre("save", function (next) {
+  // Generate short IDs if they don't exist
+  if (!this.productId) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'PRD-';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    this.productId = result;
+  }
+
   // Sync price and stock from variations if they exist
   if (this.variations && this.variations.length > 0) {
+    this.variations.forEach(variation => {
+      if (!variation.variationId) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = 'VAR-';
+        for (let i = 0; i < 6; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        variation.variationId = result;
+      }
+    });
+
     // Set price to the price of the first variation if top-level price is not set or if we want to keep it in sync
     if (this.variations[0].price !== undefined) {
       this.price = this.variations[0].price;

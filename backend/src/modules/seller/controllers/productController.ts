@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Product from "../../../models/Product";
 import Shop from "../../../models/Shop";
+import Category from "../../../models/Category";
 import { asyncHandler } from "../../../utils/asyncHandler";
 
 /**
@@ -157,7 +158,17 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
 
   // Category filter
   if (category) {
-    query.category = category;
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(category as string);
+    if (isObjectId) {
+      query.category = category;
+    } else {
+      const categoryDoc = await Category.findOne({ name: { $regex: new RegExp(`^${category}$`, "i") } });
+      if (categoryDoc) {
+        query.category = categoryDoc._id;
+      } else {
+        query.category = null; // Force empty result if not found
+      }
+    }
   }
 
   // Status filter (publish, popular, dealOfDay)
@@ -231,7 +242,12 @@ export const getProductById = asyncHandler(
       });
     }
 
-    const product = await Product.findOne({ _id: id, seller: sellerId })
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId 
+      ? { _id: id, seller: sellerId } 
+      : { productId: id, seller: sellerId };
+
+    const product = await Product.findOne(query)
       .populate("category", "name")
       .populate("subcategory", "subcategoryName")
       .populate("headerCategoryId", "name slug")
@@ -349,11 +365,17 @@ export const updateProduct = asyncHandler(
     }
 
     // Use findOne and then save to trigger pre-save hooks
-    const product = await Product.findOne({ _id: id, seller: sellerId });
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId 
+      ? { _id: id, seller: sellerId } 
+      : { productId: id, seller: sellerId };
+
+    const product = await Product.findOne(query);
 
     if (!product) {
       // Check if product exists at all
-      const existingProduct = await Product.findById(id).select("seller");
+      const existingQuery = isObjectId ? { _id: id } : { productId: id };
+      const existingProduct = await Product.findOne(existingQuery).select("seller");
       if (existingProduct) {
         console.log(
           "DEBUG updateProduct: product exists but owned by:",
@@ -405,10 +427,12 @@ export const deleteProduct = asyncHandler(
     console.log("DEBUG deleteProduct: sellerId from token:", sellerId);
     console.log("DEBUG deleteProduct: productId:", id);
 
-    const product = await Product.findOneAndDelete({
-      _id: id,
-      seller: sellerId,
-    });
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId 
+      ? { _id: id, seller: sellerId } 
+      : { productId: id, seller: sellerId };
+
+    const product = await Product.findOneAndDelete(query);
 
     if (!product) {
       return res.status(404).json({
@@ -432,7 +456,12 @@ export const updateStock = asyncHandler(async (req: Request, res: Response) => {
   const { id, variationId } = req.params;
   const { stock, status } = req.body;
 
-  const product = await Product.findOne({ _id: id, seller: sellerId });
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+  const query = isObjectId 
+    ? { _id: id, seller: sellerId } 
+    : { productId: id, seller: sellerId };
+
+  const product = await Product.findOne(query);
 
   if (!product) {
     return res.status(404).json({
@@ -442,7 +471,7 @@ export const updateStock = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const variation: any = product.variations?.find(
-    (v: any) => v._id?.toString() === variationId
+    (v: any) => v._id?.toString() === variationId || v.variationId === variationId
   );
   if (!variation) {
     return res.status(404).json({
@@ -489,8 +518,13 @@ export const updateProductStatus = asyncHandler(
     if (popular !== undefined) updateData.popular = popular;
     if (dealOfDay !== undefined) updateData.dealOfDay = dealOfDay;
 
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const query = isObjectId 
+      ? { _id: id, seller: sellerId } 
+      : { productId: id, seller: sellerId };
+
     const product = await Product.findOneAndUpdate(
-      { _id: id, seller: sellerId },
+      query,
       updateData,
       { new: true, runValidators: true }
     );
@@ -529,13 +563,15 @@ export const bulkUpdateStock = asyncHandler(
     for (const update of updates) {
       const { productId, variationId, stock } = update;
 
-      const product = await Product.findOne({
-        _id: productId,
-        seller: sellerId,
-      });
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(productId);
+      const query = isObjectId 
+        ? { _id: productId, seller: sellerId } 
+        : { productId: productId, seller: sellerId };
+
+      const product = await Product.findOne(query);
       if (product) {
         const variation: any = product.variations?.find(
-          (v: any) => v._id?.toString() === variationId
+          (v: any) => v._id?.toString() === variationId || v.variationId === variationId
         );
         if (variation) {
           variation.stock = stock;

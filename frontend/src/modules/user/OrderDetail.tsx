@@ -534,7 +534,20 @@ export default function OrderDetail() {
     error: trackingError,
     reconnectAttempts,
     reconnect,
+    otpUpdateTrigger,
   } = useDeliveryTracking(id);
+
+  // Fetch order on OTP update
+  useEffect(() => {
+    if (otpUpdateTrigger > 0 && id) {
+      console.log("🔄 OTP trigger received, fetching updated order");
+      fetchOrderById(id).then((fetchedOrder) => {
+        if (fetchedOrder) {
+          setOrder(fetchedOrder);
+        }
+      });
+    }
+  }, [otpUpdateTrigger, id, fetchOrderById]);
 
   // Seller locations for the order
   const [sellerLocations, setSellerLocations] = useState<any[]>([]);
@@ -1188,20 +1201,22 @@ export default function OrderDetail() {
             {currentStatus.title}
           </motion.h1>
 
-          {/* Status pill */}
+          {/* Status pill or just refresh button if no subtitle */}
           <motion.div
-            className="inline-flex items-center gap-2 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10"
-            style={{ backgroundColor: `${currentTheme.accentColor}66` }} // 40% opacity
+            className={`inline-flex items-center gap-2 ${currentStatus.subtitle ? "backdrop-blur-sm rounded-full px-4 py-2 border border-white/10" : ""}`}
+            style={{ backgroundColor: currentStatus.subtitle ? `${currentTheme.accentColor}66` : "transparent" }} 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}>
-            <span className="text-sm font-medium">{currentStatus.subtitle}</span>
+            {currentStatus.subtitle && (
+              <span className="text-sm font-medium">{currentStatus.subtitle}</span>
+            )}
             <motion.button
               onClick={handleRefresh}
-              className="ml-1"
+              className={currentStatus.subtitle ? "ml-1" : ""}
               animate={{ rotate: isRefreshing ? 360 : 0 }}
               transition={{ duration: 0.5 }}>
-              <RefreshCwIcon className="w-4 h-4" />
+              <RefreshCwIcon className="w-5 h-5" />
             </motion.button>
           </motion.div>
         </div>
@@ -1279,7 +1294,7 @@ export default function OrderDetail() {
       )}
 
       {/* Delivery Partner Card */}
-      {isPartnerAssigned && (
+      {isPartnerAssigned && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
         <DeliveryPartnerCard
           partner={{
             name: order?.deliveryPartner?.name || "Delivery Partner",
@@ -1303,8 +1318,8 @@ export default function OrderDetail() {
       <div className="px-4 py-4 space-y-4 pb-24">
 
 
-        {/* Delivery Partner Assignment - Only show if no partner assigned yet */}
-        {!isPartnerAssigned && (
+        {/* Delivery Partner Assignment - Only show if no partner assigned yet and order is accepted by store */}
+        {!isPartnerAssigned && (orderStatus === "Accepted" || orderStatus === "Processed") && (
           <motion.div
             className="bg-white rounded-xl p-4 shadow-sm"
             initial={{ opacity: 0, y: 20 }}
@@ -1519,14 +1534,7 @@ export default function OrderDetail() {
             </div>
           </div>
 
-          {!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
-            <SectionItem
-              icon={ChefHatIcon}
-              title={order.specialRequests || "Add special requests"}
-              subtitle={order.specialRequests ? "Tap to edit" : "Add preferences for store"}
-              onClick={() => setShowSpecialRequestsModal(true)}
-            />
-          )}
+
         </motion.div>
 
         {/* Help Section */}

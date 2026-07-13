@@ -14,6 +14,7 @@ export interface ApiResponse<T> {
 
 export interface ProductVariation {
   _id?: string;
+  variationId?: string;
   name?: string; // Mapped from title if needed, or direct
   value?: string;
   title?: string; // Frontend uses title
@@ -26,6 +27,7 @@ export interface ProductVariation {
 
 export interface Product {
   _id: string;
+  productId?: string;
   productName: string;
   seller: string | any; // Updated to allow populated object
   headerCategoryId?: string | any; // Updated to allow populated object

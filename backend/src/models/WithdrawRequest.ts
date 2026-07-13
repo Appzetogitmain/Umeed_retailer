@@ -39,7 +39,7 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>(
         },
         paymentMethod: {
             type: String,
-            enum: ['Bank Transfer', 'UPI', 'Cash'],
+            enum: ['Bank Transfer', 'UPI'],
             required: [true, 'Payment method is required'],
         },
         accountDetails: {

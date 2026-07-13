@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
     getReturnRequests,
@@ -20,6 +21,7 @@ export default function SellerReturnRequest() {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
     // View Details Modal States
     const [selectedRequest, setSelectedRequest] = useState<ReturnRequest | null>(null);
@@ -126,6 +128,47 @@ export default function SellerReturnRequest() {
         fetchReturnRequests();
     }, [fromDate, toDate, statusFilter, searchTerm, currentPage, rowsPerPage, sortColumn, sortDirection]);
 
+    // Prevent background scrolling when modal is open
+    const scrollLockTargets = useRef<{ el: HTMLElement; original: string }[]>([]);
+    useEffect(() => {
+        if (showDetailsModal) {
+            // Lock ALL scrollable ancestors
+            const targets: { el: HTMLElement; original: string }[] = [];
+            // body
+            targets.push({ el: document.body, original: document.body.style.overflow });
+            document.body.style.overflow = 'hidden';
+            // html
+            const html = document.documentElement;
+            targets.push({ el: html, original: html.style.overflow });
+            html.style.overflow = 'hidden';
+            // main element inside SellerLayout
+            const mainEl = document.querySelector('main');
+            if (mainEl instanceof HTMLElement) {
+                targets.push({ el: mainEl, original: mainEl.style.overflow });
+                mainEl.style.overflow = 'hidden';
+            }
+            // root div (#root)
+            const rootEl = document.getElementById('root');
+            if (rootEl) {
+                targets.push({ el: rootEl, original: rootEl.style.overflow });
+                rootEl.style.overflow = 'hidden';
+            }
+            scrollLockTargets.current = targets;
+        } else {
+            // Restore all
+            scrollLockTargets.current.forEach(({ el, original }) => {
+                el.style.overflow = original;
+            });
+            scrollLockTargets.current = [];
+        }
+        return () => {
+            scrollLockTargets.current.forEach(({ el, original }) => {
+                el.style.overflow = original;
+            });
+            scrollLockTargets.current = [];
+        };
+    }, [showDetailsModal]);
+
     // Client-side pagination (can be moved to backend later)
     const totalPages = Math.ceil(returnRequests.length / rowsPerPage);
     const startIndex = (currentPage - 1) * rowsPerPage;
@@ -183,34 +226,40 @@ export default function SellerReturnRequest() {
                             {/* Date Range Filter */}
                             <div className="flex items-center gap-2">
                                 <label className="text-sm text-neutral-600 whitespace-nowrap">From - To Date:</label>
-                                <div className="relative">
+                                <div className="flex items-center bg-white border border-neutral-300 rounded overflow-hidden focus-within:ring-1 focus-within:ring-green-500">
+                                    <div className="pl-3 pr-2 text-neutral-400 flex items-center justify-center">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                                        </svg>
+                                    </div>
                                     <input
-                                        type="text"
-                                        value={fromDate && toDate ? `${fromDate} - ${toDate}` : ''}
-                                        placeholder="Select date range"
-                                        className="pl-10 pr-3 py-2 bg-white border border-neutral-300 rounded text-sm focus:ring-1 focus:ring-green-500 focus:outline-none w-full sm:w-64"
-                                        readOnly
+                                        type="date"
+                                        value={fromDate}
+                                        max={toDate || undefined}
+                                        onChange={(e) => {
+                                            setFromDate(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="py-1.5 px-1 text-sm focus:outline-none w-28 sm:w-32 bg-transparent [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative"
                                     />
-                                    <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-                                    >
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                                    </svg>
+                                    <span className="text-neutral-400 text-sm">-</span>
+                                    <input
+                                        type="date"
+                                        value={toDate}
+                                        min={fromDate || undefined}
+                                        onChange={(e) => {
+                                            setToDate(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="py-1.5 px-1 text-sm focus:outline-none w-28 sm:w-32 bg-transparent [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative"
+                                    />
                                 </div>
                                 <button
                                     onClick={handleClearDates}
-                                    className="px-3 py-2 bg-neutral-700 hover:bg-neutral-800 text-white text-sm rounded transition-colors"
+                                    className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-800 text-white text-sm rounded transition-colors"
                                 >
                                     Clear
                                 </button>
@@ -254,55 +303,65 @@ export default function SellerReturnRequest() {
                             </div>
 
                             {/* Export Button */}
-                                    <button
-                                        onClick={() => {
-                                            const headers = ['Order Item Id', 'Product', 'Variant', 'Price', 'Disc Price', 'Quantity', 'Total', 'Status', 'Date'];
-                                            const csvContent = [
-                                                headers.join(','),
-                                                ...returnRequests.map(request => [
-                                                    request.orderItemId,
-                                                    `"${request.product}"`,
-                                                    `"${request.variant}"`,
-                                                    request.price,
-                                                    request.discPrice,
-                                                    request.quantity,
-                                                    request.total,
-                                                    `"${request.status}"`,
-                                                    request.date
-                                                ].join(','))
-                                            ].join('\n');
-                                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                            const link = document.createElement('a');
-                                            const url = URL.createObjectURL(blob);
-                                            link.setAttribute('href', url);
-                                            link.setAttribute('download', `return_requests_${new Date().toISOString().split('T')[0]}.csv`);
-                                            link.style.visibility = 'hidden';
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="7 10 12 15 17 10"></polyline>
-                                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                Export
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </button>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Export
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                {exportDropdownOpen && (
+                                    <div className="absolute right-0 mt-1 w-32 bg-white border border-neutral-200 rounded shadow-lg z-10 py-1">
+                                        <button
+                                            onClick={() => {
+                                                setExportDropdownOpen(false);
+                                                const headers = ['Order Item Id', 'Product', 'Variant', 'Price', 'Disc Price', 'Quantity', 'Total', 'Status', 'Date'];
+                                                const csvContent = [
+                                                    headers.join(','),
+                                                    ...returnRequests.map(request => [
+                                                        request.orderItemId,
+                                                        `"${request.product}"`,
+                                                        `"${request.variant}"`,
+                                                        request.price,
+                                                        request.discPrice,
+                                                        request.quantity,
+                                                        request.total,
+                                                        `"${request.status}"`,
+                                                        request.date
+                                                    ].join(','))
+                                                ].join('\n');
+                                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                                const link = document.createElement('a');
+                                                link.href = URL.createObjectURL(blob);
+                                                link.download = `return_requests_${new Date().toISOString().split('T')[0]}.csv`;
+                                                link.click();
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-100"
+                                        >
+                                            Export as CSV
+                                        </button>
+                                        <button onClick={() => { setExportDropdownOpen(false); alert('PDF Export not implemented yet'); }} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-100">Export as PDF</button>
+                                        <button onClick={() => { setExportDropdownOpen(false); alert('Excel Export not implemented yet'); }} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-100">Export as Excel</button>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Search */}
                             <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">Search:</span>
                                 <input
                                     type="text"
-                                    className="pl-14 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-green-500 w-full sm:w-48"
+                                    className="pl-3 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-green-500 w-full sm:w-48"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder=""
+                                    placeholder="Search:"
                                 />
                             </div>
                         </div>
@@ -427,10 +486,10 @@ export default function SellerReturnRequest() {
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.orderItemId}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.product}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.variant}</td>
-                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{request.price.toFixed(2)}</td>
-                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{request.discPrice.toFixed(2)}</td>
-                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.quantity}</td>
-                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{request.total.toFixed(2)}</td>
+                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{(request.price || 0).toFixed(2)}</td>
+                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{(request.discPrice || 0).toFixed(2)}</td>
+                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.quantity || 0}</td>
+                                            <td className="p-4 border border-neutral-200 text-sm text-neutral-900">₹{(request.total || 0).toFixed(2)}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.status}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">{request.date}</td>
                                             <td className="p-4 border border-neutral-200 text-sm text-neutral-900">
@@ -479,8 +538,8 @@ export default function SellerReturnRequest() {
             </div>
 
             {/* View Details Modal */}
-            {showDetailsModal && selectedRequest && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 overflow-y-auto">
+            {showDetailsModal && selectedRequest && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50" style={{ overscrollBehavior: 'contain' }}>
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50 rounded-t-lg">
@@ -524,7 +583,7 @@ export default function SellerReturnRequest() {
                                         <div className="grid grid-cols-4 gap-2 pt-2 border-t border-neutral-200/60">
                                             <div>
                                                 <p className="text-[10px] text-neutral-500 uppercase font-semibold">Price</p>
-                                                <p className="text-xs font-semibold text-neutral-800">₹{(requestDetails.price || selectedRequest.price).toFixed(2)}</p>
+                                                <p className="text-xs font-semibold text-neutral-800">₹{(requestDetails.price || selectedRequest.price || 0).toFixed(2)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-neutral-500 uppercase font-semibold">Disc. Price</p>
@@ -536,7 +595,7 @@ export default function SellerReturnRequest() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-neutral-500 uppercase font-semibold">Total</p>
-                                                <p className="text-xs font-bold text-green-700">₹{(requestDetails.total || selectedRequest.total).toFixed(2)}</p>
+                                                <p className="text-xs font-bold text-green-700">₹{(requestDetails.total || selectedRequest.total || 0).toFixed(2)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -629,7 +688,7 @@ export default function SellerReturnRequest() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* Footer */}
             <footer className="px-4 sm:px-6 py-4 text-center bg-white border-t border-neutral-200">

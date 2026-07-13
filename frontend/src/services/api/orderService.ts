@@ -43,6 +43,7 @@ export interface DeliveryAddress {
 
 export interface OrderDetail {
   id: string;
+  orderNumber?: string;
   invoiceNumber: string;
   orderDate: string;
   deliveryDate: string;
@@ -58,6 +59,10 @@ export interface OrderDetail {
   tax: number;
   grandTotal: number;
   paymentMethod: string;
+  appInfo?: {
+    email: string;
+    phone: string;
+  };
   paymentStatus: string;
   deliveryAddress: DeliveryAddress;
 }

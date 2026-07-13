@@ -41,8 +41,10 @@ export default function AdminHeader({
   }, []);
 
   const handleLogout = () => {
-    logout();
-    navigate("/admin/login");
+    if (window.confirm("Are you sure you want to log out?")) {
+      logout();
+      navigate("/admin/login");
+    }
   };
 
   const handleLogoClick = () => {

@@ -277,25 +277,6 @@ export const validateWithdrawal = async (
             };
         }
 
-        // Check bank details
-        const Model: any = userType === 'SELLER' ? Seller : Delivery;
-        const user = await Model.findById(userId);
-
-        if (!user) {
-            return {
-                success: false,
-                message: 'User not found',
-            };
-        }
-
-        const ifsc = (user as any).ifsc || (user as any).ifscCode;
-        if (!user.accountNumber || !ifsc || !user.bankName) {
-            return {
-                success: false,
-                message: 'Please complete your bank account details before requesting withdrawal',
-            };
-        }
-
         return {
             success: true,
             message: 'Withdrawal request is valid',
@@ -316,7 +297,8 @@ export const createWithdrawalRequest = async (
     userId: string,
     userType: 'SELLER' | 'DELIVERY_BOY',
     amount: number,
-    paymentMethod: 'Bank Transfer' | 'UPI'
+    paymentMethod: 'Bank Transfer' | 'UPI',
+    accountDetails: string
 ) => {
     try {
         // Validate withdrawal
@@ -324,17 +306,6 @@ export const createWithdrawalRequest = async (
         if (!validation.success) {
             return validation;
         }
-
-        // Get user details
-        const Model: any = userType === 'SELLER' ? Seller : Delivery;
-        const user = await Model.findById(userId);
-
-        if (!user) {
-            throw new Error('User not found');
-        }
-
-        // Create account details string
-        const accountDetails = `${user.bankName} - ${user.accountNumber} (${user.ifscCode})`;
 
         // Create withdrawal request
         const withdrawRequest = new WithdrawRequest({

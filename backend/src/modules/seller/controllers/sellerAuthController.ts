@@ -6,6 +6,7 @@ import {
 } from "../../../services/otpService";
 import { generateToken } from "../../../services/jwtService";
 import { asyncHandler } from "../../../utils/asyncHandler";
+import bcrypt from "bcrypt";
 
 /**
  * Send OTP to seller mobile number
@@ -298,9 +299,64 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const sellerId = (req as any).user.userId;
   const updates = req.body;
 
-  // Prevent updating sensitive fields directly
-  const restrictedFields = ["password", "mobile", "email", "status", "balance"];
+  const restrictedFields = ["password", "mobile", "status", "balance"];
   restrictedFields.forEach((field) => delete updates[field]);
+
+  // Validate Name (No numbers, max 50 chars)
+  if (updates.sellerName) {
+    if (!/^[A-Za-z\s]+$/.test(updates.sellerName)) {
+      return res.status(400).json({ success: false, message: "Name can only contain letters and spaces" });
+    }
+    if (updates.sellerName.length > 50) {
+      return res.status(400).json({ success: false, message: "Name cannot exceed 50 characters" });
+    }
+  }
+
+  // Handle email update and uniqueness
+  if (updates.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/;
+    if (!emailRegex.test(updates.email)) {
+      return res.status(400).json({ success: false, message: "Invalid email format" });
+    }
+    const existing = await Seller.findOne({ email: updates.email, _id: { $ne: sellerId } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: "Email is already in use by another account" });
+    }
+  }
+
+  // Handle Tax Validations
+  if (updates.panCard && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(updates.panCard)) {
+    return res.status(400).json({ success: false, message: "Invalid PAN format" });
+  }
+  if (updates.taxNumber && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(updates.taxNumber)) {
+    return res.status(400).json({ success: false, message: "Invalid GST format" });
+  }
+
+  // Handle Bank Detail Validations and Hashing
+  if (updates.accountNumber || updates.ifsc || updates.accountName || updates.bankName || updates.branch) {
+    // If they provided any bank details, they must provide the core ones to hash
+    if (!updates.accountNumber || !updates.ifsc || !updates.bankName) {
+      return res.status(400).json({ success: false, message: "Account Number, Bank Name, and IFSC are required to update bank details" });
+    }
+    
+    if (updates.accountName && !/^[A-Za-z\s]+$/.test(updates.accountName)) {
+      return res.status(400).json({ success: false, message: "Account Holder Name can only contain letters and spaces" });
+    }
+    if (!/^\d{9,18}$/.test(updates.accountNumber)) {
+      return res.status(400).json({ success: false, message: "Account Number must be between 9 and 18 digits" });
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(updates.ifsc)) {
+      return res.status(400).json({ success: false, message: "Invalid IFSC format" });
+    }
+
+    // Hash the account number
+    const salt = await bcrypt.genSalt(10);
+    updates.accountNumberHash = await bcrypt.hash(updates.accountNumber, salt);
+    updates.accountNumberMasked = `****${updates.accountNumber.slice(-4)}`;
+    
+    // Explicitly delete the plaintext account number so it is NEVER saved to the DB
+    updates.accountNumber = undefined;
+  }
 
   // Handle location update (convert lat/lng to GeoJSON)
   if (updates.latitude && updates.longitude) {

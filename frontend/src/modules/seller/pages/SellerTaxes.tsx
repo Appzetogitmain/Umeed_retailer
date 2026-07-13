@@ -9,6 +9,7 @@ export default function SellerTaxes() {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [showExportDropdown, setShowExportDropdown] = useState(false);
 
     useEffect(() => {
         const fetchTaxes = async () => {
@@ -76,48 +77,60 @@ export default function SellerTaxes() {
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => {
-                                const headers = ['ID', 'Name', 'Rate (%)', 'Status'];
-                                const csvContent = [
-                                    headers.join(','),
-                                    ...filteredTaxes.map(tax => [
-                                        tax._id,
-                                        `"${tax.name}"`,
-                                        tax.percentage,
-                                        tax.status
-                                    ].join(','))
-                                ].join('\n');
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                const url = URL.createObjectURL(blob);
-                                link.setAttribute('href', url);
-                                link.setAttribute('download', `taxes_${new Date().toISOString().split('T')[0]}.csv`);
-                                link.style.visibility = 'hidden';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            }}
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Export
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
                         <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">Search:</span>
+                            <button
+                                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            {showExportDropdown && (
+                                <div className="absolute top-full mt-1 right-0 w-36 bg-white border border-neutral-200 rounded shadow-lg z-10 py-1">
+                                    <button
+                                        onClick={() => {
+                                            setShowExportDropdown(false);
+                                            const headers = ['ID', 'Name', 'Rate (%)', 'Status'];
+                                            const csvContent = [
+                                                headers.join(','),
+                                                ...filteredTaxes.map(tax => [
+                                                    tax._id,
+                                                    `"${tax.name}"`,
+                                                    tax.percentage,
+                                                    tax.status
+                                                ].join(','))
+                                            ].join('\n');
+                                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                            const link = document.createElement('a');
+                                            const url = URL.createObjectURL(blob);
+                                            link.setAttribute('href', url);
+                                            link.setAttribute('download', `taxes_${new Date().toISOString().split('T')[0]}.csv`);
+                                            link.style.visibility = 'hidden';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
+                                    >
+                                        Export to CSV
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="relative">
                             <input
                                 type="text"
-                                className="pl-14 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-teal-500 w-48"
+                                className="px-3 py-1.5 bg-neutral-100 border border-neutral-200 rounded text-sm focus:ring-1 focus:ring-teal-500 w-48 outline-none"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder=""
+                                placeholder="Search..."
                             />
                         </div>
                     </div>

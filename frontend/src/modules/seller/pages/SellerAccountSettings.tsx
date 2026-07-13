@@ -152,8 +152,11 @@ const SellerAccountSettings = () => {
     } else if (name === "mobile") {
       if (!value) err = "Mobile number is required";
       else if (value.length !== 10) err = "Mobile number must be 10 digits";
-    } else if (name === "sellerName") {
-      if (!value) err = "Seller name is required";
+    } else if (name === "sellerName" || name === "accountName") {
+      const nameRegex = /^[A-Za-z\s]+$/;
+      if (!value) err = "This field is required";
+      else if (!nameRegex.test(value)) err = "Only letters and spaces allowed";
+      else if (value.length > 50) err = "Cannot exceed 50 characters";
     } else if (name === "storeName") {
       if (!value) err = "Store name is required";
     } else if (name === "city") {
@@ -456,22 +459,40 @@ const SellerAccountSettings = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <InputGroup label="Full Name" name="sellerName" value={sellerData.sellerName} onChange={handleInputChange} onBlur={() => validateField("sellerName", sellerData.sellerName)} error={fieldErrors.sellerName} disabled={!isEditing} autoComplete="name" />
+                          <InputGroup label="Full Name" name="sellerName" value={sellerData.sellerName} onChange={handleInputChange} onBlur={() => validateField("sellerName", sellerData.sellerName)} error={fieldErrors.sellerName} disabled={!isEditing} autoComplete="name" maxLength={50} />
                           <InputGroup label="Email Address" name="email" value={sellerData.email} onChange={handleInputChange} onBlur={() => validateField("email", sellerData.email)} error={fieldErrors.email} disabled={!isEditing} type="email" autoComplete="email" />
-                          <InputGroup label="Mobile Number" name="mobile" value={sellerData.mobile} onChange={handleInputChange} onBlur={() => validateField("mobile", sellerData.mobile)} error={fieldErrors.mobile} disabled={!isEditing} type="tel" autoComplete="tel" />
+                          <InputGroup label="Mobile Number" name="mobile" value={sellerData.mobile} onChange={handleInputChange} onBlur={() => validateField("mobile", sellerData.mobile)} error={fieldErrors.mobile} disabled={true} type="tel" autoComplete="tel" />
+                        </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 ml-1">Password</label>
-                            <div className="relative">
-                              <input
-                                type="password"
-                                autoComplete="new-password"
-                                placeholder="••••••••"
-                                disabled={!isEditing}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none disabled:bg-gray-50/50 disabled:text-gray-500 transition-all placeholder:text-gray-300"
-                              />
-                            </div>
-                            {isEditing && <p className="text-xs text-gray-400 ml-1">Leave blank to keep current password</p>}
+                        {/* Bank Details Section */}
+                        <div className="mt-8 border-t pt-8">
+                          <div className="flex items-center gap-2 mb-6">
+                            <span className="bg-indigo-100 text-indigo-600 p-2 rounded-lg">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                            </span>
+                            <h3 className="text-lg font-bold text-gray-900">Bank Details</h3>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <InputGroup label="Account Holder Name" name="accountName" value={sellerData.accountName} onChange={handleInputChange} onBlur={() => validateField("accountName", sellerData.accountName)} error={fieldErrors.accountName} disabled={!isEditing} maxLength={50} />
+                            <InputGroup label="Bank Name" name="bankName" value={sellerData.bankName} onChange={handleInputChange} disabled={!isEditing} />
+                            <InputGroup label="Branch Name" name="branch" value={sellerData.branch} onChange={handleInputChange} disabled={!isEditing} />
+                            <InputGroup label="Account Number" name="accountNumber" value={sellerData.accountNumber} onChange={handleInputChange} onBlur={() => validateField("accountNumber", sellerData.accountNumber)} error={fieldErrors.accountNumber} disabled={!isEditing} type="password" />
+                            <InputGroup label="IFSC Code" name="ifsc" value={sellerData.ifsc} onChange={(e: any) => { e.target.value = e.target.value.toUpperCase(); handleInputChange(e); }} onBlur={() => validateField("ifsc", sellerData.ifsc)} error={fieldErrors.ifsc} disabled={!isEditing} />
+                          </div>
+                        </div>
+
+                        {/* Tax Information Section */}
+                        <div className="mt-8 border-t pt-8">
+                          <div className="flex items-center gap-2 mb-6">
+                            <span className="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </span>
+                            <h3 className="text-lg font-bold text-gray-900">Tax Information</h3>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <InputGroup label="PAN Card Number" name="panCard" value={sellerData.panCard} onChange={(e: any) => { e.target.value = e.target.value.toUpperCase(); handleInputChange(e); }} onBlur={() => validateField("panCard", sellerData.panCard)} error={fieldErrors.panCard} disabled={!isEditing} placeholder="e.g. ABCDE1234F" />
+                            <InputGroup label="Tax Name" name="taxName" value={sellerData.taxName} onChange={handleInputChange} disabled={!isEditing} placeholder="e.g. GST" />
+                            <InputGroup label="Tax Number (GST)" name="taxNumber" value={sellerData.taxNumber} onChange={(e: any) => { e.target.value = e.target.value.toUpperCase(); handleInputChange(e); }} onBlur={() => validateField("taxNumber", sellerData.taxNumber)} error={fieldErrors.taxNumber} disabled={!isEditing} placeholder="e.g. 22AAAAA0000A1Z5" />
                           </div>
                         </div>
                       </div>

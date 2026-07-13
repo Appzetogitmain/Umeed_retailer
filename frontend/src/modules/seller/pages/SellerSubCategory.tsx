@@ -10,6 +10,8 @@ export default function SellerSubCategory() {
     const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const [isServerPaginated, setIsServerPaginated] = useState(false);
 
     // Fetch subcategories from API
     useEffect(() => {
@@ -30,6 +32,10 @@ export default function SellerSubCategory() {
                     // Extract pagination info if available
                     if ((response as any).pagination) {
                         setTotalPages((response as any).pagination.pages);
+                        setTotalItems((response as any).pagination.total);
+                        setIsServerPaginated(true);
+                    } else {
+                        setIsServerPaginated(false);
                     }
                 } else {
                     setError(response.message || 'Failed to fetch subcategories');
@@ -46,7 +52,9 @@ export default function SellerSubCategory() {
 
     // Client-side sorting (if API doesn't handle it)
     let sortedSubcategories = [...subcategories];
-    if (sortColumn && !sortColumn.includes('.')) {
+    // We skip client-side sort if it's already server paginated (since we only have 1 page of data here),
+    // but the API handles sorting anyway via params, so we can just leave this or apply it for the current page.
+    if (!isServerPaginated && sortColumn && !sortColumn.includes('.')) {
         sortedSubcategories.sort((a, b) => {
             let aVal: any = a[sortColumn as keyof typeof a];
             let bVal: any = b[sortColumn as keyof typeof b];
@@ -65,10 +73,11 @@ export default function SellerSubCategory() {
     }
 
     // Pagination (client-side if API doesn't handle it)
-    const displayTotalPages = totalPages > 1 ? totalPages : Math.ceil(sortedSubcategories.length / rowsPerPage);
+    const displayTotalPages = isServerPaginated ? totalPages : Math.ceil(sortedSubcategories.length / rowsPerPage);
+    const displayTotalItems = isServerPaginated ? totalItems : sortedSubcategories.length;
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const displayedSubcategories = sortedSubcategories.slice(startIndex, endIndex);
+    const displayedSubcategories = isServerPaginated ? sortedSubcategories : sortedSubcategories.slice(startIndex, endIndex);
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -122,47 +131,41 @@ export default function SellerSubCategory() {
                 </div>
 
                 {/* Pagination Footer */}
-                {totalPages > 1 && (
-                    <div className="p-4 border-t border-neutral-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-                        <div className="text-sm text-neutral-600">
-                            Showing {startIndex + 1} to {Math.min(endIndex, sortedSubcategories.length)} of {sortedSubcategories.length} entries
+                {displayTotalPages > 1 && (
+                    <div className="p-4 border-t border-neutral-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div className="text-sm text-neutral-600 text-center sm:text-left w-full sm:w-auto">
+                            Showing {Math.min(startIndex + 1, displayTotalItems)} to {Math.min(endIndex, displayTotalItems)} of {displayTotalItems} entries
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end mt-2 sm:mt-0">
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                 disabled={currentPage === 1}
-                                className={`p-2 border border-teal-600 rounded ${
+                                className={`flex items-center gap-1.5 px-4 py-2 border rounded font-medium text-sm transition-colors ${
                                     currentPage === 1
-                                        ? 'text-neutral-400 cursor-not-allowed bg-neutral-50'
-                                        : 'text-teal-600 hover:bg-teal-50'
+                                        ? 'border-neutral-200 text-neutral-400 cursor-not-allowed bg-neutral-50'
+                                        : 'border-teal-600 text-teal-600 hover:bg-teal-50'
                                 }`}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
+                                Previous
                             </button>
-                            {Array.from({ length: displayTotalPages }, (_, i) => i + 1).map(page => (
-                                <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`px-3 py-1.5 border border-teal-600 rounded font-medium text-sm ${
-                                        currentPage === page
-                                            ? 'bg-teal-600 text-white'
-                                            : 'text-teal-600 hover:bg-teal-50'
-                                    }`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
+                            
+                            <span className="text-sm font-medium text-neutral-600 hidden sm:block">
+                                Page {currentPage} of {displayTotalPages}
+                            </span>
+
                             <button
                                 onClick={() => setCurrentPage(prev => Math.min(displayTotalPages, prev + 1))}
                                 disabled={currentPage === displayTotalPages}
-                                className={`p-2 border border-teal-600 rounded ${
+                                className={`flex items-center gap-1.5 px-4 py-2 border rounded font-medium text-sm transition-colors ${
                                     currentPage === displayTotalPages
-                                        ? 'text-neutral-400 cursor-not-allowed bg-neutral-50'
-                                        : 'text-teal-600 hover:bg-teal-50'
+                                        ? 'border-neutral-200 text-neutral-400 cursor-not-allowed bg-neutral-50'
+                                        : 'border-teal-600 text-teal-600 hover:bg-teal-50'
                                 }`}
                             >
+                                Next
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>

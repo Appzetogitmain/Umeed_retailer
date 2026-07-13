@@ -9,6 +9,7 @@ router.use(requireUserType('Seller'));
 
 router.get('/balance', walletController.getBalance);
 router.get('/transactions', walletController.getTransactions);
+router.get('/payment-details', walletController.getPaymentDetails);
 router.post('/withdraw', walletController.requestWithdrawal);
 router.get('/withdrawals', walletController.getWithdrawals);
 router.get('/commissions', walletController.getCommissions);

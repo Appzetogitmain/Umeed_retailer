@@ -646,12 +646,10 @@ export const cancelOrder = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
-        if (['Delivered', 'Cancelled', 'Returned', 'Rejected', 'Out for Delivery', 'Shipped'].includes(order.status)) {
+        const cancellableStatuses = ['Placed', 'Received', 'Pending'];
+        if (!cancellableStatuses.includes(order.status)) {
             if (session) await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                message: `Order cannot be cancelled as it is already ${order.status}`
-            });
+            return res.status(400).json({ success: false, message: `Cannot cancel order. Order is currently in '${order.status}' status and has already been accepted by the seller.` });
         }
 
         // Restore stock

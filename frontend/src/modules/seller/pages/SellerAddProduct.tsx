@@ -194,7 +194,7 @@ export default function SellerAddProduct() {
               tax: (product.tax as any)?._id || product.taxId || "",
               isReturnable: product.isReturnable ? "Yes" : "No",
               maxReturnDays: product.maxReturnDays?.toString() || "",
-              fssaiLicNo: product.fssaiLicNo || "",
+              fssaiLicNo: product.fssaiLicNo ? product.fssaiLicNo.replace('FSSAI Lic. No. ', '') : "",
               totalAllowedQuantity:
                 product.totalAllowedQuantity?.toString() || "10",
               mainImageUrl: product.mainImageUrl || product.mainImage || "",
@@ -464,6 +464,11 @@ export default function SellerAddProduct() {
       }
     }
 
+    if (formData.fssaiLicNo && formData.fssaiLicNo.length !== 14) {
+      setUploadError("FSSAI License Number must be exactly 14 digits.");
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -531,7 +536,7 @@ export default function SellerAddProduct() {
           ? parseInt(formData.maxReturnDays)
           : undefined,
         totalAllowedQuantity: parseInt(formData.totalAllowedQuantity || "10"),
-        fssaiLicNo: formData.fssaiLicNo || undefined,
+        fssaiLicNo: formData.fssaiLicNo ? `FSSAI Lic. No. ${formData.fssaiLicNo}` : undefined,
         mainImageUrl: mainImageUrl || undefined,
         galleryImageUrls,
         variations: variations,
@@ -631,9 +636,14 @@ export default function SellerAddProduct() {
                     name="productName"
                     value={formData.productName}
                     onChange={handleChange}
+                    maxLength={100}
                     placeholder="Enter Product Name"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-red-500">This will help for search</p>
+                    <p className="text-xs text-neutral-500">{formData.productName.length}/100</p>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -799,9 +809,6 @@ export default function SellerAddProduct() {
                     placeholder="Select or create tags"
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   />
-                  <p className="text-xs text-red-500 mt-1">
-                    This will help for search
-                  </p>
                 </div>
               </div>
               <div>
@@ -812,74 +819,19 @@ export default function SellerAddProduct() {
                   name="smallDescription"
                   value={formData.smallDescription}
                   onChange={handleChange}
+                  maxLength={500}
                   placeholder="Enter Product Small Description"
                   rows={4}
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
                 />
+                <p className="text-xs text-neutral-500 mt-1 text-right">
+                  {formData.smallDescription.length}/500
+                </p>
               </div>
             </div>
           </div>
 
-          {/* SEO Content Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
-            <div className="bg-teal-600 text-white px-4 sm:px-6 py-3">
-              <h2 className="text-lg font-semibold">SEO Content</h2>
-            </div>
-            <div className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  name="seoTitle"
-                  value={formData.seoTitle}
-                  onChange={handleChange}
-                  placeholder="Enter SEO Title"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  SEO Keywords
-                </label>
-                <input
-                  type="text"
-                  name="seoKeywords"
-                  value={formData.seoKeywords}
-                  onChange={handleChange}
-                  placeholder="Enter SEO Keywords"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  SEO Image Alt Text
-                </label>
-                <input
-                  type="text"
-                  name="seoImageAlt"
-                  value={formData.seoImageAlt}
-                  onChange={handleChange}
-                  placeholder="Enter SEO Image Alt Text"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  SEO Description
-                </label>
-                <textarea
-                  name="seoDescription"
-                  value={formData.seoDescription}
-                  onChange={handleChange}
-                  placeholder="Enter SEO Description"
-                  rows={4}
-                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
-                />
-              </div>
-            </div>
-          </div>
+
 
           {/* Add Variation Section */}
           <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
@@ -1113,14 +1065,22 @@ export default function SellerAddProduct() {
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
                     FSSAI Lic. No.
                   </label>
-                  <input
-                    type="text"
-                    name="fssaiLicNo"
-                    value={formData.fssaiLicNo}
-                    onChange={handleChange}
-                    placeholder="Enter FSSAI Lic. No."
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  />
+                  <div className="flex rounded-lg shadow-sm">
+                    <span className="px-3 py-2 bg-neutral-100 border border-r-0 border-neutral-300 rounded-l-lg text-neutral-600 text-sm whitespace-nowrap">
+                      FSSAI Lic. No.
+                    </span>
+                    <input
+                      type="text"
+                      name="fssaiLicNo"
+                      value={formData.fssaiLicNo}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 14);
+                        handleChange({ target: { name: 'fssaiLicNo', value: val } } as any);
+                      }}
+                      placeholder="14-digit number"
+                      className="flex-1 min-w-0 px-4 py-2 border border-neutral-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">

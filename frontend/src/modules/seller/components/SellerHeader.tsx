@@ -58,8 +58,10 @@ export default function SellerHeader({
   }, []);
 
   const handleLogout = () => {
-    logout();
-    navigate("/seller/login");
+    if (window.confirm("Are you sure you want to log out?")) {
+      logout();
+      navigate("/seller/login");
+    }
   };
 
   const handleSettingsClick = () => {

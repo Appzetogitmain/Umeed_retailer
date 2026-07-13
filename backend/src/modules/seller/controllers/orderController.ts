@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Order from "../../../models/Order";
 import OrderItem from "../../../models/OrderItem";
+import AppSettings from "../../../models/AppSettings";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Seller from "../../../models/Seller";
 import WalletTransaction from "../../../models/WalletTransaction";
@@ -140,6 +141,8 @@ export const getOrderById = asyncHandler(
       .populate("customer", "name email phone")
       .populate("deliveryBoy", "name mobile email");
 
+    const settings = await AppSettings.findOne().select("contactEmail contactPhone supportEmail supportPhone");
+
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -204,6 +207,7 @@ export const getOrderById = asyncHandler(
     // Format order data for frontend
     const orderDetail = {
       id: order._id,
+      orderNumber: order.orderNumber,
       invoiceNumber: order.invoiceNumber || order.orderNumber || 'N/A',
       orderDate: order.orderDate ? order.orderDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       deliveryDate: order.estimatedDeliveryDate ? order.estimatedDeliveryDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -221,6 +225,10 @@ export const getOrderById = asyncHandler(
       paymentMethod: order.paymentMethod || 'N/A',
       paymentStatus: order.paymentStatus || 'Pending',
       deliveryAddress: order.deliveryAddress || {},
+      appInfo: {
+        email: settings?.contactEmail || settings?.supportEmail || 'info@Speedoo.com',
+        phone: settings?.contactPhone || settings?.supportPhone || '8956656429',
+      }
     };
 
     return res.status(200).json({

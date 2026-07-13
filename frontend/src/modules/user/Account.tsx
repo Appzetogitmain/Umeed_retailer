@@ -106,8 +106,10 @@ export default function Account() {
   };
 
   const handleLogout = () => {
-    authLogout();
-    navigate("/login");
+    if (window.confirm("Are you sure you want to log out?")) {
+      authLogout();
+      navigate("/login");
+    }
   };
 
   const handleDeleteAccount = async () => {

@@ -22,6 +22,7 @@ export default function SellerStockManagement() {
     const [error, setError] = useState<string>('');
     const [updatingStock, setUpdatingStock] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState('All Category');
     const [statusFilter, setStatusFilter] = useState('All Products');
     const location = useLocation();
@@ -93,8 +94,8 @@ export default function SellerStockManagement() {
                     response.data.forEach((product: Product) => {
                         product.variations.forEach((variation, index) => {
                             items.push({
-                                variationId: variation._id || `${product._id}-${index}`,
-                                productId: product._id,
+                                variationId: variation.variationId || variation._id || `${product.productId || product._id}-${index}`,
+                                productId: product.productId || product._id,
                                 name: product.productName,
                                 seller: user?.storeName || '',
                                 image: resolveImageUrl(product.mainImage || product.mainImageUrl),
@@ -151,8 +152,14 @@ export default function SellerStockManagement() {
 
     // Filter items
     let filteredItems = stockItems.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.seller.toLowerCase().includes(searchTerm.toLowerCase());
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = item.name.toLowerCase().includes(searchLower) ||
+            item.seller.toLowerCase().includes(searchLower) ||
+            item.productId.toLowerCase().includes(searchLower) ||
+            item.variationId.toLowerCase().includes(searchLower) ||
+            item.variation.toLowerCase().includes(searchLower) ||
+            item.category.toLowerCase().includes(searchLower) ||
+            String(item.stock).toLowerCase().includes(searchLower);
         const matchesCategory = categoryFilter === 'All Category' || item.category === categoryFilter;
         const matchesStatus = statusFilter === 'All Products' ||
             (statusFilter === 'Published' && item.status === 'Published') ||
@@ -271,52 +278,66 @@ export default function SellerStockManagement() {
                                 <option value={100}>100</option>
                             </select>
                         </div>
-                        <button
-                            onClick={() => {
-                                const headers = ['Variation Id', 'Product Id', 'Product Name', 'Seller Name', 'Variation', 'Current Stock', 'Status', 'Category'];
-                                const csvContent = [
-                                    headers.join(','),
-                                    ...filteredItems.map(item => [
-                                        item.variationId,
-                                        item.productId,
-                                        `"${item.name}"`,
-                                        `"${item.seller}"`,
-                                        `"${item.variation}"`,
-                                        item.stock,
-                                        item.status,
-                                        `"${item.category}"`
-                                    ].join(','))
-                                ].join('\n');
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                const url = URL.createObjectURL(blob);
-                                link.setAttribute('href', url);
-                                link.setAttribute('download', `stock_${new Date().toISOString().split('T')[0]}.csv`);
-                                link.style.visibility = 'hidden';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            }}
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Export
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
                         <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400 text-xs">Search:</span>
+                            <button
+                                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                                onBlur={() => setTimeout(() => setExportDropdownOpen(false), 200)}
+                                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform ${exportDropdownOpen ? 'rotate-180' : ''}`}>
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+
+                            {exportDropdownOpen && (
+                                <div className="absolute right-0 mt-1 w-32 bg-white rounded shadow-lg border border-neutral-200 z-10 py-1">
+                                    <button
+                                        className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                                        onClick={() => {
+                                            const headers = ['Variation Id', 'Product Id', 'Product Name', 'Seller Name', 'Variation', 'Current Stock', 'Status', 'Category'];
+                                            const csvContent = [
+                                                headers.join(','),
+                                                ...filteredItems.map(item => [
+                                                    item.variationId,
+                                                    item.productId,
+                                                    `"${item.name}"`,
+                                                    `"${item.seller}"`,
+                                                    `"${item.variation}"`,
+                                                    item.stock,
+                                                    item.status,
+                                                    `"${item.category}"`
+                                                ].join(','))
+                                            ].join('\n');
+                                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                            const link = document.createElement('a');
+                                            const url = URL.createObjectURL(blob);
+                                            link.setAttribute('href', url);
+                                            link.setAttribute('download', `stock_${new Date().toISOString().split('T')[0]}.csv`);
+                                            link.style.visibility = 'hidden';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            setExportDropdownOpen(false);
+                                        }}
+                                    >
+                                        Export as CSV
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="relative">
                             <input
                                 type="text"
-                                className="pl-14 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-teal-500 w-48"
+                                className="pl-3 pr-3 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-teal-500 w-48"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder=""
+                                placeholder="Search:"
                             />
                         </div>
                     </div>
