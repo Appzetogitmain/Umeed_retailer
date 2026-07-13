@@ -347,9 +347,11 @@ export default function ProductDetail() {
       </div>
 
       {/* Scrollable content */}
-      <div className="pt-16">
-        {/* Location Availability Banner */}
-        {!isAvailableAtLocation && (
+      <div className="pt-16 lg:grid lg:grid-cols-2 lg:gap-8 lg:px-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+        {/* Left Column (Image Gallery & Banner) */}
+        <div className="lg:sticky lg:top-24 h-fit flex flex-col gap-4">
+          {/* Location Availability Banner */}
+          {!isAvailableAtLocation && (
           <div className="bg-amber-50 border-l-4 border-amber-500 px-4 py-3 mx-4 mt-4 rounded-r-lg">
             <div className="flex items-start gap-2">
               <svg
@@ -568,9 +570,12 @@ export default function ProductDetail() {
             </div>
           )}
         </div>
+        </div>
 
+        {/* Right Column (Product Details & Reviews) */}
+        <div className="flex flex-col">
         {/* Product Details Card - White section */}
-        <div className="bg-white rounded-t-3xl -mt-6 relative z-10 px-4 md:px-6 lg:px-8 pt-2.5 md:pt-4 pb-2 md:pb-4">
+        <div className="bg-white rounded-t-3xl lg:rounded-none -mt-6 lg:mt-0 relative z-10 px-4 md:px-6 lg:px-0 pt-2.5 md:pt-4 pb-2 md:pb-4">
           {/* Delivery time */}
           <div className="flex items-center gap-0.5 mb-1">
             <svg
@@ -675,8 +680,100 @@ export default function ProductDetail() {
               </p>
             )}
 
+          {/* Desktop Add to Cart */}
+          <div className="hidden lg:flex items-center gap-4 mt-6 mb-4">
+            <AnimatePresence mode="wait">
+              {inCartQty === 0 ? (
+                <motion.div
+                  key="add-button"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center">
+                  <Button
+                    ref={addButtonRef}
+                    variant="default"
+                    size="default"
+                    onClick={handleAddToCart}
+                    disabled={
+                      !isAvailableAtLocation ||
+                      (!isVariantAvailable && variantStock !== 0)
+                    }
+                    className={`px-8 py-3 text-base font-semibold h-[48px] rounded-full ${!isAvailableAtLocation ||
+                        (!isVariantAvailable && variantStock !== 0)
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                      }`}
+                    title={
+                      !isAvailableAtLocation
+                        ? "Not available at your location"
+                        : !isVariantAvailable && variantStock !== 0
+                          ? "This variant is out of stock"
+                          : ""
+                    }>
+                    {!isAvailableAtLocation
+                      ? "Unavailable"
+                      : !isVariantAvailable && variantStock !== 0
+                        ? "Out of Stock"
+                        : "Add to cart"}
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="stepper"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-3 bg-white border-2 border-green-600 rounded-full px-3 py-1.5 h-[48px]">
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                      const productId = product.id || product._id;
+                      const variantId = selectedVariant?._id;
+                      updateQuantity(
+                        productId,
+                        inCartQty - 1,
+                        variantId,
+                        variantTitle
+                      );
+                    }}
+                    className="w-8 h-8 flex items-center justify-center text-green-600 font-bold hover:bg-green-50 rounded-full transition-colors border border-green-600 p-0 leading-none text-xl"
+                    style={{ lineHeight: 1 }}>
+                    <span className="relative top-[-1px]">−</span>
+                  </motion.button>
+                  <motion.span
+                    key={inCartQty}
+                    initial={{ scale: 1.2, y: -2 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                    className="text-lg font-bold text-green-600 min-w-[2rem] text-center">
+                    {inCartQty}
+                  </motion.span>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                      const productId = product.id || product._id;
+                      const variantId = selectedVariant?._id;
+                      updateQuantity(
+                        productId,
+                        inCartQty + 1,
+                        variantId,
+                        variantTitle
+                      );
+                    }}
+                    className="w-8 h-8 flex items-center justify-center text-green-600 font-bold hover:bg-green-50 rounded-full transition-colors border border-green-600 p-0 leading-none text-xl"
+                    style={{ lineHeight: 1 }}>
+                    <span className="relative top-[-1px]">+</span>
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* Divider line */}
-          <div className="border-t border-neutral-200 mb-1.5"></div>
+          <div className="border-t border-neutral-200 mb-1.5 lg:hidden"></div>
 
           {/* View product details link */}
           <button
@@ -1067,10 +1164,11 @@ export default function ProductDetail() {
             </div>
           )}
         </div>
+        </div>
 
         {/* Top products in this category */}
         {similarProducts.length > 0 && (
-          <div className="mt-6 mb-24">
+          <div className="mt-6 mb-24 lg:mb-0 lg:col-span-2">
             <div className="bg-neutral-100/50 border-t border-b border-neutral-200/50 py-4 px-3">
               <h3 className="text-lg font-semibold text-neutral-900 mb-4 px-1">
                 Top products in this category
@@ -1290,7 +1388,7 @@ export default function ProductDetail() {
       </div>
 
       {/* Sticky Footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 shadow-lg lg:hidden">
         <div className="px-4 py-2.5 flex items-center justify-between">
           {/* Left side - Product details */}
           <div className="flex-1">

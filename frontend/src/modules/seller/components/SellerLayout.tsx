@@ -109,7 +109,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
 
       {/* Sidebar - Fixed */}
       <div
-        className={`fixed left-0 top-0 h-screen z-50 transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 h-screen z-50 transition-transform duration-300 ease-in-out print:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -118,19 +118,21 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
 
       {/* Main Content */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 w-full ${
+        className={`flex-1 flex flex-col transition-all duration-300 w-full print:ml-0 ${
           isSidebarOpen ? 'ml-64' : 'ml-0'
         }`}
       >
         {/* Header */}
-        <SellerHeader
-          onMenuClick={toggleSidebar}
-          isSidebarOpen={isSidebarOpen}
-          notifications={notifications}
-          unreadCount={unreadCount}
-          onMarkRead={handleMarkRead}
-          onMarkAllRead={handleMarkAllRead}
-        />
+        <div className="print:hidden">
+          <SellerHeader
+            onMenuClick={toggleSidebar}
+            isSidebarOpen={isSidebarOpen}
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkRead={handleMarkRead}
+            onMarkAllRead={handleMarkAllRead}
+          />
+        </div>
 
         {/* Page Content */}
         <main id="seller-main-content" className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-neutral-50">{children}</main>

@@ -33,8 +33,8 @@ export default function SellerOrderDetail() {
       } catch (err: any) {
         setError(
           err.response?.data?.message ||
-            err.message ||
-            "Failed to fetch order details"
+          err.message ||
+          "Failed to fetch order details"
         );
       } finally {
         setLoading(false);
@@ -178,7 +178,7 @@ export default function SellerOrderDetail() {
     yPos += 6;
     doc.text(`Email: ${orderDetail.appInfo?.email || 'info@Speedoo.com'}`, margin, yPos);
     yPos += 6;
-    doc.text("Website: https://Speedoo.com", margin, yPos);
+    doc.text("Website: https://app.umeedretailers.com", margin, yPos);
     yPos += 12;
 
     // Invoice Details (Right aligned)
@@ -408,9 +408,9 @@ export default function SellerOrderDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-8">
+    <div className="min-h-screen print:min-h-0 bg-neutral-50 pb-8 print:pb-0">
       {/* Order Action Section */}
-      <div className="bg-white mb-6 rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
+      <div className="bg-white mb-6 rounded-lg shadow-sm border border-neutral-200 overflow-hidden print:hidden">
         <div className="bg-teal-600 text-white px-4 sm:px-6 py-3">
           <h2 className="text-base sm:text-lg font-semibold">
             Order Action Section
@@ -499,8 +499,8 @@ export default function SellerOrderDetail() {
       </div>
 
       {/* View Order Details Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
-        <div className="bg-teal-600 text-white px-4 sm:px-6 py-3">
+      <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden print:border-none print:shadow-none">
+        <div className="bg-teal-600 text-white px-4 sm:px-6 py-3 print:hidden">
           <h2 className="text-base sm:text-lg font-semibold">
             View Order Details
           </h2>
@@ -511,20 +511,10 @@ export default function SellerOrderDetail() {
             {/* Left: Company Info */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">A</span>
-                </div>
-                <div>
-                  <div className="text-xs text-green-600 font-semibold">
-                    Speedoo
-                  </div>
-                  <div className="text-[10px] text-green-600">
-                    in 10 Minutes
-                  </div>
-                </div>
+                <img src="/logo.png" alt="Speedoo Logo" className="h-8 object-contain" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-2">
-                Speedoo - your order our priority
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+                <span className="text-purple-600">Speedoo</span> <span className="text-orange-600">- your order our priority</span>
               </h1>
               <div className="text-sm text-neutral-600 mb-1">
                 <span className="font-medium">From:</span> Speedoo - your order our priority
@@ -538,7 +528,7 @@ export default function SellerOrderDetail() {
                 </div>
                 <div>
                   <span className="font-medium">Website:</span>{" "}
-                  https://Speedoo.com
+                  https://app.umeedretailers.com/
                 </div>
               </div>
             </div>
@@ -574,8 +564,8 @@ export default function SellerOrderDetail() {
           </div>
 
           {/* Product Table */}
-          <div className="overflow-x-auto mb-6">
-            <table className="w-full min-w-[800px]">
+          <div className="overflow-x-auto mb-6 print:overflow-visible">
+            <table className="w-full min-w-[800px] print:min-w-full">
               <thead className="bg-neutral-50 border-b border-neutral-200">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-700 uppercase tracking-wider">
@@ -641,7 +631,7 @@ export default function SellerOrderDetail() {
       </div>
 
       {/* Footer */}
-      <footer className="mt-6 px-4 sm:px-6 text-center py-4 bg-neutral-100 rounded-lg">
+      <footer className="mt-6 px-4 sm:px-6 text-center py-4 bg-neutral-100 rounded-lg print:hidden">
         <p className="text-xs sm:text-sm text-neutral-600">
           Copyright © 2026. Developed By{" "}<span className="font-semibold text-teal-600">Speedoo - Your Order Our Priority</span>
         </p>

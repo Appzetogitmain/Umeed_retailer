@@ -68,13 +68,15 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
   }, []);
 
   const chartHeight = height;
-  const padding = { top: 30, right: 15, bottom: 80, left: 30 };
-  const graphWidth = chartWidth - padding.left - padding.right;
+  const padding = { top: 30, right: 15, bottom: 80, left: 40 };
+  const baseGraphWidth = chartWidth - padding.left - padding.right;
+  const graphWidth = baseGraphWidth * zoom;
+  const maxPan = Math.max(0, graphWidth - baseGraphWidth);
   const graphHeight = chartHeight - padding.top - padding.bottom;
 
   // Calculate points for the line with smooth curves (always show all data, transform handles zoom/pan)
   const points = data.map((item, index) => {
-    const x = padding.left + (index / (data.length - 1)) * graphWidth;
+    const x = padding.left + (index / (data.length - 1)) * graphWidth - panX;
     const y = padding.top + graphHeight - (item.value / maxValue) * graphHeight;
     return { x, y, value: item.value, date: item.date, index };
   });
@@ -165,27 +167,28 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
 
     const svgRect = svgRef.current.getBoundingClientRect();
     const containerRect = containerRef.current.getBoundingClientRect();
-    const viewBoxWidth = chartWidth / zoom;
-    const scaleX = svgRect.width / viewBoxWidth;
-    const mouseX = ((e.clientX - svgRect.left) / scaleX) - panX;
-    const mouseY = (e.clientY - svgRect.top) / scaleX;
+    const mouseX = e.clientX - svgRect.left;
+    const mouseY = e.clientY - svgRect.top;
 
     // Find the nearest point
     let nearestIndex = 0;
     let minDistance = Infinity;
 
     points.forEach((point) => {
-      const distance = Math.abs(mouseX - point.x);
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestIndex = point.index;
+      // Only consider points that are currently visible
+      if (point.x >= padding.left && point.x <= chartWidth - padding.right) {
+        const distance = Math.abs(mouseX - point.x);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestIndex = point.index;
+        }
       }
     });
 
     // Only show tooltip if mouse is within the graph area
     if (
       mouseX >= padding.left &&
-      mouseX <= padding.left + graphWidth &&
+      mouseX <= chartWidth - padding.right &&
       mouseY >= padding.top &&
       mouseY <= padding.top + graphHeight
     ) {
@@ -217,15 +220,10 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
     if (!isPanning || !svgRef.current) return;
 
     const deltaX = e.clientX - panStart.x;
-    const svgRect = svgRef.current.getBoundingClientRect();
-    const viewBoxWidth = chartWidth / zoom;
-    const scaleX = svgRect.width / viewBoxWidth;
-    const adjustedDeltaX = deltaX / scaleX;
-
+    
     setPanX((prev) => {
-      const maxPan = chartWidth * (1 - 1 / zoom);
-      const newPan = prev - adjustedDeltaX;
-      return Math.max(-maxPan, Math.min(0, newPan));
+      const newPan = prev - deltaX;
+      return Math.max(0, Math.min(maxPan, newPan));
     });
 
     setPanStart({ x: e.clientX, y: e.clientY });
@@ -241,11 +239,15 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
       const range = end - start;
       if (range > 0) {
         const newZoom = Math.min(5, data.length / range);
+        const newGraphWidth = baseGraphWidth * newZoom;
+        const newMaxPan = Math.max(0, newGraphWidth - baseGraphWidth);
+        
+        const centerXIndex = (start + end) / 2;
+        const centerXPixel = (centerXIndex / (data.length - 1)) * newGraphWidth;
+        const newPanX = centerXPixel - baseGraphWidth / 2;
+        
         setZoom(newZoom);
-        const centerX = (start + end) / 2;
-        const centerXPixel = padding.left + (centerX / (data.length - 1)) * graphWidth;
-        const newPanX = -(centerXPixel - chartWidth / 2);
-        setPanX(Math.max(-chartWidth * (1 - 1 / newZoom), Math.min(0, newPanX)));
+        setPanX(Math.max(0, Math.min(newMaxPan, newPanX)));
       }
       setBrushStart(null);
       setBrushEnd(null);
@@ -258,11 +260,10 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
       setIsDragging(true);
       if (svgRef.current) {
         const svgRect = svgRef.current.getBoundingClientRect();
-        const viewBoxWidth = chartWidth / zoom;
-        const scaleX = svgRect.width / viewBoxWidth;
-        const mouseX = ((e.clientX - svgRect.left) / scaleX) - panX;
-        if (mouseX >= padding.left && mouseX <= padding.left + graphWidth) {
-          const index = Math.round(((mouseX - padding.left) / graphWidth) * (data.length - 1));
+        const mouseX = e.clientX - svgRect.left;
+        if (mouseX >= padding.left && mouseX <= chartWidth - padding.right) {
+          let index = Math.round(((mouseX - padding.left + panX) / graphWidth) * (data.length - 1));
+          index = Math.max(0, Math.min(data.length - 1, index));
           setBrushStart(index);
           setBrushEnd(index);
         }
@@ -273,11 +274,10 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
   const handleBrushMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (isDragging && brushStart !== null && svgRef.current) {
       const svgRect = svgRef.current.getBoundingClientRect();
-      const viewBoxWidth = chartWidth / zoom;
-      const scaleX = svgRect.width / viewBoxWidth;
-      const mouseX = ((e.clientX - svgRect.left) / scaleX) - panX;
-      if (mouseX >= padding.left && mouseX <= padding.left + graphWidth) {
-        const index = Math.round(((mouseX - padding.left) / graphWidth) * (data.length - 1));
+      const mouseX = e.clientX - svgRect.left;
+      if (mouseX >= padding.left && mouseX <= chartWidth - padding.right) {
+        let index = Math.round(((mouseX - padding.left + panX) / graphWidth) * (data.length - 1));
+        index = Math.max(0, Math.min(data.length - 1, index));
         setBrushEnd(index);
       }
     }
@@ -286,15 +286,14 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
   // Zoom controls
   const handleZoomIn = () => {
     const newZoom = Math.min(5, zoom * 1.2);
-    // Keep the center of the visible area centered when zooming
-    const currentViewBoxWidth = chartWidth / zoom;
-    const newViewBoxWidth = chartWidth / newZoom;
-    const centerPoint = panX + currentViewBoxWidth / 2;
-    const newPanX = centerPoint - newViewBoxWidth / 2;
-    const maxPan = chartWidth * (1 - 1 / newZoom);
+    const newGraphWidth = baseGraphWidth * newZoom;
+    const newMaxPan = Math.max(0, newGraphWidth - baseGraphWidth);
+    
+    const centerRatio = (panX + baseGraphWidth / 2) / graphWidth;
+    const newPanX = centerRatio * newGraphWidth - baseGraphWidth / 2;
+    
     setZoom(newZoom);
-    // Constrain panX to keep graph within bounds
-    setPanX(Math.max(-maxPan, Math.min(0, newPanX)));
+    setPanX(Math.max(0, Math.min(newMaxPan, newPanX)));
   };
 
   const handleZoomOut = () => {
@@ -302,14 +301,13 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
     if (newZoom === 1) {
       setPanX(0);
     } else {
-      // Keep the center of the visible area centered when zooming out
-      const currentViewBoxWidth = chartWidth / zoom;
-      const newViewBoxWidth = chartWidth / newZoom;
-      const centerPoint = panX + currentViewBoxWidth / 2;
-      const newPanX = centerPoint - newViewBoxWidth / 2;
-      const maxPan = chartWidth * (1 - 1 / newZoom);
-      // Constrain panX to keep graph within bounds
-      setPanX(Math.max(-maxPan, Math.min(0, newPanX)));
+      const newGraphWidth = baseGraphWidth * newZoom;
+      const newMaxPan = Math.max(0, newGraphWidth - baseGraphWidth);
+      
+      const centerRatio = (panX + baseGraphWidth / 2) / graphWidth;
+      const newPanX = centerRatio * newGraphWidth - baseGraphWidth / 2;
+      
+      setPanX(Math.max(0, Math.min(newMaxPan, newPanX)));
     }
     setZoom(newZoom);
   };
@@ -326,8 +324,8 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
     if (brushStart === null || brushEnd === null) return null;
     const start = Math.min(brushStart, brushEnd);
     const end = Math.max(brushStart, brushEnd);
-    const startX = padding.left + (start / (data.length - 1)) * graphWidth;
-    const endX = padding.left + (end / (data.length - 1)) * graphWidth;
+    const startX = padding.left + (start / (data.length - 1)) * graphWidth - panX;
+    const endX = padding.left + (end / (data.length - 1)) * graphWidth - panX;
     return { startX, endX, start, end };
   };
 
@@ -390,7 +388,7 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
           ref={svgRef}
           width={chartWidth}
           height={chartHeight}
-          viewBox={`${panX} 0 ${chartWidth / zoom} ${chartHeight}`}
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="w-full h-auto cursor-move"
           preserveAspectRatio="xMidYMid meet"
           onMouseMove={(e) => {
@@ -419,6 +417,9 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            <clipPath id={`clip-${title.replace(/\s+/g, '-')}`}>
+              <rect x={padding.left} y={0} width={chartWidth - padding.left - padding.right} height={chartHeight} />
+            </clipPath>
           </defs>
 
           {/* Grid Lines */}
@@ -464,6 +465,7 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
           <path
             d={areaPath}
             fill={`url(#gradient-${title.replace(/\s+/g, '-')})`}
+            clipPath={`url(#clip-${title.replace(/\s+/g, '-')})`}
             style={{ opacity: 1 }}
           />
 
@@ -476,11 +478,12 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
             strokeLinecap="round"
             strokeLinejoin="round"
             filter={`url(#glow-${title})`}
+            clipPath={`url(#clip-${title.replace(/\s+/g, '-')})`}
             style={{ transition: 'all 0.3s ease' }}
           />
 
           {/* Hover Vertical Line */}
-          {hoveredIndex !== null && (
+          {hoveredIndex !== null && points.find(p => p.index === hoveredIndex)?.x! >= padding.left && points.find(p => p.index === hoveredIndex)?.x! <= chartWidth - padding.right && (
             <line
               x1={points.find(p => p.index === hoveredIndex)?.x || 0}
               y1={padding.top}
@@ -495,42 +498,46 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
           )}
 
           {/* Data Points with Animation */}
-          {points.map((point) => {
-            const isHovered = hoveredIndex === point.index;
-            return (
-              <circle
-                key={point.index}
-                cx={point.x}
-                cy={point.y}
-                r={isHovered ? 8 : 5}
-                fill={isHovered ? '#0d9488' : '#14b8a6'}
-                stroke="white"
-                strokeWidth={isHovered ? 4 : 3}
-                style={{
-                  transition: 'all 0.2s ease',
-                  filter: isHovered ? 'drop-shadow(0 0 8px rgba(13, 148, 136, 0.9))' : 'drop-shadow(0 2px 4px rgba(20, 184, 166, 0.3))'
-                }}
-              />
-            );
-          })}
+          <g clipPath={`url(#clip-${title.replace(/\s+/g, '-')})`}>
+            {points.map((point) => {
+              const isHovered = hoveredIndex === point.index;
+              return (
+                <circle
+                  key={point.index}
+                  cx={point.x}
+                  cy={point.y}
+                  r={isHovered ? 8 : 5}
+                  fill={isHovered ? '#0d9488' : '#14b8a6'}
+                  stroke="white"
+                  strokeWidth={isHovered ? 4 : 3}
+                  style={{
+                    transition: 'all 0.2s ease',
+                    filter: isHovered ? 'drop-shadow(0 0 8px rgba(13, 148, 136, 0.9))' : 'drop-shadow(0 2px 4px rgba(20, 184, 166, 0.3))'
+                  }}
+                />
+              );
+            })}
+          </g>
 
           {/* Invisible hover areas */}
-          {points.map((point) => (
-            <rect
-              key={`hover-${point.index}`}
-              x={point.x - 20}
-              y={padding.top}
-              width="40"
-              height={graphHeight}
-              fill="transparent"
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => {
-                if (!isPanning && !isDragging) {
-                  setHoveredIndex(point.index);
-                }
-              }}
-            />
-          ))}
+          <g clipPath={`url(#clip-${title.replace(/\s+/g, '-')})`}>
+            {points.map((point) => (
+              <rect
+                key={`hover-${point.index}`}
+                x={point.x - 20}
+                y={padding.top}
+                width="40"
+                height={graphHeight}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => {
+                  if (!isPanning && !isDragging) {
+                    setHoveredIndex(point.index);
+                  }
+                }}
+              />
+            ))}
+          </g>
 
           {/* Y-Axis Labels */}
           {(() => {
@@ -557,23 +564,25 @@ export default function OrderChart({ title, data, maxValue, height = 400 }: Orde
           })()}
 
           {/* X-Axis Labels - Rotated diagonally */}
-          {data.map((item, index) => {
-            const x = padding.left + (index / (data.length - 1)) * graphWidth;
-            // Show all labels for monthly data (12 items), show every 3rd for daily data (31 items)
-            const shouldShow = data.length <= 12 || index % Math.ceil(data.length / 10) === 0 || index === data.length - 1;
-            return shouldShow ? (
-              <text
-                key={index}
-                x={x}
-                y={chartHeight - padding.bottom + 20}
-                textAnchor="end"
-                className="text-sm fill-neutral-600 font-semibold"
-                transform={`rotate(-45 ${x} ${chartHeight - padding.bottom + 20})`}
-              >
-                {item.date}
-              </text>
-            ) : null;
-          })}
+          <g clipPath={`url(#clip-${title.replace(/\s+/g, '-')})`}>
+            {data.map((item, index) => {
+              const x = padding.left + (index / (data.length - 1)) * graphWidth - panX;
+              // Show all labels for monthly data (12 items), show every 3rd for daily data (31 items)
+              const shouldShow = data.length <= 12 || index % Math.ceil(data.length / 10) === 0 || index === data.length - 1;
+              return shouldShow ? (
+                <text
+                  key={index}
+                  x={x}
+                  y={chartHeight - padding.bottom + 20}
+                  textAnchor="end"
+                  className="text-sm fill-neutral-600 font-semibold"
+                  transform={`rotate(-45 ${x} ${chartHeight - padding.bottom + 20})`}
+                >
+                  {item.date}
+                </text>
+              ) : null;
+            })}
+          </g>
 
           {/* Axes */}
           <line
