@@ -338,7 +338,7 @@ export default function DeliveryWallet() {
                         <p className="text-xs font-bold text-neutral-500 uppercase tracking-tight">Owed to Admin</p>
                         <h3 className="text-xl font-black text-orange-600 mt-1">₹{pendingAdminPayout.toLocaleString('en-IN')}</h3>
 
-                        <button
+                        {/* <button
                             onClick={() => {
                                 setPayoutAmount(pendingAdminPayout.toString());
                                 setShowPayoutModal(true);
@@ -349,7 +349,7 @@ export default function DeliveryWallet() {
                                     : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
                                 }`}>
                             Pay to Admin
-                        </button>
+                        </button> */}
                     </div>
                 </motion.div>
             </div>
