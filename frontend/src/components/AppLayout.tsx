@@ -378,14 +378,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
           )}
 
           {/* Location Permission Request Modal - Mandatory for all users */}
-          {showLocationRequest && (
+          {/* {showLocationRequest && (
             <LocationPermissionRequest
               onLocationGranted={() => setShowLocationRequest(false)}
               skipable={true}
               title="Location Access Required"
               description="We need your location to show you products available near you and enable delivery services. Location access is required to continue."
             />
-          )}
+          )} */}
 
           {/* Location Change Modal – same UI as "Location Access Required", allows updating location (e.g. from Coming Soon screen) */}
           {showLocationChangeModal && (
