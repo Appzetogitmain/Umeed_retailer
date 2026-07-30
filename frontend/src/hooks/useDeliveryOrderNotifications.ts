@@ -260,14 +260,22 @@ export const useDeliveryOrderNotifications = () => {
             socketRef.current = null;
         }
     }, []);
-
     const handleAccept = useCallback(async (orderId: string, navigate?: (path: string) => void) => {
         if (!socketRef.current || !user?.id) {
             return { success: false, message: 'Not connected or user not found' };
         }
 
         try {
-            const result = await acceptOrder(socketRef.current, orderId, user.id);
+            // Get sellerId from current notification or queue
+            let sellerId: string | undefined = undefined;
+            if (state.currentNotification?.orderId === orderId) {
+                sellerId = state.currentNotification.sellerId;
+            } else {
+                const queued = state.notificationQueue.find(n => n.orderId === orderId);
+                if (queued) sellerId = queued.sellerId;
+            }
+
+            const result = await acceptOrder(socketRef.current, orderId, user.id, sellerId);
 
             if (result.success) {
                 // Clear current notification and show next from queue
@@ -301,11 +309,20 @@ export const useDeliveryOrderNotifications = () => {
         } catch (error: any) {
             return { success: false, message: error.message || 'Failed to accept order' };
         }
-    }, [user]);
+    }, [user, state.currentNotification, state.notificationQueue]);
 
     const handleReject = useCallback(async (orderId: string) => {
         if (!socketRef.current || !user?.id) {
             return { success: false, message: 'Not connected or user not found', allRejected: false };
+        }
+
+        // Get sellerId from current notification or queue
+        let sellerId: string | undefined = undefined;
+        if (state.currentNotification?.orderId === orderId) {
+            sellerId = state.currentNotification.sellerId;
+        } else {
+            const queued = state.notificationQueue.find(n => n.orderId === orderId);
+            if (queued) sellerId = queued.sellerId;
         }
 
         // Immediately clear the notification from UI
@@ -320,13 +337,13 @@ export const useDeliveryOrderNotifications = () => {
 
         try {
             // Perform the actual rejection in the background
-            const result = await rejectOrder(socketRef.current, orderId, user.id);
+            const result = await rejectOrder(socketRef.current, orderId, user.id, sellerId);
             return result;
         } catch (error: any) {
             console.error('Failed to reject order in background:', error);
             return { success: false, message: error.message || 'Failed to reject order', allRejected: false };
         }
-    }, [user]);
+    }, [user, state.currentNotification, state.notificationQueue]);
 
     const clearCurrentNotification = useCallback(() => {
         setState(prev => {

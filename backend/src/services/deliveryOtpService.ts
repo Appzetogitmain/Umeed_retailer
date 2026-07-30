@@ -35,7 +35,7 @@ export async function generateDeliveryOtp(orderId: string): Promise<{ success: b
 /**
  * Verify delivery OTP using customer's permanent OTP
  */
-export async function verifyDeliveryOtp(orderId: string, otp: string): Promise<{ success: boolean; message: string }> {
+export async function verifyDeliveryOtp(orderId: string, otp: string, deliveryBoyId?: string): Promise<{ success: boolean; message: string }> {
   try {
     const order = await Order.findById(orderId).populate('customer');
 
@@ -63,29 +63,39 @@ export async function verifyDeliveryOtp(orderId: string, otp: string): Promise<{
     }
 
     // Developer bypass for testing
-    if ((process.env.NODE_ENV !== 'production' || process.env.USE_MOCK_OTP === 'true') && otp === '9999') {
-      order.deliveryOtpVerified = true;
-      order.status = 'Delivered';
-      order.deliveredAt = new Date();
-      order.invoiceEnabled = true;
-      await order.save();
-
-      return {
-        success: true,
-        message: 'OTP verified successfully. Order marked as delivered.',
-      };
-    }
+    const isMock = (process.env.NODE_ENV !== 'production' || process.env.USE_MOCK_OTP === 'true') && otp === '9999';
 
     // Verify OTP against customer's permanent OTP
-    if (customerOtp !== otp) {
+    if (!isMock && customerOtp !== otp) {
       throw new Error('Invalid OTP. Please check and try again.');
     }
 
-    // Mark order as delivered
+    // Mark order or sub-orders as delivered
     order.deliveryOtpVerified = true;
-    order.status = 'Delivered';
-    order.deliveredAt = new Date();
-    order.invoiceEnabled = true;
+
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryBoyId) {
+      const delIdStr = deliveryBoyId.toString();
+      order.sellerAcceptances.forEach((sa: any) => {
+        const saDelId = sa.deliveryBoy ? (typeof sa.deliveryBoy === 'object' ? sa.deliveryBoy._id?.toString() : sa.deliveryBoy.toString()) : '';
+        if (saDelId === delIdStr) {
+          sa.deliveryBoyStatus = 'Delivered';
+          sa.status = 'Delivered';
+          sa.deliveredAt = new Date();
+        }
+      });
+
+      const allSellersDelivered = order.sellerAcceptances.every((sa: any) => sa.status === 'Delivered' || sa.deliveryBoyStatus === 'Delivered');
+      if (allSellersDelivered) {
+        order.status = 'Delivered';
+        order.deliveredAt = new Date();
+        order.invoiceEnabled = true;
+      }
+    } else {
+      order.status = 'Delivered';
+      order.deliveredAt = new Date();
+      order.invoiceEnabled = true;
+    }
+
     await order.save();
 
     return {

@@ -157,6 +157,7 @@ export const createOrder = async (req: Request, res: Response) => {
         let calculatedSubtotal = 0;
         const orderItemIds: mongoose.Types.ObjectId[] = [];
         const sellerIds = new Set<string>(); // Track unique sellers
+        const sellerSubtotals = new Map<string, number>(); // Track per-seller subtotals
 
         for (const item of items) {
             if (!item.product || !item.product.id) {
@@ -293,6 +294,10 @@ export const createOrder = async (req: Request, res: Response) => {
             const itemTotal = itemPrice * qty;
             calculatedSubtotal += itemTotal;
 
+            // Track per-seller subtotal for COD splitting
+            const sellerIdStr = product.seller.toString();
+            sellerSubtotals.set(sellerIdStr, (sellerSubtotals.get(sellerIdStr) || 0) + itemTotal);
+
             // Create OrderItem
             const newOrderItemData = {
                 order: newOrder._id,
@@ -369,6 +374,19 @@ export const createOrder = async (req: Request, res: Response) => {
         newOrder.total = Number(finalTotal.toFixed(2));
         newOrder.items = orderItemIds;
 
+        // Initialize sellerAcceptances for per-seller tracking
+        const uniqueSellers = Array.from(sellerIds);
+        const feePerSeller = uniqueSellers.length > 0 ? (platformFee + deliveryFee) / uniqueSellers.length : 0;
+        
+        newOrder.sellerAcceptances = uniqueSellers.map(sellerId => {
+            const subtotal = sellerSubtotals.get(sellerId) || 0;
+            const codAmountToCollect = paymentMethod === 'COD' ? subtotal + feePerSeller : 0;
+            return {
+                seller: new mongoose.Types.ObjectId(sellerId),
+                status: "Pending",
+                codAmountToCollect: Number(codAmountToCollect.toFixed(2))
+            };
+        });
 
         if (session) {
             await newOrder.save({ session });
@@ -471,7 +489,10 @@ export const getMyOrders = async (req: Request, res: Response) => {
         const orders = await Order.find(query)
             .populate({
                 path: 'items',
-                populate: { path: 'product', select: 'productName mainImage price' }
+                populate: [
+                    { path: 'product', select: 'productName mainImage price' },
+                    { path: 'seller', select: 'storeName city' }
+                ]
             })
             .sort({ createdAt: -1 })
             .skip(skip)

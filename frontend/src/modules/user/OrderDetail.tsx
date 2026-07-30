@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../../components/ui/button";
 import { useOrders } from "../../hooks/useOrders";
@@ -473,6 +473,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const confirmed = searchParams.get("confirmed") === "true";
+  const targetSellerId = searchParams.get("sellerId");
   const { getOrderById, fetchOrderById, loading: contextLoading } = useOrders();
   const [order, setOrder] = useState<any>(id ? getOrderById(id) : undefined);
   const [loading, setLoading] = useState(!order);
@@ -535,6 +536,7 @@ export default function OrderDetail() {
     reconnectAttempts,
     reconnect,
     otpUpdateTrigger,
+    sellerDeliveries,
   } = useDeliveryTracking(id);
 
   // Fetch order on OTP update
@@ -573,15 +575,54 @@ export default function OrderDetail() {
     }
   }, [id, orderStatus]);
 
+  // Group items by seller
+  const itemsBySeller = useMemo(() => {
+    if (!order?.items) return {};
+    return order.items.reduce((acc: Record<string, { sellerInfo: any, items: any[] }>, item: any) => {
+      const sellerIdStr = typeof item.seller === 'object' ? item.seller._id?.toString() : item.seller?.toString();
+      
+      if (targetSellerId && sellerIdStr !== targetSellerId) {
+        return acc;
+      }
+
+      if (!acc[sellerIdStr]) {
+        acc[sellerIdStr] = {
+          sellerInfo: typeof item.seller === 'object' ? item.seller : { _id: sellerIdStr, storeName: "Speedoo Store", city: order.address?.city || "Local Area", phone: "1234567890" },
+          items: []
+        };
+      }
+      acc[sellerIdStr].items.push(item);
+      return acc;
+    }, {});
+  }, [order?.items, order?.address, targetSellerId]);
+
   // Fetch order if not in context
   useEffect(() => {
     const loadOrder = async () => {
       if (!id) return;
+      
+      const getStatus = (o: any) => {
+        if (targetSellerId && o.sellerAcceptances) {
+          const sa = o.sellerAcceptances.find((s: any) => {
+            const sId = typeof s.seller === 'object' ? s.seller._id : s.seller;
+            return sId?.toString() === targetSellerId;
+          });
+          if (sa) {
+            if (sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered') return 'Delivered';
+            if (sa.deliveryBoyStatus === 'Picked Up' || sa.deliveryBoyStatus === 'In Transit') return 'On the way';
+            if (sa.status === 'Accepted') return 'Accepted';
+            if (sa.status === 'Rejected') return 'Rejected';
+            if (sa.status === 'Pending') return 'Received';
+            return sa.status;
+          }
+        }
+        return o.status;
+      };
 
       const existingOrder = getOrderById(id);
       if (existingOrder) {
         setOrder(existingOrder);
-        setOrderStatus(existingOrder.status);
+        setOrderStatus(getStatus(existingOrder));
         setLoading(false);
         return;
       }
@@ -590,7 +631,7 @@ export default function OrderDetail() {
       const fetchedOrder = await fetchOrderById(id);
       if (fetchedOrder) {
         setOrder(fetchedOrder);
-        setOrderStatus(fetchedOrder.status);
+        setOrderStatus(getStatus(fetchedOrder));
       }
       setLoading(false);
     };
@@ -1293,25 +1334,67 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* Delivery Partner Card */}
-      {isPartnerAssigned && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
-        <DeliveryPartnerCard
-          partner={{
-            name: order?.deliveryPartner?.name || "Delivery Partner",
-            phone: order?.deliveryPartner?.phone,
-            profileImage: order?.deliveryPartner?.profileImage,
-            vehicleNumber: order?.deliveryPartner?.vehicleNumber,
-          }}
-          eta={routeInfo ? Math.ceil(routeInfo.durationValue / 60) : eta}
-          distance={routeInfo ? routeInfo.distanceValue : distance}
-          isTracking={isConnected && !!deliveryLocation && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string)}
-          deliveryOtp={!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) ? order?.deliveryOtp : undefined}
-          orderStatus={orderStatus}
-          onCall={() => {
-            const phone = order?.deliveryPartner?.phone || "1234567890";
-            window.location.href = `tel:${phone}`;
-          }}
-        />
+      {/* Delivery Partner Cards */}
+      {order?.sellerAcceptances && order.sellerAcceptances.length > 0 ? (
+          order.sellerAcceptances.map((acceptance: any, idx: number) => {
+              if (!acceptance.deliveryBoy) return null;
+              
+              // Find tracking data for this seller
+              const sellerIdStr = typeof acceptance.seller === 'string' ? acceptance.seller : acceptance.seller._id;
+              
+              // Filter by target seller if requested
+              if (targetSellerId && sellerIdStr?.toString() !== targetSellerId) return null;
+
+              const sellerTracking = sellerDeliveries ? sellerDeliveries[sellerIdStr] : null;
+              
+              const pEta = sellerTracking ? sellerTracking.eta : eta;
+              const pDist = sellerTracking ? sellerTracking.distance : distance;
+              const pIsTracking = isConnected && !!(sellerTracking?.location) && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string);
+
+              // We don't have the partner object fully populated here on the frontend if we only have the ID,
+              // but assuming we populate it via the API eventually. For now, use fallback names.
+              return (
+                  <div key={idx} className="mb-4">
+                      <DeliveryPartnerCard
+                          partner={{
+                              name: acceptance.deliveryBoy.name || "Delivery Partner",
+                              phone: acceptance.deliveryBoy.phone,
+                              profileImage: acceptance.deliveryBoy.profileImage,
+                              vehicleNumber: acceptance.deliveryBoy.vehicleNumber,
+                          }}
+                          eta={pEta}
+                          distance={pDist}
+                          isTracking={pIsTracking}
+                          deliveryOtp={!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) ? order?.deliveryOtp : undefined}
+                          orderStatus={orderStatus}
+                          onCall={() => {
+                              const phone = acceptance.deliveryBoy.phone || "1234567890";
+                              window.location.href = `tel:${phone}`;
+                          }}
+                      />
+                  </div>
+              );
+          })
+      ) : (
+          isPartnerAssigned && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) && (
+            <DeliveryPartnerCard
+              partner={{
+                name: order?.deliveryPartner?.name || "Delivery Partner",
+                phone: order?.deliveryPartner?.phone,
+                profileImage: order?.deliveryPartner?.profileImage,
+                vehicleNumber: order?.deliveryPartner?.vehicleNumber,
+              }}
+              eta={routeInfo ? Math.ceil(routeInfo.durationValue / 60) : eta}
+              distance={routeInfo ? routeInfo.distanceValue : distance}
+              isTracking={isConnected && !!deliveryLocation && !["Delivered", "Cancelled", "Returned"].includes(orderStatus as string)}
+              deliveryOtp={!["Delivered", "Cancelled", "Returned"].includes(orderStatus as string) ? order?.deliveryOtp : undefined}
+              orderStatus={orderStatus}
+              onCall={() => {
+                const phone = order?.deliveryPartner?.phone || "1234567890";
+                window.location.href = `tel:${phone}`;
+              }}
+            />
+          )
       )}
 
       {/* Scrollable Content */}
@@ -1435,107 +1518,137 @@ export default function OrderDetail() {
           />
         </motion.div>
 
-        {/* Store Section */}
-        <motion.div
-          className="bg-white rounded-xl shadow-sm overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.75 }}>
-          <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200">
-            <div className="w-12 h-12 rounded-full bg-orange-100 overflow-hidden flex items-center justify-center">
-              <span className="text-2xl">🛒</span>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900">Speedoo Store</p>
-              <p className="text-sm text-gray-500">
-                {order.address?.city || "Local Area"}
-              </p>
-            </div>
-            <motion.button
-              className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center"
-              whileTap={{ scale: 0.9 }}
-              onClick={handleCallStore}>
-              <PhoneIcon className="w-5 h-5 text-[#7A3E8E]" />
-            </motion.button>
-          </div>
+        {/* Store Sections */}
+        {Object.values(itemsBySeller).map((sellerGroup: any, groupIndex: number) => {
+          const saGroup = order?.sellerAcceptances?.find((sa: any) => {
+            const saSellerId = typeof sa.seller === 'object' ? sa.seller._id?.toString() : sa.seller?.toString();
+            const groupSellerId = typeof sellerGroup.sellerInfo === 'object' ? sellerGroup.sellerInfo._id?.toString() : sellerGroup.sellerInfo?.toString();
+            return saSellerId === groupSellerId;
+          });
 
-          {/* Order Items */}
-          <div
-            className="p-4 border-b border-dashed border-gray-200"
-            onClick={() => setShowItemsModal(true)}
-            style={{ cursor: "pointer" }}>
-            <div className="flex items-start gap-3">
-              <ReceiptIcon className="w-5 h-5 text-gray-500 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
-                  Order #{order.id.split("-").slice(-1)[0]}
-                </p>
-                <div className="mt-2 space-y-1">
-                  {order.items?.map((item: any, index: number) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between text-sm text-gray-600 w-full mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded border border-[#7A3E8E] flex items-center justify-center">
-                          <span className="w-2 h-2 rounded-full bg-[#7A3E8E]" />
-                        </span>
-                        <span>
-                          {item.quantity} x{" "}
-                          {item.product?.name || item.productName || "Product"}
-                        </span>
-                      </div>
-                      {(() => {
-                        const deliveredAt = order.deliveredAt || order.updatedAt;
-                        const daysSinceDelivery = deliveredAt ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 3600 * 24) : 0;
-                        const isWithinReturnWindow = daysSinceDelivery <= (item.product?.maxReturnDays || 0);
-                        const canReturn = item.status !== "Returned" && item.product?.isReturnable && isWithinReturnWindow;
-                        
-                        return (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {orderStatus === "Delivered" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReviewProduct({
-                                    id: item.product?._id || item.product,
-                                    name: item.product?.name || item.productName || "Product",
-                                  });
-                                }}
-                                className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full hover:bg-purple-100 transition-colors uppercase tracking-wide border border-purple-100"
-                              >
-                                Rate
-                              </button>
-                            )}
-                            {orderStatus === "Delivered" && canReturn && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReturnItem(item);
-                                  setShowReturnModal(true);
-                                }}
-                                className="text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 transition-colors uppercase tracking-wide border border-red-100"
-                              >
-                                Return
-                              </button>
-                            )}
-                            {item.status === "Returned" && (
-                              <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200 uppercase tracking-wide">
-                                Returned
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ))}
+          let sellerStatus = "Placed";
+          if (saGroup) {
+            if (saGroup.deliveryBoyStatus === 'Delivered' || saGroup.status === 'Delivered') sellerStatus = 'Delivered';
+            else if (saGroup.deliveryBoyStatus === 'Picked Up' || saGroup.deliveryBoyStatus === 'In Transit') sellerStatus = 'On the way';
+            else if (saGroup.status === 'Accepted') sellerStatus = 'Accepted';
+            else if (saGroup.status === 'Rejected') sellerStatus = 'Rejected';
+            else if (saGroup.status === 'Pending') sellerStatus = 'Placed';
+          }
+
+          return (
+            <motion.div
+              key={groupIndex}
+              className="bg-white rounded-xl shadow-sm overflow-hidden"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 + groupIndex * 0.1 }}>
+              <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200">
+                <div className="w-12 h-12 rounded-full bg-orange-100 overflow-hidden flex items-center justify-center">
+                  <span className="text-2xl">🛒</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{sellerGroup.sellerInfo.storeName || "Store"}</p>
+                  <p className="text-sm text-gray-500">
+                    {sellerGroup.sellerInfo.city || order.address?.city || "Local Area"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    sellerStatus === 'Accepted' ? 'bg-green-100 text-green-700' :
+                    sellerStatus === 'Rejected' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {sellerStatus}
+                  </span>
+                  <motion.button
+                    className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center"
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                      const phone = sellerGroup.sellerInfo.phone || "1234567890";
+                      window.location.href = `tel:${phone}`;
+                    }}>
+                    <PhoneIcon className="w-4 h-4 text-[#7A3E8E]" />
+                  </motion.button>
                 </div>
               </div>
-              <ChevronRightIcon className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
 
-
-        </motion.div>
+              {/* Order Items */}
+              <div
+                className="p-4 border-b border-dashed border-gray-200"
+                onClick={() => setShowItemsModal(true)}
+                style={{ cursor: "pointer" }}>
+                <div className="flex items-start gap-3">
+                  <ReceiptIcon className="w-5 h-5 text-gray-500 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">
+                      Order #{order.id.split("-").slice(-1)[0]} - Package {groupIndex + 1}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {sellerGroup.items.map((item: any, index: number) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between text-sm text-gray-600 w-full mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-4 rounded border border-[#7A3E8E] flex items-center justify-center">
+                              <span className="w-2 h-2 rounded-full bg-[#7A3E8E]" />
+                            </span>
+                            <span>
+                              {item.quantity} x{" "}
+                              {item.product?.name || item.productName || "Product"}
+                            </span>
+                          </div>
+                          {(() => {
+                            const deliveredAt = order.deliveredAt || order.updatedAt;
+                            const daysSinceDelivery = deliveredAt ? (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 3600 * 24) : 0;
+                            const isWithinReturnWindow = daysSinceDelivery <= (item.product?.maxReturnDays || 0);
+                            const canReturn = item.status !== "Returned" && item.product?.isReturnable && isWithinReturnWindow;
+                            
+                            return (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {orderStatus === "Delivered" && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReviewProduct({
+                                        id: item.product?._id || item.product,
+                                        name: item.product?.name || item.productName || "Product",
+                                      });
+                                    }}
+                                    className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full hover:bg-purple-100 transition-colors uppercase tracking-wide border border-purple-100"
+                                  >
+                                    Rate
+                                  </button>
+                                )}
+                                {orderStatus === "Delivered" && canReturn && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReturnItem(item);
+                                      setShowReturnModal(true);
+                                    }}
+                                    className="text-[10px] font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full hover:bg-red-100 transition-colors uppercase tracking-wide border border-red-100"
+                                  >
+                                    Return
+                                  </button>
+                                )}
+                                {item.status === "Returned" && (
+                                  <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200 uppercase tracking-wide">
+                                    Returned
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400" />
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
 
         {/* Help Section */}
         <motion.div

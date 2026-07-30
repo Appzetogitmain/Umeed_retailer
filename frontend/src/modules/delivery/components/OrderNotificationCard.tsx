@@ -276,14 +276,22 @@ export default function OrderNotificationCard({
                         <p className="text-xs sm:text-sm text-neutral-500 break-all">{notification.customerPhone}</p>
                     </div>
 
+                    {notification.sellerInfo && (
+                        <div>
+                            <p className="text-xs sm:text-sm text-neutral-600">Pickup Store</p>
+                            <p className="text-sm sm:text-base font-medium text-neutral-900 break-words">{notification.sellerInfo.name}</p>
+                            <p className="text-xs sm:text-sm text-neutral-500 break-all leading-relaxed">{notification.sellerInfo.address}</p>
+                        </div>
+                    )}
+
                     <div>
                         <p className="text-xs sm:text-sm text-neutral-600">Delivery Address</p>
                         <p className="text-xs sm:text-sm text-neutral-900 break-words leading-relaxed">{formatAddress()}</p>
                     </div>
 
                     <div>
-                        <p className="text-xs sm:text-sm text-neutral-600">Order Amount</p>
-                        <p className="text-lg sm:text-xl font-bold text-teal-600">₹{notification.total.toFixed(2)}</p>
+                        <p className="text-xs sm:text-sm text-neutral-600">Amount to Collect (COD)</p>
+                        <p className="text-lg sm:text-xl font-bold text-teal-600">₹{notification.codAmount?.toFixed(2) || '0.00'}</p>
                     </div>
 
                     {notification.riderEarning !== undefined && (

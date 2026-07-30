@@ -9,6 +9,18 @@ import { generateDeliveryOtp, verifyDeliveryOtp } from "../../../services/delive
 import { processOrderStatusTransition } from "../../../services/orderService";
 
 /**
+ * Helper to get clean string ID from ObjectId or populated object
+ */
+const getIdStr = (obj: any): string => {
+    if (!obj) return '';
+    if (typeof obj === 'object') {
+        if (obj._id) return obj._id.toString();
+        if (obj.id) return obj.id.toString();
+    }
+    return obj.toString();
+};
+
+/**
  * Helper to map order items for response
  */
 const mapOrderItems = (items: any[]) => {
@@ -31,13 +43,20 @@ export const getAllOrdersHistory = asyncHandler(async (req: Request, res: Respon
     const limit = parseInt(req.query.limit as string) || 20;
     const skip = (page - 1) * limit;
 
-    const orders = await Order.find({ deliveryBoy: deliveryId })
+    const riderQuery = {
+        $or: [
+            { deliveryBoy: deliveryId },
+            { "sellerAcceptances.deliveryBoy": deliveryId }
+        ]
+    };
+
+    const orders = await Order.find(riderQuery)
         .populate("items") // Populate OrderItems
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
 
-    const total = await Order.countDocuments({ deliveryBoy: deliveryId });
+    const total = await Order.countDocuments(riderQuery);
 
     // Format orders for frontend
     const formattedOrders = orders.map(order => ({
@@ -79,10 +98,17 @@ export const getTodayOrders = asyncHandler(async (req: Request, res: Response) =
     todayEnd.setHours(23, 59, 59, 999);
 
     const orders = await Order.find({
-        deliveryBoy: deliveryId,
         $or: [
-            { createdAt: { $gte: todayStart, $lte: todayEnd } }, // Created today
-            { updatedAt: { $gte: todayStart, $lte: todayEnd } }  // OR Updated today
+            { deliveryBoy: deliveryId },
+            { "sellerAcceptances.deliveryBoy": deliveryId }
+        ],
+        $and: [
+            {
+                $or: [
+                    { createdAt: { $gte: todayStart, $lte: todayEnd } }, // Created today
+                    { updatedAt: { $gte: todayStart, $lte: todayEnd } }  // OR Updated today
+                ]
+            }
         ]
     })
         .populate("items")
@@ -119,8 +145,11 @@ export const getPendingOrders = asyncHandler(async (req: Request, res: Response)
 
     // Pending statuses: Ready for pickup, Out for delivery, Picked Up, Assigned, In Transit
     const orders = await Order.find({
-        deliveryBoy: deliveryId,
-        status: { $in: ["Ready for pickup", "Out for Delivery", "Picked Up", "Assigned", "In Transit"] }
+        $or: [
+            { deliveryBoy: deliveryId },
+            { "sellerAcceptances.deliveryBoy": deliveryId }
+        ],
+        status: { $in: ["Ready for pickup", "Out for Delivery", "Picked Up", "Assigned", "In Transit", "Accepted", "Processed"] }
     })
         .populate("items")
         .sort({ createdAt: -1 });
@@ -150,11 +179,31 @@ export const getPendingOrders = asyncHandler(async (req: Request, res: Response)
  */
 export const getOrderDetails = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const deliveryId = req.user?.userId;
 
-    const order = await Order.findById(id).populate("items");
+    const order = await Order.findById(id).populate({
+        path: 'items',
+        populate: { path: 'seller' }
+    });
 
     if (!order) {
         return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // Filter items and calculation for this rider
+    let assignedItems = order.items || [];
+    let codTotalAmount = 0;
+
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryId) {
+        const myAcceptances = order.sellerAcceptances.filter((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+        if (myAcceptances.length > 0) {
+            const mySellerIds = new Set(myAcceptances.map((sa: any) => getIdStr(sa.seller)));
+            assignedItems = (order.items || []).filter((item: any) => {
+                const itemSellerId = getIdStr(item.seller);
+                return mySellerIds.has(itemSellerId);
+            });
+            codTotalAmount = myAcceptances.reduce((sum: number, sa: any) => sum + (sa.codAmountToCollect || 0), 0);
+        }
     }
 
     // Calculate rider earning dynamically
@@ -206,8 +255,8 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
         address: `${order.deliveryAddress?.address || ''}, ${order.deliveryAddress?.city || ''}`,
         deliveryAddress: order.deliveryAddress,
         status: order.status,
-        items: mapOrderItems(order.items), // Real populated items
-        totalAmount: order.total,
+        items: mapOrderItems(assignedItems), // Real populated items for this rider
+        totalAmount: codTotalAmount > 0 ? codTotalAmount : order.total,
         riderEarning: riderEarning, // Added rider earning
         paymentMethod: order.paymentMethod,
         createdAt: order.createdAt,
@@ -308,7 +357,10 @@ export const getReturnOrders = asyncHandler(async (req: Request, res: Response) 
     const deliveryId = req.user?.userId;
 
     const orders = await Order.find({
-        deliveryBoy: deliveryId,
+        $or: [
+            { deliveryBoy: deliveryId },
+            { "sellerAcceptances.deliveryBoy": deliveryId }
+        ],
         status: { $in: ["Returned", "Cancelled", "Rejected"] }
     })
         .populate("items")
@@ -341,19 +393,32 @@ export const getSellerLocationsForOrder = asyncHandler(async (req: Request, res:
     const { id } = req.params;
     const deliveryId = req.user?.userId;
 
-    // Verify order exists and is assigned to this delivery boy
+    // Verify order exists
     const order = await Order.findById(id);
     if (!order) {
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
-    // Get all unique seller IDs from order items
-    const orderItems = await OrderItem.find({ order: id });
-    const sellerIds = [...new Set(orderItems.map(item => item.seller.toString()))];
+    // Get seller IDs assigned specifically to THIS delivery boy
+    let sellerIds: string[] = [];
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryId) {
+        const myAcceptances = order.sellerAcceptances.filter((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+        if (myAcceptances.length > 0) {
+            sellerIds = myAcceptances.map((sa: any) => getIdStr(sa.seller));
+        }
+    }
+
+    if (sellerIds.length === 0) {
+        const orderItems = await OrderItem.find({ order: id });
+        sellerIds = [...new Set(orderItems.map(item => item.seller.toString()))];
+    }
 
     // Get seller details including locations
     const sellers = await Seller.find({ _id: { $in: sellerIds } })
@@ -456,7 +521,7 @@ export const verifyDeliveryOtpController = asyncHandler(async (req: Request, res
 
     try {
         const previousStatus = order.status;
-        const result = await verifyDeliveryOtp(id, otp);
+        const result = await verifyDeliveryOtp(id, otp, deliveryId);
         // Note: verifyDeliveryOtp is from service, not this controller
 
         // Reload order to get updated status
@@ -581,7 +646,10 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
@@ -608,7 +676,7 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
 
     // Check if this seller is already picked up
     const existingPickup = order.sellerPickups?.find(
-        (pickup: any) => pickup.seller.toString() === sellerId
+        (pickup: any) => getIdStr(pickup.seller) === getIdStr(sellerId)
     );
 
     if (existingPickup && existingPickup.pickedUpAt) {
@@ -618,9 +686,18 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
         });
     }
 
-    // Get all unique seller IDs from order items
-    const orderItems = await OrderItem.find({ order: id });
-    const allSellerIds = [...new Set(orderItems.map(item => item.seller.toString()))];
+    // Get seller IDs assigned specifically to THIS rider
+    let assignedSellerIds: string[] = [];
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryId) {
+        assignedSellerIds = order.sellerAcceptances
+            .filter((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId))
+            .map((sa: any) => getIdStr(sa.seller));
+    }
+
+    if (assignedSellerIds.length === 0) {
+        const orderItems = await OrderItem.find({ order: id });
+        assignedSellerIds = [...new Set(orderItems.map(item => getIdStr(item.seller)))];
+    }
 
     // Initialize sellerPickups array if it doesn't exist
     if (!order.sellerPickups) {
@@ -629,7 +706,7 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
 
     // Add or update pickup confirmation for this seller
     const pickupIndex = order.sellerPickups.findIndex(
-        (pickup: any) => pickup.seller.toString() === sellerId
+        (pickup: any) => getIdStr(pickup.seller) === getIdStr(sellerId)
     );
 
     const pickupData = {
@@ -646,15 +723,26 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
         order.sellerPickups.push(pickupData as any);
     }
 
-    // Check if all sellers have been picked up
+    // Update sellerAcceptances status if present
+    if (order.sellerAcceptances) {
+        const saIdx = order.sellerAcceptances.findIndex((sa: any) => 
+            getIdStr(sa.seller) === getIdStr(sellerId)
+        );
+        if (saIdx !== -1) {
+            order.sellerAcceptances[saIdx].deliveryBoyStatus = 'Picked Up';
+            order.sellerAcceptances[saIdx].pickedUpAt = new Date();
+        }
+    }
+
+    // Check if all assigned sellers for this rider have been picked up
     const pickedUpSellerIds = order.sellerPickups
         .filter((pickup: any) => pickup.pickedUpAt)
-        .map((pickup: any) => pickup.seller.toString());
+        .map((pickup: any) => getIdStr(pickup.seller));
 
-    const allPickedUp = allSellerIds.every(sellerId => pickedUpSellerIds.includes(sellerId));
+    const allPickedUp = assignedSellerIds.every(sId => pickedUpSellerIds.includes(sId));
 
-    // If all sellers picked up, automatically change status to "Out for Delivery"
-    if (allPickedUp && order.status !== 'Out for Delivery' && order.status !== 'Delivered') {
+    // Automatically transition to "Out for Delivery" if all assigned sellers for this rider are picked up
+    if (allPickedUp && order.status !== 'Delivered') {
         order.status = 'Out for Delivery';
         order.deliveryBoyStatus = 'In Transit';
     }
@@ -691,7 +779,7 @@ export const confirmSellerPickup = asyncHandler(async (req: Request, res: Respon
             order,
             allPickedUp,
             pickedUpSellers: pickedUpSellerIds.length,
-            totalSellers: allSellerIds.length
+            totalSellers: assignedSellerIds.length
         }
     });
 });

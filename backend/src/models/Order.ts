@@ -83,6 +83,17 @@ export interface IOrder extends Document {
     longitude?: number;
   }>;
 
+  // Per-seller acceptance and delivery tracking
+  sellerAcceptances?: Array<{
+    seller: mongoose.Types.ObjectId;
+    status: "Pending" | "Accepted" | "Rejected";
+    acceptedAt?: Date;
+    deliveryBoy?: mongoose.Types.ObjectId;
+    deliveryBoyStatus?: "Assigned" | "Picked Up" | "In Transit" | "Delivered" | "Failed";
+    assignedAt?: Date;
+    codAmountToCollect?: number; // Amount this specific rider needs to collect for COD orders
+  }>;
+
   // Notes
   adminNotes?: string;
   customerNotes?: string;
@@ -312,6 +323,39 @@ const OrderSchema = new Schema<IOrder>(
           type: Number,
         },
       },
+    ],
+
+    // Per-seller acceptance and delivery tracking
+    sellerAcceptances: [
+      {
+        seller: {
+          type: Schema.Types.ObjectId,
+          ref: "Seller",
+          required: true,
+        },
+        status: {
+          type: String,
+          enum: ["Pending", "Accepted", "Rejected"],
+          default: "Pending",
+        },
+        acceptedAt: {
+          type: Date,
+        },
+        deliveryBoy: {
+          type: Schema.Types.ObjectId,
+          ref: "Delivery",
+        },
+        deliveryBoyStatus: {
+          type: String,
+          enum: ["Assigned", "Picked Up", "In Transit", "Delivered", "Failed"],
+        },
+        assignedAt: {
+          type: Date,
+        },
+        codAmountToCollect: {
+          type: Number,
+        }
+      }
     ],
 
     // Notes

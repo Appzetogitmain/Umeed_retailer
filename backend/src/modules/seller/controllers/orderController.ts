@@ -99,7 +99,11 @@ export const getOrders = asyncHandler(
         ? order.estimatedDeliveryDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
         : order.orderDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
       orderDate: order.orderDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
-      status: (order.status === 'Out for Delivery' || order.status === 'Out For Delivery') ? 'On the way' : order.status,
+      status: (() => {
+        const sellerAcceptance = order.sellerAcceptances?.find((sa: any) => sa.seller.toString() === sellerId.toString());
+        let stat = sellerAcceptance ? sellerAcceptance.status : order.status;
+        return (stat === 'Out for Delivery' || stat === 'Out For Delivery') ? 'On the way' : stat;
+      })(),
       amount: order.total,
       customerName: (order.customer as any)?.name || order.customerName || '',
       customerPhone: (order.customer as any)?.phone || order.customerPhone || '',
@@ -217,7 +221,11 @@ export const getOrderById = asyncHandler(
       orderDate: order.orderDate ? order.orderDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       deliveryDate: order.estimatedDeliveryDate ? order.estimatedDeliveryDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       timeSlot: order.timeSlot || 'N/A',
-      status: (order.status === 'Out for Delivery' || order.status === 'Out For Delivery') ? 'On the way' : order.status,
+      status: (() => {
+        const sellerAcceptance = order.sellerAcceptances?.find((sa: any) => sa.seller.toString() === sellerId.toString());
+        let stat = sellerAcceptance ? sellerAcceptance.status : order.status;
+        return (stat === 'Out for Delivery' || stat === 'Out For Delivery') ? 'On the way' : stat;
+      })(),
       customerName: (order.customer as any)?.name || order.customerName || '',
       customerEmail: (order.customer as any)?.email || order.customerEmail || '',
       customerPhone: (order.customer as any)?.phone || order.customerPhone || '',
@@ -287,27 +295,68 @@ export const updateOrderStatus = asyncHandler(
         mappedStatus = 'Out for Delivery';
     }
 
-    // Check if status is already the same
-    if (order.status === mappedStatus) {
-      return res.status(400).json({
-        success: false,
-        message: `Order is already ${status}`,
-      });
+    const previousStatus = order.status;
+
+    // Handle per-seller status updates
+    let isSellerStatusUpdate = false;
+    let allAccepted = false;
+    let sellerAcceptanceIndex = -1;
+
+    if (order.sellerAcceptances && Array.isArray(order.sellerAcceptances)) {
+        sellerAcceptanceIndex = order.sellerAcceptances.findIndex((sa: any) => sa.seller.toString() === sellerId.toString());
+        if (sellerAcceptanceIndex !== -1) {
+            const currentSellerStatus = order.sellerAcceptances[sellerAcceptanceIndex].status;
+            
+            // Check if status is already the same for this seller
+            if (currentSellerStatus === mappedStatus) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Order is already ${status} for your store`,
+                });
+            }
+
+            if (mappedStatus === 'Accepted' || mappedStatus === 'Rejected') {
+                order.sellerAcceptances[sellerAcceptanceIndex].status = mappedStatus;
+                if (mappedStatus === 'Accepted') {
+                    order.sellerAcceptances[sellerAcceptanceIndex].acceptedAt = new Date();
+                }
+                isSellerStatusUpdate = true;
+
+                // Check if all sellers have accepted
+                allAccepted = order.sellerAcceptances.every((sa: any) => sa.status === 'Accepted');
+                
+                // If all accepted, update the main order status
+                if (allAccepted) {
+                    order.status = 'Accepted';
+                }
+            } else if (mappedStatus === 'Out for Delivery' || mappedStatus === 'Delivered' || mappedStatus === 'Cancelled') {
+                 // For now, if a seller forces a status like Delivered, we'll just update the main order status 
+                 // (typically this should be done by the delivery boy, but sellers have the option)
+                 order.status = mappedStatus;
+            }
+        }
+    } else {
+        // Fallback for older orders without sellerAcceptances array
+        if (order.status === mappedStatus) {
+            return res.status(400).json({
+                success: false,
+                message: `Order is already ${status}`,
+            });
+        }
+        order.status = mappedStatus;
+        if (mappedStatus === 'Accepted') {
+            allAccepted = true; // Act as if all accepted for legacy orders
+        }
     }
 
-    const previousStatus = order.status;
-    order.status = mappedStatus;
     await order.save();
 
-    // Trigger delivery notification if seller accepts the order
-    if (status === 'Accepted' && previousStatus !== 'Accepted') {
+    // Trigger delivery notification if THIS seller accepts the order
+    if (mappedStatus === 'Accepted' && isSellerStatusUpdate) {
         try {
             const io: SocketIOServer = (req.app.get("io") as SocketIOServer);
             if (io) {
                 // Need to fetch full order with details for the notification service
-                // Using lean() to get a plain JS object which is what the service expects mostly,
-                // but checking the service implementation, it uses .items mainly for seller location.
-                // We should ensure the passed order object has populated items with sellers.
                 const fullOrder = await Order.findById(order._id)
                     .populate({
                         path: 'items',
@@ -316,13 +365,36 @@ export const updateOrderStatus = asyncHandler(
                     .lean();
 
                 if (fullOrder) {
-                     await notifyDeliveryBoysOfNewOrder(io, fullOrder);
-                     console.log(`Delivery notification triggered for Accepted order ${order.orderNumber}`);
+                    // Need to dynamically import to avoid circular dependencies if any, though regular import is fine
+                    const { notifyDeliveryBoysForSellerPickup } = await import("../../../services/orderNotificationService");
+                    
+                    if (typeof notifyDeliveryBoysForSellerPickup === 'function') {
+                        await notifyDeliveryBoysForSellerPickup(io, fullOrder, sellerId);
+                        console.log(`Per-seller delivery notification triggered for Accepted order ${order.orderNumber}, seller ${sellerId}`);
+                    } else {
+                        // Fallback to old behavior if not implemented yet
+                        const { notifyDeliveryBoysOfNewOrder } = await import("../../../services/orderNotificationService");
+                        await notifyDeliveryBoysOfNewOrder(io, fullOrder);
+                    }
                 }
             }
         } catch (notifyError) {
             console.error('Error notifying delivery boys on seller acceptance:', notifyError);
             // Don't fail the request, just log
+        }
+    } else if (mappedStatus === 'Accepted' && !isSellerStatusUpdate && previousStatus !== 'Accepted') {
+         // Legacy path for old orders
+         try {
+            const io: SocketIOServer = (req.app.get("io") as SocketIOServer);
+            if (io) {
+                const fullOrder = await Order.findById(order._id).populate({ path: 'items', populate: { path: 'seller' } }).lean();
+                if (fullOrder) {
+                     const { notifyDeliveryBoysOfNewOrder } = await import("../../../services/orderNotificationService");
+                     await notifyDeliveryBoysOfNewOrder(io, fullOrder);
+                }
+            }
+        } catch (notifyError) {
+            console.error('Error notifying delivery boys on legacy seller acceptance:', notifyError);
         }
     }
 

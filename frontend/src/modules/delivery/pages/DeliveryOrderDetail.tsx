@@ -646,9 +646,10 @@ export default function DeliveryOrderDetail() {
                         </h3>
                         <div className="space-y-3">
                             {sellerLocations.map((seller: any, idx: number) => {
-                                const isPickedUp = order?.sellerPickups?.some(
-                                    (p: any) => p.seller === seller.sellerId && p.pickedUpAt
-                                );
+                                const isPickedUp = order?.sellerPickups?.some((p: any) => {
+                                    const pSellerId = typeof p.seller === 'object' ? p.seller?._id?.toString() : p.seller?.toString();
+                                    return pSellerId === seller.sellerId && !!p.pickedUpAt;
+                                });
                                 const proximity = sellerProximity[seller.sellerId];
                                 const withinRange = proximity?.withinRange || false;
                                 const distance = proximity?.distance;

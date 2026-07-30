@@ -242,10 +242,10 @@ export const initializeSocket = (httpServer: HttpServer) => {
         });
 
         // Handle order acceptance
-        socket.on('accept-order', async (data: { orderId: string; deliveryBoyId: string }) => {
+        socket.on('accept-order', async (data: { orderId: string; deliveryBoyId: string; sellerId?: string }) => {
             try {
-                console.log(`✅ Delivery boy ${data.deliveryBoyId} accepting order ${data.orderId}`);
-                const result = await handleOrderAcceptance(io, data.orderId, String(data.deliveryBoyId).trim());
+                console.log(`✅ Delivery boy ${data.deliveryBoyId} accepting order ${data.orderId}${data.sellerId ? ` (seller ${data.sellerId})` : ''}`);
+                const result = await handleOrderAcceptance(io, data.orderId, String(data.deliveryBoyId).trim(), data.sellerId);
                 socket.emit('accept-order-response', result);
             } catch (error) {
                 console.error('❌ Error in accept-order handler:', error);
@@ -254,9 +254,13 @@ export const initializeSocket = (httpServer: HttpServer) => {
         });
 
         // Handle order rejection
-        socket.on('reject-order', async (data: { orderId: string; deliveryBoyId: string }) => {
+        socket.on('reject-order', async (data: { orderId: string; deliveryBoyId: string; sellerId?: string }) => {
             try {
-                console.log(`❌ Delivery boy ${data.deliveryBoyId} rejecting order ${data.orderId}`);
+                console.log(`❌ Delivery boy ${data.deliveryBoyId} rejecting order ${data.orderId}${data.sellerId ? ` (seller ${data.sellerId})` : ''}`);
+                // Modify handleOrderRejection to take sellerId as well (or at least log it here)
+                // For now we pass it down, but handleOrderRejection would need to be updated similarly if we wanted full per-seller rejection tracking.
+                // We'll just pass the standard ones for now, but state tracking in orderNotificationService handles sellerId if we pass stateKey.
+                // Actually, handleOrderRejection doesn't take sellerId yet. Let's just log it.
                 const result = await handleOrderRejection(io, data.orderId, String(data.deliveryBoyId).trim());
                 socket.emit('reject-order-response', result);
             } catch (error) {
@@ -266,15 +270,22 @@ export const initializeSocket = (httpServer: HttpServer) => {
         });
 
         // Handle delivery location update (optimized)
-        socket.on('update-location', async (data: { orderId: string; latitude: number; longitude: number }) => {
-            const { orderId, latitude, longitude } = data;
+        socket.on('update-location', async (data: { orderId: string; latitude: number; longitude: number; sellerId?: string }) => {
+            const { orderId, latitude, longitude, sellerId } = data;
             const deliveryBoyId = (socket as any).user?.userId;
 
             if (!deliveryBoyId || !orderId || !latitude || !longitude) return;
 
             try {
-                // 1. Verify Delivery Boy is assigned to this order
-                const order = await Order.findOne({ _id: orderId, deliveryBoy: deliveryBoyId }).select('deliveryAddress status');
+                // 1. Verify Delivery Boy is assigned to this order (either globally or to a specific seller)
+                const order = await Order.findOne({ 
+                    _id: orderId, 
+                    $or: [
+                        { deliveryBoy: deliveryBoyId },
+                        { "sellerAcceptances.deliveryBoy": deliveryBoyId }
+                    ]
+                }).select('deliveryAddress status sellerAcceptances');
+                
                 if (!order) {
                     console.warn(`⚠️ Unauthorized location update attempt from ${deliveryBoyId} for order ${orderId}`);
                     return;

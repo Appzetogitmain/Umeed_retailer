@@ -271,6 +271,202 @@ export async function findDeliveryBoysNearSellerLocations(
 }
 
 /**
+ * Emit new order notification to delivery boys near a specific seller
+ * Prioritizes delivery boys within the seller's service radius
+ */
+export async function notifyDeliveryBoysForSellerPickup(
+    io: SocketIOServer,
+    order: any,
+    sellerId: string
+): Promise<void> {
+    try {
+        const targetSellerIdStr = sellerId ? sellerId.toString() : '';
+
+        // Find delivery boys near this specific seller
+        // This is a simplified version of finding near multiple sellers
+        
+        let targetSeller: any = null;
+        if (order.items && order.items.length > 0) {
+            const firstItemForSeller = order.items.find((item: any) => {
+                const itemSellerId = item.seller && item.seller._id ? item.seller._id.toString() : item.seller.toString();
+                return itemSellerId === targetSellerIdStr;
+            });
+            if (firstItemForSeller) {
+                targetSeller = firstItemForSeller.seller;
+            }
+        }
+
+        let sellerLng: number | null = null;
+        let sellerLat: number | null = null;
+        if (targetSeller) {
+            if (targetSeller.location && targetSeller.location.coordinates) {
+                sellerLng = targetSeller.location.coordinates[0];
+                sellerLat = targetSeller.location.coordinates[1];
+            } else if (targetSeller.latitude && targetSeller.longitude) {
+                sellerLat = parseFloat(targetSeller.latitude);
+                sellerLng = parseFloat(targetSeller.longitude);
+            }
+        }
+        
+        // Find delivery boys near this seller
+        let nearbyDeliveryBoyIds: mongoose.Types.ObjectId[] = [];
+        
+        if (sellerLat !== null && sellerLng !== null && !isNaN(sellerLat) && !isNaN(sellerLng)) {
+            try {
+                const nearby = await findDeliveryBoysNearLocation(sellerLat, sellerLng, 15);
+                nearbyDeliveryBoyIds = nearby.map(b => b.deliveryBoyId);
+            } catch (err) {
+                console.error('Error finding delivery boys near specific seller location:', err);
+            }
+        }
+
+        // Fallback to all online active riders if none found nearby or location is missing
+        if (nearbyDeliveryBoyIds.length === 0) {
+            console.log(`ℹ️ No nearby delivery boys found within radius for seller ${sellerId}, falling back to all online riders.`);
+            nearbyDeliveryBoyIds = await findAvailableDeliveryBoys();
+        }
+
+        if (nearbyDeliveryBoyIds.length === 0) {
+            console.log(`⚠️ No online delivery boys available anywhere in the system.`);
+            return;
+        }
+
+        // --- FILTER BUSY DELIVERY BOYS ---
+        // Active = deliveryBoyStatus is Assigned, Picked Up, or In Transit
+        const busyDeliveryBoys = await Order.find({
+            deliveryBoy: { $in: nearbyDeliveryBoyIds },
+            deliveryBoyStatus: { $in: ['Assigned', 'Picked Up', 'In Transit'] },
+            status: { $nin: ['Delivered', 'Cancelled', 'Rejected', 'Returned'] }
+        }).distinct('deliveryBoy');
+        
+        // Also check sellerAcceptances busy
+        const busySubDeliveryBoys = await Order.find({
+            "sellerAcceptances.deliveryBoy": { $in: nearbyDeliveryBoyIds },
+            "sellerAcceptances.deliveryBoyStatus": { $in: ['Assigned', 'Picked Up', 'In Transit'] },
+            status: { $nin: ['Delivered', 'Cancelled', 'Rejected', 'Returned'] }
+        }).distinct("sellerAcceptances.deliveryBoy");
+
+        const allBusyIds = new Set([
+            ...busyDeliveryBoys.map((id: any) => id.toString()),
+            ...busySubDeliveryBoys.map((id: any) => id.toString())
+        ]);
+
+        if (allBusyIds.size > 0) {
+            const originalCount = nearbyDeliveryBoyIds.length;
+            nearbyDeliveryBoyIds = nearbyDeliveryBoyIds.filter(id => !allBusyIds.has(id.toString()));
+
+            console.log(`ℹ️ Filtered out busy delivery boys. Active: ${nearbyDeliveryBoyIds.length}`);
+
+            if (nearbyDeliveryBoyIds.length === 0) {
+                console.log('⚠️ All nearby delivery boys are currently busy.');
+                return;
+            }
+        }
+        // ---------------------------------
+
+        // Calculate rider earning dynamically for this seller's portion
+        let riderEarning = 40; // Default minimum
+        let sellerSubtotal = 0;
+        
+        // Calculate subtotal for this seller's items
+        if (order.items && order.items.length > 0) {
+            sellerSubtotal = order.items
+                .filter((item: any) => {
+                    const itemSellerId = item.seller && item.seller._id ? item.seller._id.toString() : item.seller.toString();
+                    return itemSellerId === targetSellerIdStr;
+                })
+                .reduce((sum: number, item: any) => sum + (item.total || 0), 0);
+        }
+        
+        // Very basic commission calculation for sub-orders
+        riderEarning = (sellerSubtotal * 5) / 100;
+        if (riderEarning < 40) riderEarning = 40; // minimum
+        riderEarning = Math.round(riderEarning * 100) / 100;
+
+        // Find COD amount for this rider
+        let codAmount = 0;
+        if (order.sellerAcceptances && order.paymentMethod === 'COD') {
+             const acceptance = order.sellerAcceptances.find((sa: any) => sa.seller.toString() === targetSellerIdStr);
+             if (acceptance && acceptance.codAmountToCollect) {
+                 codAmount = acceptance.codAmountToCollect;
+             }
+        }
+
+        // Prepare order data for notification
+        const orderData = {
+            orderId: order._id.toString(),
+            orderNumber: order.orderNumber,
+            sellerId: sellerId,
+            sellerInfo: {
+                 name: targetSeller.storeName || 'Seller',
+                 address: targetSeller.address || 'Seller Address',
+                 lat: sellerLat,
+                 lng: sellerLng
+            },
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
+            deliveryAddress: {
+                address: order.deliveryAddress.address,
+                city: order.deliveryAddress.city,
+                state: order.deliveryAddress.state,
+                pincode: order.deliveryAddress.pincode,
+            },
+            total: order.total,
+            codAmount: codAmount,
+            subtotal: sellerSubtotal,
+            createdAt: order.createdAt,
+            riderEarning: riderEarning,
+        };
+
+        // Initialize notification state for this specific seller sub-order
+        const stateKey = `${order._id.toString()}-${sellerId}`;
+        const notifiedIds = new Set<string>();
+
+        const pushNotificationPayload = {
+            title: 'New Delivery Request!',
+            body: `Pickup from ${targetSeller.storeName || 'Seller'} for Order #${order.orderNumber}.`,
+            data: {
+                type: 'NEW_ORDER',
+                orderId: String(order._id),
+                sellerId: sellerId,
+                orderNumber: String(order.orderNumber),
+                url: `/delivery/dashboard`
+            },
+        };
+
+        for (const id of nearbyDeliveryBoyIds) {
+            const idString = id.toString().trim();
+            const roomName = `delivery-${idString}`;
+
+            await sendNotificationToDeliveryBoy(idString, pushNotificationPayload).catch(err => {
+                console.error(`Failed to send push notification to ${idString}:`, err);
+            });
+            notifiedIds.add(idString);
+
+            // Emit socket notification to rider room
+            io.to(roomName).emit('new-order', orderData);
+        }
+
+        // Broadcast to all online delivery boys as backup
+        io.emit('new-order', orderData);
+
+        if (notifiedIds.size === 0) return;
+
+        notificationStates.set(stateKey, {
+            orderId: order._id.toString(),
+            notifiedDeliveryBoys: notifiedIds,
+            rejectedDeliveryBoys: new Set(),
+            acceptedBy: null,
+            orderData: orderData,
+        });
+
+        console.log(`📢 Notified ${notifiedIds.size} riders near seller ${sellerId} for order ${order.orderNumber}`);
+    } catch (error) {
+        console.error('Error in notifyDeliveryBoysForSellerPickup:', error);
+    }
+}
+
+/**
  * Emit new order notification to delivery boys near seller locations
  * Prioritizes delivery boys within the seller's service radius
  */
@@ -433,10 +629,12 @@ export async function notifyDeliveryBoysOfNewOrder(
 export async function handleOrderAcceptance(
     io: SocketIOServer,
     orderId: string,
-    deliveryBoyId: string
+    deliveryBoyId: string,
+    sellerId?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const state = notificationStates.get(orderId);
+        const stateKey = sellerId ? `${orderId}-${sellerId}` : orderId;
+        const state = notificationStates.get(stateKey);
         const normalizedDeliveryBoyId = String(deliveryBoyId).trim();
 
         // 1. In-Memory Check (Preferred)
@@ -446,10 +644,9 @@ export async function handleOrderAcceptance(
                 return { success: false, message: 'Order already accepted by another delivery boy' };
             }
 
-            // Check if this delivery boy was notified
+            // Ensure delivery boy is registered in notified list if they received broadcast
             if (!state.notifiedDeliveryBoys.has(normalizedDeliveryBoyId)) {
-                console.warn(`⚠️ Delivery boy ${normalizedDeliveryBoyId} not in notified list for acceptance of order ${orderId}. Notified:`, Array.from(state.notifiedDeliveryBoys));
-                return { success: false, message: 'You were not notified about this order' };
+                state.notifiedDeliveryBoys.add(normalizedDeliveryBoyId);
             }
 
             // Check if this delivery boy already rejected
@@ -460,10 +657,7 @@ export async function handleOrderAcceptance(
             // Mark as accepted in memory
             state.acceptedBy = normalizedDeliveryBoyId;
         } else {
-            console.log(`⚠️ Notification state missing for order ${orderId}. Checking database for fallback...`);
-            // 2. Database Fallback (For server restarts/stale notifications)
-            // We skip "notified" and "rejected" checks because that data is lost.
-            // We assume if they have the ID, they were notified effectively.
+            console.log(`⚠️ Notification state missing for order ${stateKey}. Checking database for fallback...`);
         }
 
         // Update order in database
@@ -472,47 +666,87 @@ export async function handleOrderAcceptance(
             return { success: false, message: 'Order not found' };
         }
 
-        // Check if order already has a delivery boy assigned
-        if (order.deliveryBoy) {
-            return { success: false, message: 'Order already assigned to another delivery boy' };
+        if (sellerId && order.sellerAcceptances && order.sellerAcceptances.length > 0) {
+            // Per-seller acceptance logic
+            const sellerIdStr = sellerId.toString();
+            const acceptanceIndex = order.sellerAcceptances.findIndex((sa: any) => sa.seller.toString() === sellerIdStr);
+            if (acceptanceIndex === -1) {
+                 return { success: false, message: 'Seller sub-order not found' };
+            }
+            if (order.sellerAcceptances[acceptanceIndex].deliveryBoy) {
+                 return { success: false, message: 'This pickup is already assigned to another rider' };
+            }
+
+            order.sellerAcceptances[acceptanceIndex].deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
+            order.sellerAcceptances[acceptanceIndex].deliveryBoyStatus = 'Assigned';
+            order.sellerAcceptances[acceptanceIndex].assignedAt = new Date();
+
+            // Set main deliveryBoy as fallback if not set yet
+            if (!order.deliveryBoy) {
+                order.deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
+                order.deliveryBoyStatus = 'Assigned';
+                order.assignedAt = new Date();
+            }
+            
+            // Also update main status to Processed if it's currently Accepted
+            if (order.status === 'Accepted') {
+                order.status = 'Processed';
+            }
+            
+            await order.save();
+        } else {
+            // Legacy single-delivery logic
+            if (order.deliveryBoy) {
+                return { success: false, message: 'Order already assigned to another delivery boy' };
+            }
+
+            // Assign order to delivery boy
+            order.deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
+            order.deliveryBoyStatus = 'Assigned';
+            order.assignedAt = new Date();
+            order.status = 'Processed'; // Mark as processed when assigned
+
+            await order.save();
         }
 
-        // Assign order to delivery boy
-        order.deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
-        order.deliveryBoyStatus = 'Assigned';
-        order.assignedAt = new Date();
-        order.status = 'Processed'; // Mark as processed when assigned
-
-        await order.save();
-
         // Emit order-accepted event to all delivery boys who were notified
-        // (Only to individual rooms, not general room)
         if (state) {
             for (const notifiedId of state.notifiedDeliveryBoys) {
                 const notifiedIdString = String(notifiedId).trim();
                 io.to(`delivery-${notifiedIdString}`).emit('order-accepted', {
                     orderId,
+                    sellerId,
                     acceptedBy: normalizedDeliveryBoyId,
                 });
             }
             // Clean up notification state
-            notificationStates.delete(orderId);
+            notificationStates.delete(stateKey);
         } else {
             // If no state, emit to the accepting delivery boy
             io.to(`delivery-${normalizedDeliveryBoyId}`).emit('order-accepted', {
                 orderId,
+                sellerId,
                 acceptedBy: normalizedDeliveryBoyId,
             });
         }
 
         // Emit delivery-boy-accepted event to customer for tracking
-        io.to(`order-${orderId}`).emit('delivery-boy-accepted', {
-            orderId,
-            deliveryBoyId: normalizedDeliveryBoyId,
-            message: 'Delivery boy accepted your order. Tracking started.',
-        });
+        if (sellerId) {
+             io.to(`order-${orderId}`).emit('seller-delivery-assigned', {
+                orderId,
+                sellerId,
+                deliveryBoyId: normalizedDeliveryBoyId,
+                message: 'Delivery partner assigned for a portion of your order.',
+            });
+        } else {
+             io.to(`order-${orderId}`).emit('delivery-boy-accepted', {
+                orderId,
+                deliveryBoyId: normalizedDeliveryBoyId,
+                message: 'Delivery boy accepted your order. Tracking started.',
+            });
+        }
 
-        console.log(`✅ Order ${orderId} accepted by delivery boy ${normalizedDeliveryBoyId} ${state ? '(Memory)' : '(DB Fallback)'}`);
+        console.log(`✅ Order ${stateKey} accepted by delivery boy ${normalizedDeliveryBoyId} ${state ? '(Memory)' : '(DB Fallback)'}`);
         return { success: true, message: 'Order accepted successfully' };
     } catch (error) {
         console.error('Error handling order acceptance:', error);
@@ -540,11 +774,10 @@ export async function handleOrderRejection(
             return { success: false, message: 'Order already accepted', allRejected: false };
         }
 
-        // Check if this delivery boy was notified
         const normalizedDeliveryBoyId = String(deliveryBoyId).trim();
+        // Ensure delivery boy is registered in notified list
         if (!state.notifiedDeliveryBoys.has(normalizedDeliveryBoyId)) {
-            console.warn(`⚠️ Delivery boy ${normalizedDeliveryBoyId} not in notified list for order ${orderId}. Notified:`, Array.from(state.notifiedDeliveryBoys));
-            return { success: false, message: 'You were not notified about this order', allRejected: false };
+            state.notifiedDeliveryBoys.add(normalizedDeliveryBoyId);
         }
 
         // Check if already rejected

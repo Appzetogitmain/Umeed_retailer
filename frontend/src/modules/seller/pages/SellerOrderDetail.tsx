@@ -419,7 +419,7 @@ export default function SellerOrderDetail() {
         <div className="bg-neutral-50 px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex-1 w-full sm:w-auto">
-              {orderStatus === "Received" ? (
+              {orderStatus === "Received" || orderStatus === "Pending" ? (
                 <div className="flex gap-3">
                   <button
                     onClick={() => handleStatusUpdate("Accepted")}

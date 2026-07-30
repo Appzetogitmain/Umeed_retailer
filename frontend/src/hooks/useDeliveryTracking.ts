@@ -27,6 +27,14 @@ interface TrackingData {
     error: string | null
     reconnectAttempts: number
     otpUpdateTrigger: number
+    sellerDeliveries: Record<string, {
+        deliveryBoyId: string;
+        location: { lat: number; lng: number } | null;
+        eta: number;
+        distance: number;
+        status: string;
+        lastUpdate: Date | null;
+    }>
 }
 
 const MAX_RECONNECT_ATTEMPTS = 5
@@ -44,6 +52,7 @@ export const useDeliveryTracking = (orderId: string | undefined) => {
         error: null,
         reconnectAttempts: 0,
         otpUpdateTrigger: 0,
+        sellerDeliveries: {},
     })
 
     const socketRef = useRef<Socket | null>(null)
@@ -109,7 +118,26 @@ export const useDeliveryTracking = (orderId: string | undefined) => {
             }))
         })
 
-        socket.on('location-update', (update: LocationUpdate) => {
+        socket.on('seller-delivery-assigned', (data: any) => {
+            console.log('✅ Delivery partner assigned for seller:', data)
+            setTrackingData(prev => ({
+                ...prev,
+                isConnected: true,
+                sellerDeliveries: {
+                    ...prev.sellerDeliveries,
+                    [data.sellerId]: {
+                        deliveryBoyId: data.deliveryBoyId,
+                        location: null,
+                        eta: 0,
+                        distance: 0,
+                        status: 'assigned',
+                        lastUpdate: new Date(),
+                    }
+                }
+            }))
+        })
+
+        socket.on('location-update', (update: LocationUpdate & { sellerId?: string }) => {
             console.log('📍 Location update received:', update)
 
             // Parse timestamp - handle both string and Date objects
@@ -128,18 +156,41 @@ export const useDeliveryTracking = (orderId: string | undefined) => {
                 timestamp = new Date();
             }
 
-            setTrackingData(prev => ({
-                ...prev,
-                deliveryLocation: {
-                    lat: update.location.latitude,
-                    lng: update.location.longitude,
-                },
-                eta: update.eta,
-                distance: update.distance,
-                status: update.status,
-                lastUpdate: timestamp,
-                error: null,
-            }))
+            setTrackingData(prev => {
+                const newData = {
+                    ...prev,
+                    error: null,
+                };
+                
+                if (update.sellerId) {
+                    newData.sellerDeliveries = {
+                        ...prev.sellerDeliveries,
+                        [update.sellerId]: {
+                            ...(prev.sellerDeliveries[update.sellerId] || { deliveryBoyId: '' }),
+                            location: {
+                                lat: update.location.latitude,
+                                lng: update.location.longitude,
+                            },
+                            eta: update.eta,
+                            distance: update.distance,
+                            status: update.status,
+                            lastUpdate: timestamp,
+                        }
+                    };
+                } else {
+                    // Legacy single-order update
+                    newData.deliveryLocation = {
+                        lat: update.location.latitude,
+                        lng: update.location.longitude,
+                    };
+                    newData.eta = update.eta;
+                    newData.distance = update.distance;
+                    newData.status = update.status;
+                    newData.lastUpdate = timestamp;
+                }
+                
+                return newData;
+            })
         })
 
         // Listen for generic order status updates

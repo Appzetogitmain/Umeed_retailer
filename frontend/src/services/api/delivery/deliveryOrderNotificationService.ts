@@ -3,6 +3,13 @@ import { Socket } from 'socket.io-client';
 export interface OrderNotificationData {
     orderId: string;
     orderNumber: string;
+    sellerId?: string;
+    sellerInfo?: {
+        name: string;
+        address: string;
+        lat: number;
+        lng: number;
+    };
     customerName: string;
     customerPhone: string;
     deliveryAddress: {
@@ -15,6 +22,7 @@ export interface OrderNotificationData {
     total: number;
     subtotal: number;
     shipping: number;
+    codAmount?: number;
     createdAt: string;
     riderEarning?: number;
 }
@@ -36,7 +44,8 @@ export interface RejectOrderResponse {
 export const acceptOrder = (
     socket: Socket,
     orderId: string,
-    deliveryBoyId: string
+    deliveryBoyId: string,
+    sellerId?: string
 ): Promise<AcceptOrderResponse> => {
     return new Promise((resolve) => {
         const timeout = setTimeout(() => {
@@ -46,7 +55,7 @@ export const acceptOrder = (
             });
         }, 10000); // 10 second timeout
 
-        socket.emit('accept-order', { orderId, deliveryBoyId });
+        socket.emit('accept-order', { orderId, deliveryBoyId, sellerId });
 
         socket.once('accept-order-response', (response: AcceptOrderResponse) => {
             clearTimeout(timeout);
@@ -61,7 +70,8 @@ export const acceptOrder = (
 export const rejectOrder = (
     socket: Socket,
     orderId: string,
-    deliveryBoyId: string
+    deliveryBoyId: string,
+    sellerId?: string
 ): Promise<RejectOrderResponse> => {
     return new Promise((resolve) => {
         const timeout = setTimeout(() => {
@@ -72,7 +82,7 @@ export const rejectOrder = (
             });
         }, 10000); // 10 second timeout
 
-        socket.emit('reject-order', { orderId, deliveryBoyId });
+        socket.emit('reject-order', { orderId, deliveryBoyId, sellerId });
 
         socket.once('reject-order-response', (response: RejectOrderResponse) => {
             clearTimeout(timeout);

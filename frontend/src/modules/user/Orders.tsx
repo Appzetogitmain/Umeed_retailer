@@ -32,7 +32,57 @@ export default function Orders() {
   const statuses = ['All', 'Placed', 'Accepted', 'On the way', 'Delivered', 'Cancelled', 'Returned'];
 
   const filteredOrders = useMemo(() => {
-    let result = [...orders];
+    let result: any[] = [];
+
+    // Split orders by seller
+    orders.forEach(order => {
+      if (!order.items || order.items.length === 0) return;
+
+      const itemsBySeller = order.items.reduce((acc: any, item: any) => {
+        const sellerId = item.seller
+          ? (typeof item.seller === 'object' ? (item.seller._id?.toString() || item.seller.toString()) : item.seller.toString())
+          : 'unknown';
+        if (!acc[sellerId]) acc[sellerId] = { seller: item.seller, items: [], total: 0 };
+        acc[sellerId].items.push(item);
+        // Estimate total since unitPrice and quantity might be inside item or product
+        acc[sellerId].total += (item.total || ((item.unitPrice || item.product?.price || 0) * (item.quantity || 1)));
+        return acc;
+      }, {});
+
+      // For each seller, create a virtual order entry
+      Object.keys(itemsBySeller).forEach((sellerId, index) => {
+        const sellerGroup = itemsBySeller[sellerId];
+        const sa = (order as any).sellerAcceptances?.find((s: any) => {
+            const sId = typeof s.seller === 'object' ? s.seller?._id?.toString() : s.seller?.toString();
+            return sId === sellerId.toString();
+        });
+
+        let sellerStatus = order.status;
+        if (sa) {
+            if (sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered') {
+                sellerStatus = 'Delivered';
+            } else if (sa.deliveryBoyStatus === 'Picked Up' || sa.deliveryBoyStatus === 'In Transit') {
+                sellerStatus = 'On the way';
+            } else if (sa.status === 'Accepted') {
+                sellerStatus = 'Accepted';
+            } else if (sa.status === 'Rejected') {
+                sellerStatus = 'Rejected';
+            } else if (sa.status === 'Pending') {
+                sellerStatus = 'Placed';
+            }
+        }
+        
+        result.push({
+          ...order,
+          // Give it a unique virtual id for rendering key
+          virtualId: `${order.id}-${sellerId}-${index}`,
+          items: sellerGroup.items,
+          status: sellerStatus,
+          sellerInfo: sellerGroup.seller,
+          totalAmount: sellerGroup.total + (order.fees?.deliveryFee || 0) / Object.keys(itemsBySeller).length // Distribute delivery fee
+        });
+      });
+    });
 
     if (statusFilter !== 'All') {
       result = result.filter(order => order.status === statusFilter);
@@ -154,8 +204,8 @@ export default function Orders() {
             
             return (
               <Link
-                key={order.id}
-                to={`/orders/${order.id}`}
+                key={order.virtualId}
+                to={`/orders/${order.id}?sellerId=${order.sellerInfo?._id || order.sellerInfo}`}
                 className="block bg-white rounded-2xl border border-neutral-100 p-3 hover:border-purple-100 transition-all active:scale-[0.99]"
               >
                 {/* Header: Icon + ID + Status */}
@@ -173,8 +223,11 @@ export default function Orders() {
                         <span className="text-xs font-bold text-neutral-900">Order</span>
                         <span className="text-[10px] font-medium text-neutral-400 bg-neutral-50 px-1.5 py-0.5 rounded-md border border-neutral-100">#{shortId}</span>
                       </div>
-                      <div className="text-[10px] text-neutral-400 font-medium mt-0.5">
-                        {formatDate(order.createdAt)}
+                      <div className="text-[10px] text-neutral-400 font-medium mt-0.5 flex flex-col">
+                        <span>{formatDate(order.createdAt)}</span>
+                        {order.sellerInfo?.storeName && (
+                          <span className="text-neutral-600 font-bold mt-0.5 truncate max-w-[120px]">Store: {order.sellerInfo.storeName}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -190,7 +243,7 @@ export default function Orders() {
                 <div className="flex items-center justify-between gap-4 py-3 border-t border-neutral-50">
                   <div className="flex items-center gap-2 overflow-hidden">
                     <div className="flex -space-x-3 overflow-hidden">
-                      {order.items.slice(0, 3).map((item, idx) => (
+                      {order.items.slice(0, 3).map((item: any, idx: number) => (
                         <div key={idx} className="relative z-[idx]">
                           <div className="w-12 h-12 rounded-lg border border-neutral-100 bg-white p-1 shadow-sm">
                             <img 
@@ -207,7 +260,7 @@ export default function Orders() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] text-neutral-600 font-medium truncate">
-                        {order.items.map(item => item.product.productName || item.product.name).join(', ')}
+                        {order.items.map((item: any) => item.product.productName || item.product.name).join(', ')}
                       </p>
                       {order.items.length > 3 && (
                         <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">
