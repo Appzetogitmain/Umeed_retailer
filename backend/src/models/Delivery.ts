@@ -187,7 +187,6 @@ const DeliverySchema = new Schema<IDelivery>(
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        index: "2dsphere",
       },
     },
     balance: {
@@ -253,6 +252,10 @@ DeliverySchema.methods.comparePassword = async function (
 ): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// IMPORTANT: The 2dsphere index MUST be on the top-level GeoJSON 'location' field,
+// NOT on 'location.coordinates'. This is required for $near / $geoWithin queries.
+DeliverySchema.index({ location: '2dsphere' });
 
 const Delivery = mongoose.model<IDelivery>('Delivery', DeliverySchema);
 

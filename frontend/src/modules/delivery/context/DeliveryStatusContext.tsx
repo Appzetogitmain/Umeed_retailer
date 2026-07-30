@@ -128,6 +128,31 @@ export function DeliveryStatusProvider({ children }: { children: ReactNode }) {
     // Optimistic update
     setIsOnlineLocal(newStatus);
     try {
+      // When going online, immediately push current location to the backend.
+      // Without this, the delivery boy's location in MongoDB could be null for up to
+      // 30 seconds (throttle window), causing geo queries to find no one for new orders.
+      if (newStatus && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            setCurrentLocation({ latitude, longitude });
+            // Reset throttle so the first watchPosition tick doesn't skip the update
+            lastUpdateTimeRef.current = Date.now();
+            try {
+              await updateGeneralLocation(latitude, longitude);
+              // Also fetch sellers in range immediately
+              const data = await getSellersInRadius(latitude, longitude);
+              setSellersInRangeCount(data.count || 0);
+              setSellersInRange(data.sellers || []);
+            } catch (locErr) {
+              console.error('Failed to push immediate location on going online:', locErr);
+            }
+          },
+          (err) => console.warn('Could not get immediate location on toggle online:', err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+
       await updateStatus(newStatus);
     } catch (error) {
       console.error("Failed to update status", error);

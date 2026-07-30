@@ -2099,7 +2099,12 @@ export default function Checkout() {
               }`}
             style={(cart.items.length > 0 && !isSubmitting) ? { backgroundColor: currentTheme.accentColor } : {}}
           >
-            {isSubmitting ? "Processing..." : "Place Order"}
+            {isSubmitting 
+              ? "Processing..." 
+              : paymentMethod === "Online" 
+                ? `Pay ₹${grandTotal.toLocaleString('en-IN')} Now` 
+                : "Place COD Order"
+            }
           </button>
         ) : (
           <button
