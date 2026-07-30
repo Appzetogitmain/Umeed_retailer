@@ -16,6 +16,7 @@ export default function SellerDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isShopOpen, setIsShopOpen] = useState(true);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [sellerStatus, setSellerStatus] = useState<string>('approved');
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -38,6 +39,7 @@ export default function SellerDashboard() {
           const shopStatus = profileResponse.data.isShopOpen ?? true;
           console.log('Initial shop status from profile:', shopStatus, 'Raw value:', profileResponse.data.isShopOpen);
           setIsShopOpen(shopStatus);
+          setSellerStatus(profileResponse.data.status || 'approved');
         }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Error loading dashboard data');
@@ -251,6 +253,25 @@ export default function SellerDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Alert for Pending Seller */}
+      {sellerStatus !== 'approved' && sellerStatus !== 'Approved' && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-md shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-orange-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-orange-800">Store Under Review</h3>
+              <p className="mt-1 text-sm text-orange-700">
+                Your store application is currently under review. Once Speedoo approves your application, you will be able to show your products to customers and start selling.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header with Shop Status Toggle */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4 sm:gap-0">
         <div>
