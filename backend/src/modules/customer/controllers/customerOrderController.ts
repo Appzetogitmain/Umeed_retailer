@@ -387,7 +387,7 @@ export const createOrder = async (req: Request, res: Response) => {
         // Emit notification to sellers — only for COD orders.
         // Online-payment orders start as 'Pending' and sellers are notified
         // only after successful payment verification (in paymentRoutes.ts).
-        if (paymentMethod !== 'Online') {
+        if (newOrder.paymentMethod !== 'Online') {
             try {
                 const io: SocketIOServer = (req.app.get("io") as SocketIOServer);
                 if (io) {
