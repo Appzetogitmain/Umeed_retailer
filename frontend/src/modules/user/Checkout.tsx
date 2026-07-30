@@ -588,20 +588,13 @@ export default function Checkout() {
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(profileFormData.email)) {
-      setProfileError("Please enter a valid email address");
-      return;
-    }
-
     setIsUpdatingProfile(true);
     setProfileError(null);
 
     try {
       const response = await updateProfile({
         name: profileFormData.name.trim(),
-        email: profileFormData.email.trim(),
+        email: user?.email || "", // Keep existing email
       });
 
       if (response.success) {
@@ -658,7 +651,7 @@ export default function Checkout() {
                 Complete Your Profile
               </h2>
               <p className="text-sm text-neutral-600 mb-4">
-                Please provide your name and email to continue with your order.
+                Please provide your full name to continue with your order.
               </p>
 
               <div className="space-y-3">
@@ -681,25 +674,6 @@ export default function Checkout() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={profileFormData.email}
-                    onChange={(e) =>
-                      setProfileFormData((prev) => ({
-                        ...prev,
-                        email: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter your email"
-                    className="w-full px-3 py-2.5 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:border-neutral-900 transition-colors"
-                    disabled={isUpdatingProfile}
-                  />
-                </div>
-
                 {profileError && (
                   <p className="text-xs text-red-600 bg-red-50 p-2 rounded">
                     {profileError}
@@ -717,16 +691,14 @@ export default function Checkout() {
                     onClick={handleProfileSubmit}
                     disabled={
                       isUpdatingProfile ||
-                      !profileFormData.name.trim() ||
-                      !profileFormData.email.trim()
+                      !profileFormData.name.trim()
                     }
                     className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-colors ${isUpdatingProfile ||
-                      !profileFormData.name.trim() ||
-                      !profileFormData.email.trim()
+                      !profileFormData.name.trim()
                       ? "bg-neutral-300 text-neutral-500 cursor-not-allowed"
                       : "text-white shadow-lg"
                       }`}
-                    style={!(isUpdatingProfile || !profileFormData.name.trim() || !profileFormData.email.trim()) ? { backgroundColor: currentTheme.primary[2] } : {}}>
+                    style={!(isUpdatingProfile || !profileFormData.name.trim()) ? { backgroundColor: currentTheme.primary[2] } : {}}>
                     {isUpdatingProfile ? "Saving..." : "Save & Continue"}
                   </button>
                 </div>
@@ -1926,7 +1898,7 @@ export default function Checkout() {
         <h3 className="text-sm font-bold text-neutral-900 mb-2">Payment Method</h3>
         <div className="space-y-2">
           {/* Online Payment Option */}
-          {/* <div
+          <div
             onClick={() => setPaymentMethod("Online")}
             className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
             style={paymentMethod === "Online" 
@@ -1960,7 +1932,7 @@ export default function Checkout() {
                 </svg>
               </div>
             )}
-          </div> */}
+          </div>
 
           {/* COD Option */}
           <div
