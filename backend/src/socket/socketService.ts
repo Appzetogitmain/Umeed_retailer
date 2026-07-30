@@ -3,7 +3,7 @@ import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../services/jwtService';
 import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from '../config/corsOrigins';
-import { handleOrderAcceptance, handleOrderRejection } from '../services/orderNotificationService';
+import { handleOrderAcceptance, handleOrderRejection, notificationStates } from '../services/orderNotificationService';
 import Order from '../models/Order';
 import DeliveryTracking from '../models/DeliveryTracking';
 
@@ -226,6 +226,19 @@ export const initializeSocket = (httpServer: HttpServer) => {
                 message: 'Successfully joined delivery notifications room',
                 deliveryBoyId: normalizedDeliveryBoyId
             });
+
+            // Check if there are any active orders waiting for this delivery boy
+            for (const [orderId, state] of notificationStates.entries()) {
+                if (
+                    state.notifiedDeliveryBoys.has(normalizedDeliveryBoyId) &&
+                    !state.rejectedDeliveryBoys.has(normalizedDeliveryBoyId) &&
+                    !state.acceptedBy &&
+                    state.orderData
+                ) {
+                    console.log(`🔄 Sending pending new-order event to reconnected delivery boy ${normalizedDeliveryBoyId} for order ${orderId}`);
+                    socket.emit('new-order', state.orderData);
+                }
+            }
         });
 
         // Handle order acceptance

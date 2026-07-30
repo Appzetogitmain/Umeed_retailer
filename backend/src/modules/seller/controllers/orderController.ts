@@ -54,7 +54,12 @@ export const getOrders = asyncHandler(
         'Rejected': 'Rejected',
       };
       query.status = statusMapping[status as string] || status;
+    } else {
+      // Always exclude 'Pending' orders (= online-payment orders not yet paid)
+      // from the seller's default view. They will move to 'Received' after payment.
+      query.status = { $ne: 'Pending' };
     }
+
 
     // Search filter
     if (search) {

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Payment from '../models/Payment';
 import Order from '../models/Order';
 import mongoose from 'mongoose';
+import { Server as SocketIOServer } from 'socket.io';
 
 // Initialize Razorpay instance
 const getRazorpayInstance = () => {
@@ -111,7 +112,8 @@ export const capturePayment = async (
     orderId: string,
     razorpayOrderId: string,
     razorpayPaymentId: string,
-    razorpaySignature: string
+    razorpaySignature: string,
+    io?: SocketIOServer
 ) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -184,8 +186,7 @@ export const capturePayment = async (
         // Update order
         order.paymentStatus = 'Paid';
         order.paymentId = razorpayPaymentId;
-        // Keep status as Placed/Received or whatever was set.
-        // Usually, online payment orders start as 'Pending' and move to 'Received'
+        // Move from 'Pending' (awaiting payment) to 'Received' (visible to sellers)
         if (order.status === 'Pending') {
             order.status = 'Received';
         }
@@ -194,6 +195,20 @@ export const capturePayment = async (
         await session.commitTransaction();
         session.endSession();
         isSessionEnded = true;
+
+        // Notify sellers NOW that payment is confirmed — this is the first time
+        // sellers learn about an online-payment order.
+        if (io) {
+            try {
+                const { notifySellersOfOrderUpdate } = await import('./sellerNotificationService');
+                const savedOrder = await Order.findById(orderId).lean();
+                if (savedOrder) {
+                    await notifySellersOfOrderUpdate(io, savedOrder, 'NEW_ORDER');
+                }
+            } catch (notifErr) {
+                console.error('Error notifying sellers after payment:', notifErr);
+            }
+        }
 
         // Trigger creation of Pending commissions post-commit (outside transaction to avoid deadlocks)
         try {

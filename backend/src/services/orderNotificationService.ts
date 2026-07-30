@@ -5,6 +5,7 @@ import Seller from '../models/Seller';
 import DeliveryTracking from '../models/DeliveryTracking';
 import mongoose from 'mongoose';
 import { notifySellersOfOrderUpdate } from './sellerNotificationService';
+import { sendNotificationToDeliveryBoy } from '../utils/pushNotificationHelper';
 
 // Track order notification state
 export interface OrderNotificationState {
@@ -12,6 +13,7 @@ export interface OrderNotificationState {
     notifiedDeliveryBoys: Set<string>;
     rejectedDeliveryBoys: Set<string>;
     acceptedBy: string | null;
+    orderData?: any;
 }
 
 export const notificationStates = new Map<string, OrderNotificationState>();
@@ -372,24 +374,44 @@ export async function notifyDeliveryBoysOfNewOrder(
         const orderId = order._id.toString();
         const notifiedIds = new Set<string>();
 
-        // Only add delivery boys who are actually connected to the notification room
+        // We will send push notifications and socket events
+        const pushNotificationPayload = {
+            notification: {
+                title: 'New Delivery Request!',
+                body: `Order #${order.orderNumber} is ready for pickup.`,
+            },
+            data: {
+                type: 'NEW_ORDER',
+                orderId: orderId,
+                orderNumber: order.orderNumber,
+                url: `/delivery/dashboard`
+            },
+        };
+
+        // Notify all eligible nearby delivery boys
         for (const id of nearbyDeliveryBoyIds) {
             const idString = id.toString().trim();
             const roomName = `delivery-${idString}`;
             const room = io.sockets.adapter.rooms.get(roomName);
 
+            // Always send push notification to all eligible delivery boys
+            // so they receive it in the background/outside the app
+            await sendNotificationToDeliveryBoy(idString, pushNotificationPayload).catch(err => {
+                console.error(`Failed to send push notification to ${idString}:`, err);
+            });
+            notifiedIds.add(idString);
+
+            // Send socket event if they are connected to the room
             if (room && room.size > 0) {
-                notifiedIds.add(idString);
                 io.to(roomName).emit('new-order', orderData);
                 console.log(`📤 Emitted new-order to connected delivery boy room: ${roomName}`);
             } else {
-                console.log(`⏩ Skipping disconnected delivery boy: ${idString}`);
+                console.log(`⏩ Delivery boy offline from socket, but push notification sent: ${idString}`);
             }
         }
 
         if (notifiedIds.size === 0) {
-            console.log('⚠️ No connected delivery boys found to notify');
-            // Don't emit to general room as it includes offline delivery boys
+            console.log('⚠️ No eligible delivery boys found to notify');
             return;
         }
 
@@ -398,12 +420,10 @@ export async function notifyDeliveryBoysOfNewOrder(
             notifiedDeliveryBoys: notifiedIds,
             rejectedDeliveryBoys: new Set(),
             acceptedBy: null,
+            orderData: orderData,
         });
 
-        // Only notify individual active delivery boys, not the general room
-        // This prevents offline delivery boys from receiving notifications
-
-        console.log(`📢 Notified ${notifiedIds.size} connected delivery boys near seller locations about order ${order.orderNumber}`);
+        console.log(`📢 Notified ${notifiedIds.size} delivery boys near seller locations about order ${order.orderNumber}`);
     } catch (error) {
         console.error('Error notifying delivery boys:', error);
     }

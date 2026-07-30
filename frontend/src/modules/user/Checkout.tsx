@@ -2126,7 +2126,9 @@ export default function Checkout() {
             amount={grandTotal}
             customerDetails={{
               name: user.name || "Customer",
-              email: user.email || "",
+              // Razorpay requires an email for receipt generation.
+              // Use a dummy fallback so users without an email aren't blocked.
+              email: user.email || "customer@speedoo.com",
               phone: user.phone || "",
             }}
             onSuccess={(paymentId) => {

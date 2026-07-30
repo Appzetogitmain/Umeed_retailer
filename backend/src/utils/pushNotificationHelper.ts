@@ -45,3 +45,46 @@ export async function sendNotificationToUser(userId: string, payload: PushNotifi
         // Non-blocking error
     }
 }
+
+/**
+ * Send notification to a specific delivery boy
+ * @param deliveryBoyId - The ID of the delivery boy to send to
+ * @param payload - Notification payload
+ * @param includeMobile - Whether to include mobile tokens (default true)
+ */
+export async function sendNotificationToDeliveryBoy(deliveryBoyId: string, payload: PushNotificationPayload, includeMobile: boolean = true) {
+    try {
+        const Delivery = (await import('../models/Delivery')).default;
+        const deliveryBoy = await Delivery.findById(deliveryBoyId);
+        
+        if (!deliveryBoy) {
+            console.warn(`Delivery boy not found for notification: ${deliveryBoyId}`);
+            return;
+        }
+
+        let tokens: string[] = [];
+
+        // Add Web Tokens
+        if (deliveryBoy.settings?.notifications !== false && deliveryBoy.fcmTokens && deliveryBoy.fcmTokens.length > 0) {
+            tokens = [...tokens, ...deliveryBoy.fcmTokens];
+        }
+
+        // Add Mobile Tokens
+        if (includeMobile && deliveryBoy.settings?.notifications !== false && deliveryBoy.fcmTokenMobile && deliveryBoy.fcmTokenMobile.length > 0) {
+            tokens = [...tokens, ...deliveryBoy.fcmTokenMobile];
+        }
+
+        // Remove duplicates
+        const uniqueTokens = [...new Set(tokens)];
+
+        if (uniqueTokens.length === 0) {
+            return; // No tokens to send to
+        }
+
+        console.log(`Sending notification to delivery boy ${deliveryBoyId} (${uniqueTokens.length} tokens)`);
+        await sendPushNotification(uniqueTokens, payload);
+    } catch (error) {
+        console.error(`Error sending notification to delivery boy ${deliveryBoyId}:`, error);
+        // Non-blocking error
+    }
+}

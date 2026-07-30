@@ -86,7 +86,8 @@ router.post('/verify', authenticate, requireUserType('Customer'), async (req: Re
             orderId,
             razorpayOrderId,
             razorpayPaymentId,
-            razorpaySignature
+            razorpaySignature,
+            req.app.get('io') as any // Pass Socket.io to notify sellers after payment
         );
 
         if (!result.success) {

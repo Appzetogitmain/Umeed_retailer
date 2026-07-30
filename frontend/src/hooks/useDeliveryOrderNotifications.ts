@@ -12,17 +12,55 @@ interface NotificationState {
     error: string | null;
 }
 
+const STORAGE_KEY = 'delivery_order_notifications';
+
+const loadPersistedNotifications = (): Partial<NotificationState> => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            return {
+                currentNotification: parsed.currentNotification || null,
+                notificationQueue: parsed.notificationQueue || [],
+            };
+        }
+    } catch (e) {
+        console.error('Error loading persisted notifications', e);
+    }
+    return {};
+};
+
+const savePersistedNotifications = (currentNotification: OrderNotificationData | null, notificationQueue: OrderNotificationData[]) => {
+    try {
+        if (!currentNotification && notificationQueue.length === 0) {
+            localStorage.removeItem(STORAGE_KEY);
+        } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ currentNotification, notificationQueue }));
+        }
+    } catch (e) {
+        console.error('Error saving persisted notifications', e);
+    }
+};
+
 const MAX_RECONNECT_ATTEMPTS = 5;
 const INITIAL_RECONNECT_DELAY = 2000;
 
 export const useDeliveryOrderNotifications = () => {
     const { isAuthenticated, user } = useAuth();
+    
+    // Initialize state with persisted notifications if they exist
+    const persisted = loadPersistedNotifications();
     const [state, setState] = useState<NotificationState>({
-        currentNotification: null,
-        notificationQueue: [],
+        currentNotification: persisted.currentNotification || null,
+        notificationQueue: persisted.notificationQueue || [],
         isConnected: false,
         error: null,
     });
+
+    // Save to local storage whenever notifications change
+    useEffect(() => {
+        savePersistedNotifications(state.currentNotification, state.notificationQueue);
+    }, [state.currentNotification, state.notificationQueue]);
 
     const socketRef = useRef<Socket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
