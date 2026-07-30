@@ -87,12 +87,12 @@ export const createTax = asyncHandler(async (req: Request, res: Response) => {
         });
     }
 
-    // Check if tax with same name already exists
-    const existingTax = await Tax.findOne({ name });
+    // Check if tax with same name AND percentage already exists
+    const existingTax = await Tax.findOne({ name, percentage });
     if (existingTax) {
         return res.status(409).json({
             success: false,
-            message: "Tax with this name already exists",
+            message: "Tax with this name and percentage already exists",
         });
     }
 
@@ -124,17 +124,26 @@ export const updateTax = asyncHandler(async (req: Request, res: Response) => {
         });
     }
 
-    // Check if name is being changed and if it conflicts with another tax
-    if (name && name !== tax.name) {
-        const existingTax = await Tax.findOne({ name, _id: { $ne: id } });
+    // Check if the combination of name and percentage conflicts with another tax
+    const updatedName = name || tax.name;
+    const updatedPercentage = percentage !== undefined ? percentage : tax.percentage;
+
+    if (name !== undefined || percentage !== undefined) {
+        const existingTax = await Tax.findOne({ 
+            name: updatedName, 
+            percentage: updatedPercentage,
+            _id: { $ne: id } 
+        });
+        
         if (existingTax) {
             return res.status(409).json({
                 success: false,
-                message: "Tax with this name already exists",
+                message: "Tax with this name and percentage already exists",
             });
         }
-        tax.name = name;
     }
+
+    if (name) tax.name = name;
 
     if (percentage !== undefined) {
         tax.percentage = percentage;

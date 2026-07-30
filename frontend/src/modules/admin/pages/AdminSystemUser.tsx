@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getAllSystemUsers,
   createSystemUser,
@@ -311,7 +312,7 @@ export default function AdminSystemUser() {
             <h1 className="text-2xl font-semibold text-neutral-800">System User</h1>
           </div>
           <div className="text-sm text-blue-500">
-            <span className="text-blue-500 hover:underline cursor-pointer">Home</span>{' '}
+            <Link to="/admin" className="text-blue-500 hover:underline">Home</Link>{' '}
             <span className="text-neutral-400">/</span> Dashboard
           </div>
         </div>

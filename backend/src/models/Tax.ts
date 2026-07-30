@@ -15,7 +15,6 @@ const taxSchema = new Schema<ITax>(
             type: String,
             required: [true, "Tax name is required"],
             trim: true,
-            unique: true,
         },
         percentage: {
             type: Number,
@@ -36,7 +35,7 @@ const taxSchema = new Schema<ITax>(
 
 // Index for faster queries
 taxSchema.index({ status: 1 });
-// taxSchema.index({ name: 1 });
+taxSchema.index({ name: 1, percentage: 1 }, { unique: true });
 
 const Tax = model<ITax>("Tax", taxSchema);
 

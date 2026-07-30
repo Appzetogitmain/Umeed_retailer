@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DashboardCard from "../components/DashboardCard";
 import OrderChart from "../components/OrderChart";
@@ -517,14 +518,14 @@ export default function AdminDashboard() {
           title="Product Sold Out"
           value={stats.soldOutProducts}
           accentColor="#ec4899"
-          onClick={() => navigate("/admin/stock", { state: { filterStock: "Out of Stock" } })}
+          onClick={() => navigate("/admin/product/list", { state: { filterStock: "Out of Stock" } })}
         />
         <DashboardCard
           icon={lowStockIcon}
           title="Product low on Stock"
           value={stats.lowStockProducts}
           accentColor="#eab308"
-          onClick={() => navigate("/admin/stock", { state: { filterStock: "Low Stock" } })}
+          onClick={() => navigate("/admin/product/list", { state: { filterStock: "Low Stock" } })}
         />
       </div>
 
@@ -769,6 +770,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-4 sm:px-6 py-3">
                         <button
+                          onClick={() => navigate(`/admin/orders/${order.id}`)}
                           className="bg-teal-600 hover:bg-teal-700 text-white p-2 rounded transition-colors"
                           aria-label="View order">
                           <svg

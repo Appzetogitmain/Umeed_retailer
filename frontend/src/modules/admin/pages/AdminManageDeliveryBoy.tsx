@@ -7,6 +7,7 @@ import {
     type DeliveryBoy,
 } from '../../../services/api/admin/adminDeliveryService';
 import { useAuth } from '../../../context/AuthContext';
+import useScrollLock from '../../../hooks/useScrollLock';
 
 export default function AdminManageDeliveryBoy() {
     const { isAuthenticated, token } = useAuth();
@@ -28,6 +29,8 @@ export default function AdminManageDeliveryBoy() {
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [showRejectInput, setShowRejectInput] = useState(false);
+
+    useScrollLock(isDetailModalOpen);
 
     // Debounce search term and fetch delivery boys
     useEffect(() => {

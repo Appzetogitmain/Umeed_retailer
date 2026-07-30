@@ -18,6 +18,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RouteTransition from "./components/RouteTransition";
 import ScrollToTop from "./components/ScrollToTop";
+import NotFound from "./components/NotFound";
 
 // Critical routes - load immediately (Home, Cart, Checkout)
 import Home from "./modules/user/Home";
@@ -953,6 +954,7 @@ function AppContent() {
                                     path="/store/hobby"
                                     element={<HobbyStore />}
                                   />
+                                  <Route path="*" element={<NotFound />} />
                                 </Routes>
                               </Suspense>
                             </AppLayout>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { uploadImage } from "../../../services/api/uploadService";
 import {
   validateImageFile,
@@ -482,9 +483,9 @@ export default function AdminShopByStore() {
         </h1>
           </div>
         <div className="text-sm text-blue-500">
-          <span className="text-blue-500 hover:underline cursor-pointer">
+          <Link to="/admin" className="text-blue-500 hover:underline">
             Home
-          </span>{" "}
+          </Link>{" "}
           <span className="text-neutral-400">/</span> Dashboard
         </div>
       </div>

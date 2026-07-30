@@ -521,35 +521,14 @@ const SellerAccountSettings = () => {
                           <div>
                             <h3 className="text-xl font-bold text-gray-900">{sellerData.storeName || 'Store Name'}</h3>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700 uppercase tracking-wide">
-                                {sellerData.category || 'Category'}
-                              </span>
+                              {/* Category removed */}
                             </div>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <InputGroup label="Store Name" name="storeName" value={sellerData.storeName} onChange={handleInputChange} onBlur={() => validateField("storeName", sellerData.storeName)} error={fieldErrors.storeName} disabled={!isEditing} />
-
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 ml-1">Store Category</label>
-                            <div className="relative">
-                              <select
-                                name="category"
-                                value={sellerData.category}
-                                onChange={handleInputChange}
-                                disabled={!isEditing}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none disabled:bg-gray-50/50 disabled:text-gray-500 transition-all appearance-none bg-white"
-                              >
-                                <option value="">Select Category</option>
-                                {categories.map(cat => (
-                                  <option key={cat._id} value={cat.name}>{cat.name}</option>
-                                ))}
-                              </select>
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                              </div>
-                            </div>
+                          <div className="md:col-span-2">
+                            <InputGroup label="Store Name" name="storeName" value={sellerData.storeName} onChange={handleInputChange} onBlur={() => validateField("storeName", sellerData.storeName)} error={fieldErrors.storeName} disabled={!isEditing} />
                           </div>
 
                           <div className="md:col-span-2 space-y-1.5">

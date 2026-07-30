@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getAllSellers, updateSellerStatus, deleteSeller, Seller as SellerType, updateSeller } from '../../../services/api/sellerService';
 import SellerServiceMap from '../components/SellerServiceMap';
+import useScrollLock from '../../../hooks/useScrollLock';
 
 interface Seller {
     _id: string;
@@ -101,7 +102,7 @@ export default function AdminManageSellerList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortColumn, setSortColumn] = useState<string | null>('id');
+    const [sortColumn, setSortColumn] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [isExportOpen, setIsExportOpen] = useState(false);
     const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
@@ -110,6 +111,8 @@ export default function AdminManageSellerList() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdatingRadius, setIsUpdatingRadius] = useState(false);
     const [newRadius, setNewRadius] = useState<number>(10);
+
+    useScrollLock(isModalOpen || isEditModalOpen);
 
     // Fetch sellers from backend
     useEffect(() => {

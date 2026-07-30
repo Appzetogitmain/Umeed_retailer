@@ -114,3 +114,8 @@ video {
   }
 }
 
+/* Hide native calendar icon in date inputs since we use a custom SVG button */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getNotifications,
   createNotification,
@@ -246,7 +247,7 @@ export default function AdminNotification() {
             <h1 className="text-2xl font-semibold text-neutral-800">Notification</h1>
           </div>
           <div className="text-sm">
-            <span className="text-blue-600 hover:underline cursor-pointer">Home</span>
+            <Link to="/admin" className="text-blue-600 hover:underline">Home</Link>
             <span className="text-neutral-400 mx-1">/</span>
             <span className="text-neutral-600">Notification</span>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Input } from "../../../components/ui/input";
 import { jsPDF } from "jspdf";
 import {
@@ -22,13 +22,14 @@ type SortDirection = "asc" | "desc";
 
 export default function AdminAllOrders() {
   const { isAuthenticated, token } = useAuth();
+  const location = useLocation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const fromDateRef = useRef<HTMLInputElement>(null);
   const toDateRef = useRef<HTMLInputElement>(null);
   const [seller, setSeller] = useState("All Sellers");
-  const [status, setStatus] = useState("All Status");
+  const [status, setStatus] = useState(location.state?.status || "All Status");
   const [entriesPerPage, setEntriesPerPage] = useState("10");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +59,14 @@ export default function AdminAllOrders() {
 
     fetchSellers();
   }, [isAuthenticated, token]);
+
+  // Update status if navigating from another page with state
+  useEffect(() => {
+    if (location.state?.status) {
+      setStatus(location.state.status);
+      setCurrentPage(1);
+    }
+  }, [location.state?.status]);
 
   // Fetch orders on component mount
   useEffect(() => {

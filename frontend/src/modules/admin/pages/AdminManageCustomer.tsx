@@ -9,6 +9,8 @@ import {
   type Customer,
 } from "../../../services/api/admin/adminCustomerService";
 import { useAuth } from "../../../context/AuthContext";
+import useScrollLock from "../../../hooks/useScrollLock";
+import { Link } from "react-router-dom";
 
 type SortField =
   | "id"
@@ -58,24 +60,7 @@ export default function AdminManageCustomer() {
   }, []);
 
   // Prevent background scrolling when modal is open
-  useEffect(() => {
-    const handleScrollPrevent = (e: Event) => {
-      e.preventDefault();
-    };
-
-    if (isModalOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("wheel", handleScrollPrevent, { passive: false });
-      window.addEventListener("touchmove", handleScrollPrevent, { passive: false });
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("wheel", handleScrollPrevent);
-      window.removeEventListener("touchmove", handleScrollPrevent);
-    };
-  }, [isModalOpen]);
+  useScrollLock(isModalOpen);
 
   // Fetch customers on component mount
   useEffect(() => {
@@ -319,7 +304,7 @@ export default function AdminManageCustomer() {
             </h1>
           </div>
           <div className="text-sm text-neutral-600">
-            <span className="text-blue-600">Home</span> /{" "}
+            <Link to="/admin" className="text-blue-600 hover:underline">Home</Link> /{" "}
             <span className="text-neutral-900">Manage Customer</span>
           </div>
         </div>

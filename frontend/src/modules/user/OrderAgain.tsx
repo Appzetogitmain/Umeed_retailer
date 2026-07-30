@@ -77,7 +77,7 @@ export default function OrderAgain() {
 
           <>
             <h2 className="text-lg font-black text-neutral-900 mb-4 px-1">Previously Ordered Items</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
               {previousProducts.map((product) => {
                 const { displayPrice, mrp, discount, hasDiscount } = calculateProductPrice(product);
                 const cartItem = cart.items.find(item => item?.product && item.product.id === product.id);

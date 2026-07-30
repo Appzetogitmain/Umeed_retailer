@@ -347,9 +347,9 @@ export default function ProductDetail() {
       </div>
 
       {/* Scrollable content */}
-      <div className="pt-16 lg:grid lg:grid-cols-2 lg:gap-8 lg:px-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+      <div className="pt-16 md:grid md:grid-cols-2 md:gap-8 md:px-8 max-w-7xl mx-auto pb-24 md:pb-8">
         {/* Left Column (Image Gallery & Banner) */}
-        <div className="lg:sticky lg:top-24 h-fit flex flex-col gap-4">
+        <div className="md:sticky md:top-24 h-fit flex flex-col gap-4">
           {/* Location Availability Banner */}
           {!isAvailableAtLocation && (
           <div className="bg-amber-50 border-l-4 border-amber-500 px-4 py-3 mx-4 mt-4 rounded-r-lg">
@@ -575,7 +575,7 @@ export default function ProductDetail() {
         {/* Right Column (Product Details & Reviews) */}
         <div className="flex flex-col">
         {/* Product Details Card - White section */}
-        <div className="bg-white rounded-t-3xl lg:rounded-none -mt-6 lg:mt-0 relative z-10 px-4 md:px-6 lg:px-0 pt-2.5 md:pt-4 pb-2 md:pb-4">
+        <div className="bg-white rounded-t-3xl md:rounded-none -mt-6 md:mt-0 relative z-10 px-4 md:px-8 pt-2.5 md:pt-4 pb-2 md:pb-4">
           {/* Delivery time */}
           <div className="flex items-center gap-0.5 mb-1">
             <svg
@@ -681,7 +681,7 @@ export default function ProductDetail() {
             )}
 
           {/* Desktop Add to Cart */}
-          <div className="hidden lg:flex items-center gap-4 mt-6 mb-4">
+          <div className="hidden md:flex items-center gap-4 mt-6 mb-4">
             <AnimatePresence mode="wait">
               {inCartQty === 0 ? (
                 <motion.div
@@ -773,7 +773,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Divider line */}
-          <div className="border-t border-neutral-200 mb-1.5 lg:hidden"></div>
+          <div className="border-t border-neutral-200 mb-1.5 md:hidden"></div>
 
           {/* View product details link */}
           <button
@@ -1093,7 +1093,7 @@ export default function ProductDetail() {
         )}
 
         {/* Reviews Section */}
-        <div className="bg-white px-4 md:px-6 lg:px-8 py-6 border-t border-neutral-100">
+        <div className="bg-white px-4 md:px-8 py-6 border-t border-neutral-100">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-neutral-900">
               Ratings & Reviews
@@ -1168,7 +1168,7 @@ export default function ProductDetail() {
 
         {/* Top products in this category */}
         {similarProducts.length > 0 && (
-          <div className="mt-6 mb-24 lg:mb-0 lg:col-span-2">
+          <div className="mt-6 mb-24 md:mb-0 md:col-span-2">
             <div className="bg-neutral-100/50 border-t border-b border-neutral-200/50 py-4 px-3">
               <h3 className="text-lg font-semibold text-neutral-900 mb-4 px-1">
                 Top products in this category

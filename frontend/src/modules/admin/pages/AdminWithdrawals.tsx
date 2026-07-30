@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../../../context/ToastContext';
+import useScrollLock from '../../../hooks/useScrollLock';
 import {
     getWithdrawalRequests,
     getWithdrawalStats,
@@ -67,6 +68,8 @@ export default function AdminWithdrawals() {
     const [adminNotes, setAdminNotes] = useState('');
     const [rejectReason, setRejectReason] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    useScrollLock(showApproveModal || showRejectModal || showDetailsModal);
 
     useEffect(() => {
         fetchData();

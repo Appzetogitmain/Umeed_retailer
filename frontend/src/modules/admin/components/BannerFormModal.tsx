@@ -9,6 +9,7 @@ import {
   createImagePreview,
 } from "../../../utils/imageUpload";
 import { type HeaderCategory } from "../../../services/api/headerCategoryService";
+import useScrollLock from "../../../hooks/useScrollLock";
 
 interface BannerFormModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export default function BannerFormModal({
   mode,
   headerCategories,
 }: BannerFormModalProps) {
+  useScrollLock(isOpen);
   const [formData, setFormData] = useState<BannerFormData>({
     title: "",
     image: "",

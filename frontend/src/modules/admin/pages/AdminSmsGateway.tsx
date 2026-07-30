@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface SmsGateway {
   id: string;
@@ -92,7 +93,7 @@ export default function AdminSmsGateway() {
           </div>
           </div>
           <div className="text-sm text-neutral-600">
-            <span className="text-blue-600">Home</span> / <span className="text-neutral-900">SMS Gateway</span>
+            <Link to="/admin" className="text-blue-600 hover:underline">Home</Link> / <span className="text-neutral-900">SMS Gateway</span>
           </div>
         </div>
       </div>

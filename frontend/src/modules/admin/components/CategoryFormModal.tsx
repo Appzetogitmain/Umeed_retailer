@@ -4,6 +4,7 @@ import {
   CreateCategoryData,
   UpdateCategoryData,
 } from "../../../services/api/admin/adminProductService";
+import useScrollLock from "../../../hooks/useScrollLock";
 import { uploadImage } from "../../../services/api/uploadService";
 import {
   validateImageFile,
@@ -180,23 +181,7 @@ export default function CategoryFormModal({
   }, [isOpen, mode, category, parentCategory]);
 
   // Prevent background scrolling when modal is open
-  useEffect(() => {
-    const handleScrollPrevent = (e: Event) => {
-      e.preventDefault();
-    };
-
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("wheel", handleScrollPrevent, { passive: false });
-      window.addEventListener("touchmove", handleScrollPrevent, { passive: false });
-    }
-    
-    return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("wheel", handleScrollPrevent);
-      window.removeEventListener("touchmove", handleScrollPrevent);
-    };
-  }, [isOpen]);
+  useScrollLock(isOpen);
 
   const handleInputChange = (
     e: React.ChangeEvent<

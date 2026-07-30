@@ -110,6 +110,14 @@ export default function AdminStockManagement() {
     filterStatus,
   ]);
 
+  // Update filterStock if navigating from another page with state
+  useEffect(() => {
+    if (location.state?.filterStock) {
+      setFilterStock(location.state.filterStock);
+      setCurrentPage(1);
+    }
+  }, [location.state?.filterStock]);
+
   const handleDelete = async (productId: string) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {

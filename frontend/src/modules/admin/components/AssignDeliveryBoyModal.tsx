@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getDeliveryBoys, type DeliveryBoy } from '../../../services/api/admin/adminDeliveryService';
 import { assignDeliveryBoy } from '../../../services/api/admin/adminOrderService';
+import useScrollLock from '../../../hooks/useScrollLock';
 
 interface AssignDeliveryBoyModalProps {
     isOpen: boolean;
@@ -19,6 +20,8 @@ export default function AssignDeliveryBoyModal({
     currentDeliveryBoy,
     onAssignSuccess,
 }: AssignDeliveryBoyModalProps) {
+    useScrollLock(isOpen);
+
     const [deliveryBoys, setDeliveryBoys] = useState<DeliveryBoy[]>([]);
     const [selectedDeliveryBoyId, setSelectedDeliveryBoyId] = useState<string>('');
     const [loading, setLoading] = useState(false);

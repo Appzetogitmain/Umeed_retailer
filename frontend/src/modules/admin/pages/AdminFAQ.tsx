@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   getFAQs,
   createFAQ,
@@ -250,13 +251,11 @@ export default function AdminFAQ() {
             <h1 className="text-2xl font-semibold text-neutral-800">FAQ</h1>
           </div>
           <div className="text-sm text-blue-500">
-            <span className="text-blue-500 hover:underline cursor-pointer">
+            <Link to="/admin" className="text-blue-500 hover:underline">
               Home
-            </span>{" "}
+            </Link>{" "}
             <span className="text-neutral-400">/</span>{" "}
-            <span className="text-blue-500 hover:underline cursor-pointer">
-              Dashboard
-            </span>
+            <span className="text-neutral-600">FAQ</span>
           </div>
         </div>
       </div>

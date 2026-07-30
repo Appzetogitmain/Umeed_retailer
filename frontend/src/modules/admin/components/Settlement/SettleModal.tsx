@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import useScrollLock from '../../../../hooks/useScrollLock';
 
 interface Seller {
   _id: string;
@@ -23,6 +24,7 @@ const SettleModal: React.FC<SettleModalProps> = ({
   onSubmit, 
   submitting 
 }) => {
+  useScrollLock(isOpen);
   const [formData, setFormData] = useState({
     sellerId: '',
     amount: '',

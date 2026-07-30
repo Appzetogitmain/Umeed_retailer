@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getProfile, updateProfile, type AdminProfile as AdminProfileType } from '../../../services/api/admin/adminProfileService';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -166,7 +167,7 @@ export default function AdminProfile() {
           </div>
                     </div>
                     <div className="text-sm text-neutral-600">
-                        <span className="text-blue-600">Home</span> /{' '}
+                        <Link to="/admin" className="text-blue-600 hover:underline">Home</Link> /{' '}
                         <span className="text-neutral-900">Profile</span>
                     </div>
                 </div>

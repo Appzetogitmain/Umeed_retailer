@@ -7,6 +7,7 @@ import {
 } from "../../../services/api/admin/adminMiscService";
 import { getDeliveryBoys, type DeliveryBoy } from "../../../services/api/admin/adminDeliveryService";
 import { useAuth } from "../../../context/AuthContext";
+import useScrollLock from "../../../hooks/useScrollLock";
 
 export default function AdminReturnRequest() {
   const { isAuthenticated, token } = useAuth();
@@ -33,6 +34,8 @@ export default function AdminReturnRequest() {
   const [transactionIdInput, setTransactionIdInput] = useState("");
   const [submittingAction, setSubmittingAction] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  useScrollLock(showDetailsModal);
 
   // Fetch Delivery Boys for manual assignment
   useEffect(() => {

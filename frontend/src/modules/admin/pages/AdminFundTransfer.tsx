@@ -7,6 +7,7 @@ import {
 import { getDeliveryBoys } from "../../../services/api/admin/adminDeliveryService";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
+import useScrollLock from "../../../hooks/useScrollLock";
 
 interface Transaction {
   id: string;
@@ -62,6 +63,8 @@ export default function AdminFundTransfer() {
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+
+  useScrollLock(isModalOpen);
 
   // Fetch delivery boys on component mount
   useEffect(() => {

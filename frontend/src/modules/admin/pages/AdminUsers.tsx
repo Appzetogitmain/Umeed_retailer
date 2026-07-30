@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getUsers, updateUserStatus, type User as UserType } from '../../../services/api/admin/adminMiscService';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -138,7 +139,7 @@ export default function AdminUsers() {
     const displayedUsers = users;
     const startIndex = (currentPage - 1) * entriesPerPage;
 
-    const handleStatusChange = async (userId: string, newStatus: 'Active' | 'Suspended') => {
+    const handleStatusChange = async (userId: string, newStatus: 'Active' | 'Inactive') => {
         try {
             const response = await updateUserStatus(userId, newStatus);
 
@@ -196,7 +197,7 @@ export default function AdminUsers() {
             <h1 className="text-2xl font-semibold text-teal-800">User List</h1>
           </div>
                     <div className="text-sm text-blue-500">
-                        <span className="text-blue-500 hover:underline cursor-pointer">Home</span>{' '}
+                        <Link to="/admin" className="text-blue-500 hover:underline">Home</Link>{' '}
                         <span className="text-neutral-400">/</span> User List
                     </div>
                 </div>
@@ -339,7 +340,7 @@ export default function AdminUsers() {
                                             <td className="p-4 align-middle">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.status === 'Active'
                                                     ? 'bg-green-100 text-green-800'
-                                                    : user.status === 'Suspended'
+                                                    : user.status === 'Inactive'
                                                         ? 'bg-red-100 text-red-800'
                                                         : 'bg-yellow-100 text-yellow-800'
                                                     }`}>
@@ -353,7 +354,7 @@ export default function AdminUsers() {
                                             <td className="p-4 align-middle">
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => handleStatusChange(user._id, user.status === 'Active' ? 'Suspended' : 'Active')}
+                                                        onClick={() => handleStatusChange(user._id, user.status === 'Active' ? 'Inactive' : 'Active')}
                                                         className={`p-1.5 text-white rounded transition-colors ${user.status === 'Active'
                                                             ? 'bg-red-600 hover:bg-red-700'
                                                             : 'bg-green-600 hover:bg-green-700'
