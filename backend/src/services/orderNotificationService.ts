@@ -376,14 +376,12 @@ export async function notifyDeliveryBoysOfNewOrder(
 
         // We will send push notifications and socket events
         const pushNotificationPayload = {
-            notification: {
-                title: 'New Delivery Request!',
-                body: `Order #${order.orderNumber} is ready for pickup.`,
-            },
+            title: 'New Delivery Request!',
+            body: `Order #${order.orderNumber} is ready for pickup.`,
             data: {
                 type: 'NEW_ORDER',
-                orderId: orderId,
-                orderNumber: order.orderNumber,
+                orderId: String(orderId),
+                orderNumber: String(order.orderNumber),
                 url: `/delivery/dashboard`
             },
         };
