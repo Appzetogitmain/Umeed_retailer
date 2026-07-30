@@ -142,7 +142,19 @@ export const useDeliveryTracking = (orderId: string | undefined) => {
             }))
         })
 
-        // Listen for order status updates
+        // Listen for generic order status updates
+        socket.on('order-status-updated', (data: any) => {
+            console.log('🔄 Order status updated:', data)
+            if (data.status) {
+                setTrackingData(prev => ({
+                    ...prev,
+                    orderStatus: data.status,
+                    lastUpdate: new Date(),
+                }))
+            }
+        })
+
+        // Listen for specific order status updates
         socket.on('order-taken', (data: any) => {
             console.log('📦 Order picked up from seller:', data)
             setTrackingData(prev => ({

@@ -326,12 +326,24 @@ export const updateOrderStatus = asyncHandler(
         }
     }
 
-    // Trigger processOrderStatusTransition for full commission distribution, inventory updates, etc.
     try {
         const { processOrderStatusTransition } = await import("../../../services/orderService");
         await processOrderStatusTransition(id, mappedStatus, previousStatus);
     } catch (transitionError: any) {
         console.error('Error processing order status transition in seller updateOrderStatus:', transitionError);
+    }
+
+    // Emit real-time status update to the tracking page
+    try {
+        const io: SocketIOServer = (req.app.get("io") as SocketIOServer);
+        if (io) {
+            io.to(`order-${order._id}`).emit('order-status-updated', {
+                orderId: order._id,
+                status: mappedStatus,
+            });
+        }
+    } catch (socketError) {
+        console.error('Error emitting order status update:', socketError);
     }
 
     return res.status(200).json({
