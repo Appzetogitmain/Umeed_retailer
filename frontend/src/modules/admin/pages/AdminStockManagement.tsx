@@ -7,6 +7,7 @@ import {
   type Product,
   type Category,
 } from "../../../services/api/admin/adminProductService";
+import { normalizeImageUrl } from "../../../utils/imageUrl";
 import { useAuth } from "../../../context/AuthContext";
 
 interface ProductVariation {
@@ -173,7 +174,7 @@ export default function AdminStockManagement() {
             name: product.productName,
             seller: sellerName,
             sellerId: sellerId,
-            image: product.mainImage || product.galleryImages[0] || "",
+            image: normalizeImageUrl(product.mainImage || product.galleryImages[0] || "") || "",
             variation: `${variation.name}: ${variation.value}`,
             stock:
               variation.stock !== undefined
@@ -192,7 +193,7 @@ export default function AdminStockManagement() {
           name: product.productName,
           seller: sellerName,
           sellerId: sellerId,
-          image: product.mainImage || product.galleryImages[0] || "",
+          image: normalizeImageUrl(product.mainImage || product.galleryImages[0] || "") || "",
           variation: "Default",
           stock: product.stock || 0,
           status: product.publish ? "Published" : "Unpublished",

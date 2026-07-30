@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { calculateProductPrice } from '../../utils/priceUtils';
 import { useAuth } from '../../context/AuthContext';
 import AuthPrompt from '../../components/AuthPrompt';
-
+import { normalizeImageUrl } from '../../utils/imageUrl';
 
 export default function Wishlist() {
   const { isAuthenticated } = useAuth();
@@ -36,7 +36,7 @@ export default function Wishlist() {
           ...p,
           id: p._id || (p as any).id,
           name: p.productName || (p as any).name || 'Unknown Product',
-          imageUrl: p.mainImageUrl || p.mainImage || (p as any).imageUrl,
+          imageUrl: normalizeImageUrl(p.mainImageUrl || p.mainImage || (p as any).imageUrl),
           price: (p as any).price || (p as any).variations?.[0]?.price || 0,
           pack: (p as any).pack || (p as any).variations?.[0]?.name || 'Standard'
         })) as any);

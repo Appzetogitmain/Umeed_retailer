@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { normalizeImageUrl } from "../../../utils/imageUrl";
 import { getAllReviews, updateReviewStatus, deleteReview, Review } from "../../../services/api/adminReviewService";
 
 export default function AdminReviews() {
@@ -130,7 +131,7 @@ export default function AdminReviews() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {review.product?.mainImage && (
-                          <img src={review.product.mainImage} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-100" />
+                          <img src={normalizeImageUrl(review.product.mainImage)} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-100" />
                         )}
                         <div>
                           <span className="font-medium text-gray-900 line-clamp-2 max-w-[200px]">

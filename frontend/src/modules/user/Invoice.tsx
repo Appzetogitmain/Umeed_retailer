@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Button from "../../components/ui/button";
 import { useOrders } from "../../hooks/useOrders";
 import { useThemeContext } from "../../context/ThemeContext";
+import { normalizeImageUrl } from "../../utils/imageUrl";
 
 const ArrowLeftIcon = ({ className }: { className?: string }) => (
   <svg
@@ -288,7 +289,7 @@ export default function Invoice() {
                         <div className="flex items-center gap-3">
                           {item.product?.image || item.product?.mainImage ? (
                             <img
-                              src={item.product.image || item.product.mainImage}
+                              src={normalizeImageUrl(item.product.image || item.product.mainImage)}
                               alt={productName}
                               className="w-12 h-12 object-cover rounded"
                             />

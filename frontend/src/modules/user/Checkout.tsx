@@ -36,7 +36,7 @@ import { getProducts } from "../../services/api/customerProductService";
 import { addToWishlist } from "../../services/api/customerWishlistService";
 import { updateProfile } from "../../services/api/customerService";
 import { calculateProductPrice } from "../../utils/priceUtils";
-
+import { normalizeImageUrl } from "../../utils/imageUrl";
 // const STORAGE_KEY = 'saved_address'; // Removed
 
 // Similar products helper removed - using API
@@ -249,7 +249,7 @@ export default function Checkout() {
                 id: pid,
                 _id: pid,
                 name: p.productName || p.name || "Product",
-                imageUrl: p.mainImage || p.imageUrl || p.mainImageUrl || "",
+                imageUrl: normalizeImageUrl(p.mainImage || p.imageUrl || p.mainImageUrl || ""),
                 price: displayPrice,
                 mrp: mrp,
                 pack:
@@ -1300,7 +1300,7 @@ export default function Checkout() {
                     <div className="w-full h-28 bg-neutral-100 flex items-center justify-center overflow-hidden relative">
                       {product.imageUrl || product.mainImage ? (
                         <img
-                          src={product.imageUrl || product.mainImage}
+                          src={normalizeImageUrl(product.imageUrl || product.mainImage)}
                           alt={product.name || product.productName || "Product"}
                           className="w-full h-full object-contain"
                           onError={(e) => {

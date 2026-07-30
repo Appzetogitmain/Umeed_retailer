@@ -9,6 +9,7 @@ import { calculateProductPrice } from '../../utils/priceUtils';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import AuthPrompt from '../../components/AuthPrompt';
+import { normalizeImageUrl } from '../../utils/imageUrl';
 
 
 export default function OrderAgain() {
@@ -93,7 +94,7 @@ export default function OrderAgain() {
                     {/* Image Container */}
                     <div className="relative group aspect-square bg-neutral-50 p-3 flex items-center justify-center overflow-hidden">
                       <img
-                        src={product.mainImage || product.imageUrl}
+                        src={normalizeImageUrl(product.mainImage || product.imageUrl)}
                         alt={product.productName || product.name}
                         className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                         onClick={() => navigate(`/product/${product.id}`)}

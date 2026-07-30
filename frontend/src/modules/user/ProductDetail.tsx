@@ -16,6 +16,7 @@ import { getProductById } from "../../services/api/customerProductService";
 import WishlistButton from "../../components/WishlistButton";
 import StarRating from "../../components/ui/StarRating";
 import { calculateProductPrice } from "../../utils/priceUtils";
+import { normalizeImageUrl } from "../../utils/imageUrl";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -69,10 +70,10 @@ export default function ProductDetail() {
 
           // Get all images (main + gallery)
           const allImages = [
-            productData.mainImage || productData.imageUrl || "",
+            normalizeImageUrl(productData.mainImage || productData.imageUrl || ""),
             ...(productData.galleryImages ||
               productData.galleryImageUrls ||
-              []),
+              []).map((img: string) => normalizeImageUrl(img)),
           ].filter(Boolean);
 
           setProduct({
@@ -80,7 +81,7 @@ export default function ProductDetail() {
             // Ensure all critical fields have safe defaults
             id: productData._id || productData.id,
             name: productData.productName || productData.name || "Product",
-            imageUrl: productData.mainImage || productData.imageUrl || "",
+            imageUrl: normalizeImageUrl(productData.mainImage || productData.imageUrl || ""),
             allImages: allImages,
             price: productData.price || 0,
             mrp: productData.mrp || productData.price || 0,

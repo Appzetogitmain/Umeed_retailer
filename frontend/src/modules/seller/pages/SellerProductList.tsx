@@ -13,6 +13,7 @@ import {
 import { useAuth } from "../../../context/AuthContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { normalizeImageUrl } from "../../../utils/imageUrl";
 
 // ... (interfaces remain same)
 
@@ -157,8 +158,7 @@ export default function SellerProductList() {
         productName: product.productName,
         sellerName: user?.storeName || "",
         productImage:
-          product.mainImage ||
-          product.mainImageUrl ||
+          normalizeImageUrl(product.mainImage || product.mainImageUrl) ||
           "/assets/product-placeholder.jpg",
         brandName: (product.brand as any)?.name || "-",
         category: (product.category as any)?.name || "-",
@@ -176,8 +176,7 @@ export default function SellerProductList() {
       productName: product.productName,
       sellerName: user?.storeName || "",
       productImage:
-        product.mainImage ||
-        product.mainImageUrl ||
+        normalizeImageUrl(product.mainImage || product.mainImageUrl) ||
         "/assets/product-placeholder.jpg",
       brandName: (product.brand as any)?.name || "-",
       category: (product.category as any)?.name || "-",

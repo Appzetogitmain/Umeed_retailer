@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useMemo } from 'react';
+import { normalizeImageUrl } from '../../utils/imageUrl';
 import { useOrders } from '../../hooks/useOrders';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -193,7 +194,7 @@ export default function Orders() {
                         <div key={idx} className="relative z-[idx]">
                           <div className="w-12 h-12 rounded-lg border border-neutral-100 bg-white p-1 shadow-sm">
                             <img 
-                              src={item.product.mainImage || item.product.imageUrl} 
+                              src={normalizeImageUrl(item.product.mainImage || item.product.imageUrl)} 
                               alt={item.product.productName || item.product.name}
                               className="w-full h-full object-contain"
                             />

@@ -18,7 +18,7 @@ import {
 } from "../../services/api/customerOrderService";
 import { uploadImage } from "../../services/api/uploadService";
 import ReviewModal from "./components/ReviewModal";
-
+import { normalizeImageUrl } from "../../utils/imageUrl";
 // Icon Components
 const ArrowLeftIcon = ({ className }: { className?: string }) => (
   <svg
@@ -1075,7 +1075,7 @@ export default function OrderDetail() {
                   <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center flex-shrink-0 border border-neutral-200/50">
                     {item.product?.mainImage ? (
                       <img
-                        src={item.product.mainImage}
+                        src={normalizeImageUrl(item.product.mainImage)}
                         alt={item.product?.name || item.productName || "Product"}
                         className="w-full h-full object-cover rounded-xl filter grayscale"
                       />
@@ -1673,7 +1673,7 @@ export default function OrderDetail() {
                     <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                       {item.product?.mainImage ? (
                         <img
-                          src={item.product.mainImage}
+                          src={normalizeImageUrl(item.product.mainImage)}
                           alt={
                             item.product?.name || item.productName || "Product"
                           }

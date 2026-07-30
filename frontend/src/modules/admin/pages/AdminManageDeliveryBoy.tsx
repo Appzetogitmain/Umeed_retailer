@@ -20,8 +20,8 @@ export default function AdminManageDeliveryBoy() {
     const [availabilityFilter, setAvailabilityFilter] = useState('All');
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortColumn, setSortColumn] = useState<string | null>(null);
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [sortColumn, setSortColumn] = useState<string | null>('_id');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [totalPages, setTotalPages] = useState(1);
     const [totalDeliveryBoys, setTotalDeliveryBoys] = useState(0);
     const [successMessage, setSuccessMessage] = useState('');

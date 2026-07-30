@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { getProducts, updateStock, Product } from '../../../services/api/productService';
+import { normalizeImageUrl } from "../../../utils/imageUrl";
 import { getCategories } from '../../../services/api/categoryService';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -53,17 +54,17 @@ export default function SellerStockManagement() {
     // Helper to resolve image URL
     const resolveImageUrl = (url: string | undefined) => {
         if (!url) return '/assets/product-placeholder.jpg';
+        url = normalizeImageUrl(url) || url;
         if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
 
-        // Handle relative paths
         const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
         try {
             const urlObj = new URL(apiBase);
             const origin = urlObj.origin;
             const cleanUrl = url.replace(/\\/g, '/'); // Fix windows backslashes
-            return `${origin}/${cleanUrl.startsWith('/') ? cleanUrl.slice(1) : cleanUrl}`;
+            return normalizeImageUrl(`${origin}/${cleanUrl.startsWith('/') ? cleanUrl.slice(1) : cleanUrl}`);
         } catch (e) {
-            return url;
+            return normalizeImageUrl(url);
         }
     };
 
@@ -92,13 +93,13 @@ export default function SellerStockManagement() {
                     // Convert products to stock items
                     const items: StockItem[] = [];
                     response.data.forEach((product: Product) => {
-                        product.variations.forEach((variation, index) => {
+                        product.variations.forEach((variation: any, index: number) => {
                             items.push({
                                 variationId: variation.variationId || variation._id || `${product.productId || product._id}-${index}`,
                                 productId: product.productId || product._id,
                                 name: product.productName,
                                 seller: user?.storeName || '',
-                                image: resolveImageUrl(product.mainImage || product.mainImageUrl),
+                                image: resolveImageUrl(product.mainImage || product.mainImageUrl) || "",
                                 variation: variation.title || variation.value || variation.name || 'Default',
                                 stock: variation.stock,
                                 status: product.publish ? 'Published' : 'Unpublished',
