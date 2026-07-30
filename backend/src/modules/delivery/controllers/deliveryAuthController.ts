@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Delivery from "../../../models/Delivery";
 import Order from "../../../models/Order";
+import Notification from "../../../models/Notification";
 import {
   sendSmsOtp as sendSmsOtpService,
   verifySmsOtp as verifySmsOtpService,
@@ -227,6 +228,15 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   // Generate token for automatic login
   const token = generateToken(delivery._id.toString(), "Delivery");
+
+  // Create welcome notification
+  await Notification.create({
+    title: "Welcome to Speedoo!",
+    message: "Registration successful. Welcome! Your account is currently pending approval.",
+    type: "system",
+    recipientType: "Delivery",
+    recipientId: delivery._id,
+  });
 
   return res.status(201).json({
     success: true,

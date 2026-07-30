@@ -27,40 +27,28 @@ export const getDashboardStats = async (): Promise<DeliveryDashboardStats> => {
         const response = await api.get(`${BASE_URL}/dashboard/stats`);
         const data = response.data.data;
         
-        // Return mock data if everything is 0 or empty (for demo purposes)
-        if (!data || (!data.allOrders && !data.pendingOrders)) {
-            return {
-                dailyCollection: 2450,
-                cashBalance: 1200,
-                pendingOrders: 9,
-                allOrders: 15,
-                returnOrders: 2,
-                returnItems: 3,
-                todayEarning: 450,
-                totalEarning: 8500,
-                pendingOrdersList: [
-                    { id: '1', orderId: 'ORD-1001', customerName: 'John Doe', status: 'Ready for pickup', address: '123 Main St, City', totalAmount: 500, estimatedDeliveryTime: '20 mins' },
-                    { id: '2', orderId: 'ORD-1002', customerName: 'Jane Smith', status: 'Pending', address: '456 Oak Ave, Town', totalAmount: 850, estimatedDeliveryTime: '45 mins' }
-                ]
-            };
-        }
-        
-        return data;
-    } catch (error) {
-        // Fallback mock data in case of error
         return {
-            dailyCollection: 2450,
-            cashBalance: 1200,
-            pendingOrders: 9,
-            allOrders: 15,
-            returnOrders: 2,
-            returnItems: 3,
-            todayEarning: 450,
-            totalEarning: 8500,
-            pendingOrdersList: [
-                { id: '1', orderId: 'ORD-1001', customerName: 'John Doe', status: 'Ready for pickup', address: '123 Main St, City', totalAmount: 500, estimatedDeliveryTime: '20 mins' },
-                { id: '2', orderId: 'ORD-1002', customerName: 'Jane Smith', status: 'Pending', address: '456 Oak Ave, Town', totalAmount: 850, estimatedDeliveryTime: '45 mins' }
-            ]
+            dailyCollection: data?.dailyCollection || 0,
+            cashBalance: data?.cashBalance || 0,
+            pendingOrders: data?.pendingOrders || 0,
+            allOrders: data?.allOrders || 0,
+            returnOrders: data?.returnOrders || 0,
+            returnItems: data?.returnItems || 0,
+            todayEarning: data?.todayEarning || 0,
+            totalEarning: data?.totalEarning || 0,
+            pendingOrdersList: data?.pendingOrdersList || []
+        };
+    } catch (error) {
+        return {
+            dailyCollection: 0,
+            cashBalance: 0,
+            pendingOrders: 0,
+            allOrders: 0,
+            returnOrders: 0,
+            returnItems: 0,
+            todayEarning: 0,
+            totalEarning: 0,
+            pendingOrdersList: []
         };
     }
 };
