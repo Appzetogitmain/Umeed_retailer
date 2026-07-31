@@ -487,7 +487,22 @@ export const distributeCommissions = async (orderId: string) => {
                 existingDeliveryComm &&
                 existingDeliveryComm.status === "Pending"
             ) {
-                // If it existed as pending, mark as paid and credit
+                // Recalculate to ensure the correct dynamic amount is used
+                // (old pending may have been created with outdated rates)
+                let correctAmount = existingDeliveryComm.commissionAmount;
+                if (order.riderEarningBreakdown && order.riderEarningBreakdown.totalEarning > 0) {
+                    correctAmount = order.riderEarningBreakdown.totalEarning;
+                } else {
+                    try {
+                        const dynamicEarning = await calculateDynamicRiderEarning(order);
+                        correctAmount = dynamicEarning.totalEarning;
+                    } catch (e) {
+                        console.error("Error recalculating pending delivery commission:", e);
+                    }
+                }
+
+                // Update amount and mark as paid
+                existingDeliveryComm.commissionAmount = Math.round(correctAmount * 100) / 100;
                 existingDeliveryComm.status = "Paid";
                 existingDeliveryComm.paidAt = new Date();
                 await existingDeliveryComm.save({ session });

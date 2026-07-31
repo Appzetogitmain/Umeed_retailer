@@ -1,10 +1,11 @@
 import { ReactNode, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DeliveryBottomNav from './DeliveryBottomNav';
 import { DeliveryStatusProvider, useDeliveryStatus } from '../context/DeliveryStatusContext';
 import { DeliveryUserProvider, useDeliveryUser } from '../context/DeliveryUserContext';
-import { getDeliveryProfile } from '../../../services/api/delivery/deliveryService';
+import { getDeliveryProfile, getOrderDetails } from '../../../services/api/delivery/deliveryService';
 import { useDeliveryOrderNotifications } from '../../../hooks/useDeliveryOrderNotifications';
+import { registerFCMToken, setupForegroundNotificationHandler } from '../../../services/pushNotificationService';
 import OrderNotificationCard from './OrderNotificationCard';
 import { AnimatePresence } from 'framer-motion';
 
@@ -14,13 +15,102 @@ interface DeliveryLayoutContentProps {
 
 function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isOnline } = useDeliveryStatus();
   const { setUserName } = useDeliveryUser();
   const {
     currentNotification,
     acceptOrder,
     rejectOrder,
+    showNotificationData,
   } = useDeliveryOrderNotifications();
+
+  // Register FCM token globally for Delivery Boy & setup foreground handler
+  useEffect(() => {
+    registerFCMToken().catch(err => console.error('Delivery FCM token error:', err));
+    setupForegroundNotificationHandler((payload) => {
+      console.log('📬 Delivery App received foreground notification:', payload);
+      if (payload.data?.orderId) {
+        // Automatically fetch and show the order modal card
+        getOrderDetails(payload.data.orderId).then(order => {
+          if (order) {
+            showNotificationData({
+              orderId: order.id || order._id,
+              orderNumber: order.orderId || order.orderNumber,
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              deliveryAddress: order.deliveryAddress || { address: order.address, city: '', pincode: '' },
+              total: order.totalAmount || order.total,
+              subtotal: order.subtotal || order.totalAmount,
+              shipping: order.shipping || 0,
+              codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
+              createdAt: order.createdAt || new Date().toISOString(),
+              riderEarning: order.riderEarning || 40,
+            });
+          }
+        }).catch(err => console.error('Failed to load notification order:', err));
+      }
+    });
+
+    // Listen to messages from Service Worker (when notification click happens)
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'FCM_NOTIFICATION_CLICK' && event.data.data?.orderId) {
+        const orderId = event.data.data.orderId;
+        getOrderDetails(orderId).then(order => {
+          if (order) {
+            showNotificationData({
+              orderId: order.id || order._id,
+              orderNumber: order.orderId || order.orderNumber,
+              customerName: order.customerName,
+              customerPhone: order.customerPhone,
+              deliveryAddress: order.deliveryAddress || { address: order.address, city: '', pincode: '' },
+              total: order.totalAmount || order.total,
+              subtotal: order.subtotal || order.totalAmount,
+              shipping: order.shipping || 0,
+              codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
+              createdAt: order.createdAt || new Date().toISOString(),
+              riderEarning: order.riderEarning || 40,
+            });
+          }
+        }).catch(err => console.error('Failed to load order on notification click:', err));
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
+    };
+  }, [showNotificationData]);
+
+  // Handle URL query param ?openOrder=xyz (when user clicks OS notification tray item)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const openOrderId = searchParams.get('openOrder');
+    if (openOrderId) {
+      getOrderDetails(openOrderId).then(order => {
+        if (order) {
+          showNotificationData({
+            orderId: order.id || order._id,
+            orderNumber: order.orderId || order.orderNumber,
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
+            deliveryAddress: order.deliveryAddress || { address: order.address, city: '', pincode: '' },
+            total: order.totalAmount || order.total,
+            subtotal: order.subtotal || order.totalAmount,
+            shipping: order.shipping || 0,
+            codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
+            createdAt: order.createdAt || new Date().toISOString(),
+            riderEarning: order.riderEarning || 40,
+          });
+        }
+      }).catch(err => console.error('Failed to load order from openOrder URL param:', err));
+    }
+  }, [location.search, showNotificationData]);
 
   useEffect(() => {
     const fetchProfile = async () => {

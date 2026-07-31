@@ -76,45 +76,71 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // Refs for request cancellation and preventing race conditions
   const abortControllerRef = useRef<AbortController | null>(null);
   const isRequestingRef = useRef(false);
+  const requestLocationRef = useRef<((silent?: boolean) => Promise<void>) | null>(null);
 
   // Initialize location state and check session permission
   useEffect(() => {
     const checkInitialPermission = async () => {
-      console.log('[LocationContext] Checking initial permission status...');
+      console.log('[LocationContext] Checking native browser permission status...');
 
       try {
-        // 1. Check sessionStorage for session-level permission
-        const sessionGranted = sessionStorage.getItem(SESSION_PERMISSION_KEY);
-
-        if (sessionGranted === 'true') {
-          console.log('[LocationContext] Permission already granted in this session.');
-
-          // 2. Check for cached location in localStorage
-          const cachedLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
-          if (cachedLocation) {
-            try {
-              const parsedLocation = JSON.parse(cachedLocation);
-              console.log('[LocationContext] Using cached location from this session:', parsedLocation.address);
-              setLocation(parsedLocation);
-              setIsLocationEnabled(true);
-              setLocationPermissionStatus('session_granted');
-            } catch (e) {
-              console.error('[LocationContext] Failed to parse cached location:', e);
-            }
-          } else {
-            // Permission granted but no location? Prompt to refresh it
-            console.log('[LocationContext] Session permission exists but no cached location.');
-            setLocationPermissionStatus('session_granted');
+        // 1. Check native persistent permission status if supported
+        let nativeStatus = 'prompt';
+        if (navigator.permissions && navigator.permissions.query) {
+          try {
+            const permission = await navigator.permissions.query({ name: 'geolocation' });
+            nativeStatus = permission.state;
+            
+            // Listen for changes
+            permission.onchange = () => {
+              if (permission.state === 'denied') {
+                setLocationPermissionStatus('denied');
+                setIsLocationEnabled(false);
+                setLocationError('Location access was denied.');
+              }
+            };
+          } catch (e) {
+            console.warn('[LocationContext] Permissions API error, falling back:', e);
           }
-        } else {
-          console.log('[LocationContext] No session-level permission found. User will be prompted.');
-          setLocation(null);
+        }
+
+        // 2. Load cached location if available
+        const cachedLocation = localStorage.getItem(LOCATION_STORAGE_KEY);
+        if (cachedLocation) {
+          try {
+            const parsedLocation = JSON.parse(cachedLocation);
+            console.log('[LocationContext] Using cached location:', parsedLocation.address);
+            setLocation(parsedLocation);
+            setIsLocationEnabled(true);
+          } catch (e) {
+            console.error('[LocationContext] Failed to parse cached location:', e);
+          }
+        }
+
+        // 3. Handle based on native status
+        if (nativeStatus === 'granted') {
+          console.log('[LocationContext] Permission natively granted. Fetching silently...');
+          setLocationPermissionStatus('granted');
+          // Trigger a silent location refresh
+          if (requestLocationRef.current) {
+            requestLocationRef.current(true); // pass silent=true
+          }
+        } else if (nativeStatus === 'denied') {
+          console.log('[LocationContext] Permission natively denied.');
+          setLocationPermissionStatus('denied');
           setIsLocationEnabled(false);
+          setLocationError('Location access was denied in browser settings.');
+        } else {
+          // 'prompt' state
+          console.log('[LocationContext] Permission not yet granted natively. Showing prompt.');
           setLocationPermissionStatus('prompt');
+          if (!cachedLocation) {
+            setLocation(null);
+            setIsLocationEnabled(false);
+          }
         }
       } catch (error) {
-        console.error('[LocationContext] Error checking session storage:', error);
-        // Fallback to prompt if storage is unavailable
+        console.error('[LocationContext] Error checking permissions:', error);
         setLocationPermissionStatus('prompt');
       } finally {
         setIsLocationLoading(false);
@@ -167,11 +193,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, [location?.latitude, location?.longitude]);
 
   // Request user's current location - OPTIMIZED for speed and accuracy
-  const requestLocation = useCallback(async (): Promise<void> => {
+  const requestLocation = useCallback(async (silent = false): Promise<void> => {
     if (!navigator.geolocation) {
       console.error('[LocationContext] Geolocation is not supported');
-      setLocationError('Geolocation is not supported by your browser');
-      setIsLocationLoading(false);
+      if (!silent) setLocationError('Geolocation is not supported by your browser');
+      if (!silent) setIsLocationLoading(false);
       return;
     }
 
@@ -189,8 +215,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     geocodeCache.clear();
 
     isRequestingRef.current = true;
-    setIsLocationLoading(true);
-    setLocationError(null);
+    if (!silent) setIsLocationLoading(true);
+    if (!silent) setLocationError(null);
     abortControllerRef.current = new AbortController();
 
     console.log('[LocationContext] Requesting geolocation from browser...');
@@ -371,6 +397,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       );
     });
   }, [isAuthenticated, user, SESSION_PERMISSION_KEY, LOCATION_STORAGE_KEY]);
+
+  // Update ref so useEffect can call it
+  useEffect(() => {
+    requestLocationRef.current = requestLocation;
+  }, [requestLocation]);
 
   // Helper function to save location to backend (non-blocking)
   const saveLocationToBackend = async (locationData: Location): Promise<void> => {

@@ -429,7 +429,8 @@ export async function notifyDeliveryBoysForSellerPickup(
                 orderId: String(order._id),
                 sellerId: sellerId,
                 orderNumber: String(order.orderNumber),
-                url: `/delivery/dashboard`
+                url: `/delivery/dashboard?openOrder=${String(order._id)}`,
+                link: `/delivery/dashboard?openOrder=${String(order._id)}`
             },
         };
 
@@ -544,7 +545,8 @@ export async function notifyDeliveryBoysOfNewOrder(
                 type: 'NEW_ORDER',
                 orderId: String(orderId),
                 orderNumber: String(order.orderNumber),
-                url: `/delivery/dashboard`
+                url: `/delivery/dashboard?openOrder=${String(orderId)}`,
+                link: `/delivery/dashboard?openOrder=${String(orderId)}`
             },
         };
 

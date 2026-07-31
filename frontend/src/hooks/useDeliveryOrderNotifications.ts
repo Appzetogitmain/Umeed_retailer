@@ -356,6 +356,25 @@ export const useDeliveryOrderNotifications = () => {
         });
     }, []);
 
+    const showNotificationData = useCallback((orderData: OrderNotificationData) => {
+        setState(prev => {
+            // Prevent duplicate current notification
+            if (prev.currentNotification?.orderId === orderData.orderId) {
+                return prev;
+            }
+            if (prev.currentNotification) {
+                return {
+                    ...prev,
+                    notificationQueue: [...prev.notificationQueue.filter(n => n.orderId !== orderData.orderId), orderData],
+                };
+            }
+            return {
+                ...prev,
+                currentNotification: orderData,
+            };
+        });
+    }, []);
+
     useEffect(() => {
         if (!isAuthenticated || user?.userType !== 'Delivery' || !user?.id) {
             disconnectSocket();
@@ -380,6 +399,7 @@ export const useDeliveryOrderNotifications = () => {
         acceptOrder: handleAccept,
         rejectOrder: handleReject,
         clearNotification: clearCurrentNotification,
+        showNotificationData,
         socket: socketRef.current,
     };
 };

@@ -221,11 +221,8 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
         riderEarning = 40; // absolute fallback
     }
 
-    // Ensure we always have a minimum earning (at least shipping fee or a standard minimum payout like 40)
-    const minEarning = order.shipping || 40;
-    if (riderEarning < minEarning) {
-        riderEarning = minEarning;
-    }
+    // NOTE: min earning is already enforced inside calculateDynamicRiderEarning based on admin config
+    // Do NOT override riderEarning with order.shipping - that is the customer fee, not rider pay
 
     riderEarning = Math.round(riderEarning * 100) / 100;
 

@@ -43,15 +43,25 @@ if (messaging) {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const data = event.notification.data;
-    const urlToOpen = data?.link || '/';
+    const data = event.notification.data || {};
+    const urlToOpen = data.link || data.url || '/delivery/dashboard';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Check if there is already a window/tab open with the target URL
+            // Check if there is already a window/tab open
             for (const client of clientList) {
-                if (client.url && 'focus' in client) {
-                    return client.focus();
+                if ('focus' in client) {
+                    client.focus();
+                    if ('postMessage' in client) {
+                        client.postMessage({
+                            type: 'FCM_NOTIFICATION_CLICK',
+                            data: data
+                        });
+                    }
+                    if ('navigate' in client) {
+                        return client.navigate(urlToOpen);
+                    }
+                    return;
                 }
             }
             // If no window/tab is open, open the URL

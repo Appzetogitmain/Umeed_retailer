@@ -1141,9 +1141,9 @@ export default function Checkout() {
                   className="flex gap-2">
                   {/* Product Image */}
                   <div className="w-12 h-12 bg-neutral-100 rounded-lg flex-shrink-0 overflow-hidden">
-                    {item.product?.imageUrl ? (
+                    {(item.product?.imageUrl || item.product?.mainImage || (item.product as any)?.mainImageUrl) ? (
                       <img
-                        src={item.product?.imageUrl}
+                        src={normalizeImageUrl(item.product?.imageUrl || item.product?.mainImage || (item.product as any)?.mainImageUrl)}
                         alt={item.product?.name}
                         className="w-full h-full object-contain"
                       />
