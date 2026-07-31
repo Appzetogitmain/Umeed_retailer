@@ -45,7 +45,7 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
               shipping: order.shipping || 0,
               codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
               createdAt: order.createdAt || new Date().toISOString(),
-              riderEarning: order.riderEarning || 40,
+              riderEarning: order.riderEarning ?? 0,
             });
           }
         }).catch(err => console.error('Failed to load notification order:', err));
@@ -69,7 +69,7 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
               shipping: order.shipping || 0,
               codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
               createdAt: order.createdAt || new Date().toISOString(),
-              riderEarning: order.riderEarning || 40,
+              riderEarning: order.riderEarning ?? 0,
             });
           }
         }).catch(err => console.error('Failed to load order on notification click:', err));
@@ -105,7 +105,7 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
             shipping: order.shipping || 0,
             codAmount: order.paymentMethod === 'COD' ? order.totalAmount : undefined,
             createdAt: order.createdAt || new Date().toISOString(),
-            riderEarning: order.riderEarning || 40,
+            riderEarning: order.riderEarning ?? 0,
           });
         }
       }).catch(err => console.error('Failed to load order from openOrder URL param:', err));
