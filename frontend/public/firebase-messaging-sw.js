@@ -3,13 +3,13 @@ importScripts('https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.9.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCGGEeLFXSt0TScXaPnzhOQRE3icZqxf4M",
-    authDomain: "kosil-e-com.firebaseapp.com",
-    projectId: "kosil-e-com",
-    storageBucket: "kosil-e-com.firebasestorage.app",
-    messagingSenderId: "277843928493",
-    appId: "1:277843928493:web:02b318e1002498016e6d24",
-    measurementId: "G-QY6BQ2GDYB"
+    apiKey: "AIzaSyBuiRbdOfnKE6kIsxiYLSLx8G8IAvibuUQ",
+    authDomain: "speedoo-2f9df.firebaseapp.com",
+    projectId: "speedoo-2f9df",
+    storageBucket: "speedoo-2f9df.firebasestorage.app",
+    messagingSenderId: "118580376455",
+    appId: "1:118580376455:web:40ab746155ee3ec4ee1922",
+    measurementId: "G-HWK6NPM1W7"
 };
 
 // Initialize Firebase
