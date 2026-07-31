@@ -98,6 +98,7 @@ export default function DeliveryOrderDetail() {
     const [otpValue, setOtpValue] = useState('');
     const [otpSending, setOtpSending] = useState(false);
     const [otpVerifying, setOtpVerifying] = useState(false);
+    const [otpTimer, setOtpTimer] = useState<number>(0);
     const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [deliveryBoyLocation, setDeliveryBoyLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -112,12 +113,57 @@ export default function DeliveryOrderDetail() {
     const [customerProximity, setCustomerProximity] = useState<{ withinRange: boolean; distance: number } | null>(null);
     const [getOtpEnabled, setGetOtpEnabled] = useState(false);
 
+    // Restore OTP state & timer from localStorage on mount or refresh
+    useEffect(() => {
+        if (!id) return;
+        const savedTimeStr = localStorage.getItem(`otp_sent_${id}`);
+        if (savedTimeStr) {
+            const savedTime = parseInt(savedTimeStr, 10);
+            if (!isNaN(savedTime)) {
+                const elapsed = Math.floor((Date.now() - savedTime) / 1000);
+                setShowOtpInput(true);
+                if (elapsed < 30) {
+                    setOtpTimer(30 - elapsed);
+                } else {
+                    setOtpTimer(0);
+                }
+            }
+        }
+    }, [id]);
+
+    // Countdown interval timer effect
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+        if (otpTimer > 0) {
+            timer = setInterval(() => {
+                setOtpTimer(prev => {
+                    if (prev <= 1) {
+                        if (timer) clearInterval(timer);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [otpTimer]);
+
     const fetchOrder = async () => {
         if (!id) return;
         try {
             setLoading(true);
             const data = await getOrderDetails(id);
             setOrder(data);
+            // If rider has completed delivery, clear OTP state and localStorage
+            const effectiveStatus = data?.riderStatus ?? data?.status;
+            if (effectiveStatus === 'Delivered') {
+                localStorage.removeItem(`otp_sent_${id}`);
+                setShowOtpInput(false);
+                setOtpValue('');
+                setOtpTimer(0);
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to load order details');
         } finally {
@@ -161,10 +207,20 @@ export default function DeliveryOrderDetail() {
         try {
             setOtpSending(true);
             await sendDeliveryOtp(id);
+            localStorage.setItem(`otp_sent_${id}`, Date.now().toString());
             setShowOtpInput(true);
+            setOtpTimer(30);
             alert('OTP sent to customer successfully');
         } catch (err: any) {
-            alert(err.message || 'Failed to send OTP');
+            const msg = err.message || 'Failed to send OTP';
+            alert(msg);
+            // If order is already delivered, refresh to reflect correct status
+            if (msg.toLowerCase().includes('already delivered')) {
+                if (id) localStorage.removeItem(`otp_sent_${id}`);
+                setShowOtpInput(false);
+                setOtpTimer(0);
+                await fetchOrder();
+            }
         } finally {
             setOtpSending(false);
         }
@@ -187,15 +243,29 @@ export default function DeliveryOrderDetail() {
             setOtpVerifying(true);
             const result = await verifyDeliveryOtp(id, otpValue);
             alert(result.message || 'OTP verified successfully. Order marked as delivered.');
-            await fetchOrder(); // Refresh order data
+            if (id) localStorage.removeItem(`otp_sent_${id}`);
             setShowOtpInput(false);
             setOtpValue('');
+            setOtpTimer(0);
+            await fetchOrder(); // Refresh order data
         } catch (err: any) {
-            alert(err.message || 'Failed to verify OTP');
+            const msg = err.message || 'Failed to verify OTP';
+            alert(msg);
+            // Always refresh order on error - if already delivered, the UI must reflect that
+            if (id) {
+                if (msg.toLowerCase().includes('already delivered') || msg.toLowerCase().includes('already delivered')) {
+                    localStorage.removeItem(`otp_sent_${id}`);
+                    setShowOtpInput(false);
+                    setOtpValue('');
+                    setOtpTimer(0);
+                }
+            }
+            await fetchOrder(); // Always refresh to get latest status
         } finally {
             setOtpVerifying(false);
         }
     };
+
 
     // Handle seller pickup confirmation
     const handleSellerPickup = async (sellerId: string) => {
@@ -507,7 +577,10 @@ export default function DeliveryOrderDetail() {
 
     const statusFlow: DeliveryOrderStatus[] = ['Pending', 'Ready for pickup', 'Picked up', 'Out for Delivery', 'Delivered'];
 
-    let currentStatusIndex = statusFlow.indexOf(order.status as DeliveryOrderStatus);
+    // Use riderStatus for multi-seller orders (this rider may have delivered even if order isn't fully done)
+    const effectiveOrderStatus = (order.riderStatus ?? order.status) as DeliveryOrderStatus;
+
+    let currentStatusIndex = statusFlow.indexOf(effectiveOrderStatus);
     // Handle cases where status might not be in the flow (e.g. Cancelled)
     if (currentStatusIndex === -1 && (order.status === 'Cancelled' || order.status === 'Returned')) {
         // Maybe show a different UI for cancelled/returned orders
@@ -563,12 +636,12 @@ export default function DeliveryOrderDetail() {
                 <span className="ml-2 font-semibold text-lg text-neutral-800">Order Details</span>
 
                 <div className="ml-auto">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
-                        order.status === 'Picked up' ? 'bg-indigo-100 text-indigo-700' :
-                            order.status === 'Ready for pickup' ? 'bg-yellow-100 text-yellow-700' :
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${effectiveOrderStatus === 'Delivered' ? 'bg-green-100 text-green-700' :
+                        effectiveOrderStatus === 'Picked up' ? 'bg-indigo-100 text-indigo-700' :
+                            effectiveOrderStatus === 'Ready for pickup' ? 'bg-yellow-100 text-yellow-700' :
                                 'bg-orange-100 text-orange-700'
                         }`}>
-                        {order.status}
+                        {effectiveOrderStatus}
                     </span>
                 </div>
             </div>
@@ -855,11 +928,18 @@ export default function DeliveryOrderDetail() {
 
             </div>
 
-            {/* Customer Delivery OTP Section (only when order is Out for Delivery) */}
-            {order.status === 'Out for Delivery' && (
+            {/* Customer Delivery OTP Section (only when order is Out for Delivery and not yet delivered) */}
+            {((order.riderStatus ?? order.status) === 'Out for Delivery') && (
                 <div className="fixed bottom-24 left-6 right-6 z-30">
                     <div className="bg-white rounded-2xl p-4 shadow-2xl border border-neutral-200">
-                        <p className="text-sm font-semibold text-neutral-900 mb-3">Customer Delivery OTP</p>
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-semibold text-neutral-900">Customer Delivery OTP</p>
+                            {showOtpInput && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                                    OTP Sent
+                                </span>
+                            )}
+                        </div>
 
                         {/* Distance indicator */}
                         {customerProximity && (
@@ -872,48 +952,73 @@ export default function DeliveryOrderDetail() {
                             </p>
                         )}
 
-                        {/* 4-digit OTP Input - Always visible but disabled until OTP is sent */}
+                        {/* 4-digit OTP Input */}
                         <input
                             type="text"
                             value={otpValue}
                             onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
                             placeholder="Enter 4-digit OTP"
                             disabled={!showOtpInput}
-                            className={`w-full px-4 py-3 border rounded-xl text-lg font-semibold text-center mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 ${showOtpInput ? 'border-neutral-300 bg-white' : 'border-neutral-200 bg-neutral-100 text-neutral-400'
+                            className={`w-full px-4 py-3 border rounded-xl text-lg font-semibold text-center mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 ${showOtpInput ? 'border-neutral-300 bg-white text-neutral-900 shadow-sm' : 'border-neutral-200 bg-neutral-100 text-neutral-400'
                                 }`}
                             maxLength={4}
                         />
 
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-2">
                             {!showOtpInput ? (
                                 <button
                                     onClick={handleSendOtp}
                                     disabled={!getOtpEnabled || otpSending}
-                                    className={`flex-1 py-3 rounded-xl font-semibold transition-all ${getOtpEnabled && !otpSending
+                                    className={`w-full py-3 rounded-xl font-semibold transition-all ${getOtpEnabled && !otpSending
                                         ? 'bg-green-600 text-white hover:bg-green-700 active:scale-[0.98]'
                                         : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                                         }`}
                                 >
-                                    {otpSending ? 'Sending...' : getOtpEnabled ? 'Get OTP' : 'Move within 500m to get OTP'}
+                                    {otpSending ? 'Sending OTP...' : getOtpEnabled ? 'Get OTP' : 'Move within 500m to get OTP'}
                                 </button>
                             ) : (
                                 <>
                                     <button
-                                        onClick={() => {
-                                            setShowOtpInput(false);
-                                            setOtpValue('');
-                                        }}
-                                        className="flex-1 py-3 rounded-xl bg-neutral-200 text-neutral-700 font-semibold hover:bg-neutral-300 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
                                         onClick={handleVerifyOtp}
-                                        className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                                        className={`w-full py-3 rounded-xl font-semibold text-white transition-all ${
+                                            otpVerifying || otpValue.length !== 4
+                                                ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                                                : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98]'
+                                        }`}
                                         disabled={otpVerifying || otpValue.length !== 4}
                                     >
                                         {otpVerifying ? 'Verifying...' : 'Verify OTP'}
                                     </button>
+
+                                    <div className="flex items-center justify-between pt-1">
+                                        <button
+                                            onClick={handleSendOtp}
+                                            disabled={otpTimer > 0 || otpSending}
+                                            className={`text-xs font-semibold ${
+                                                otpTimer > 0 || otpSending
+                                                    ? 'text-neutral-400 cursor-not-allowed'
+                                                    : 'text-blue-600 hover:underline'
+                                            }`}
+                                        >
+                                            {otpSending
+                                                ? 'Resending OTP...'
+                                                : otpTimer > 0
+                                                ? `Resend OTP in ${otpTimer}s`
+                                                : 'Resend OTP'}
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                if (id) localStorage.removeItem(`otp_sent_${id}`);
+                                                setShowOtpInput(false);
+                                                setOtpValue('');
+                                                setOtpTimer(0);
+                                            }}
+                                            className="text-xs text-neutral-500 hover:text-neutral-700 font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
                                 </>
                             )}
                         </div>

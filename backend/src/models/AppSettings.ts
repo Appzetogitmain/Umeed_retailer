@@ -62,7 +62,20 @@ export interface IAppSettings extends Document {
     baseCharge: number;
     baseDistance: number;
     kmRate: number;
-    deliveryBoyKmRate?: number;
+    deliveryBoyKmRate?: number; // deprecated
+  };
+  
+  // Dynamic Rider Earning Config
+  riderEarningConfig?: {
+    basePay: number;
+    perKmRate: number;
+    minimumEarning: number;
+    peakBonus: number;
+    isPeakModeActive: boolean;
+    rainBonus: number;
+    isRainModeActive: boolean;
+    heavyItemBonus: number;
+    heavyItemWeightThreshold: number;
   };
 
   // Tax Settings
@@ -273,6 +286,19 @@ const AppSettingsSchema = new Schema<IAppSettings>(
       baseDistance: { type: Number, default: 0 },
       kmRate: { type: Number, default: 0 },
       deliveryBoyKmRate: { type: Number, default: 0 },
+    },
+
+    // Dynamic Rider Earning Config
+    riderEarningConfig: {
+      basePay: { type: Number, default: 30, min: 0 },
+      perKmRate: { type: Number, default: 8, min: 0 },
+      minimumEarning: { type: Number, default: 40, min: 0 },
+      peakBonus: { type: Number, default: 0, min: 0 },
+      isPeakModeActive: { type: Boolean, default: false },
+      rainBonus: { type: Number, default: 0, min: 0 },
+      isRainModeActive: { type: Boolean, default: false },
+      heavyItemBonus: { type: Number, default: 0, min: 0 },
+      heavyItemWeightThreshold: { type: Number, default: 5, min: 0 }, // weight in kg
     },
 
     // Tax Settings

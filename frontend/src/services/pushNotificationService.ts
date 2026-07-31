@@ -54,9 +54,7 @@ export async function getFCMToken() {
     try {
         const registration = await registerServiceWorker();
         if (!registration) {
-            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert('❌ Service Worker registration failed. FCM will not work on this mobile device.');
-            }
+            console.warn('⚠️ Service Worker registration failed. FCM will not work on this device.');
             return null; // Failed or not supported
         }
 
@@ -64,7 +62,7 @@ export async function getFCMToken() {
         await navigator.serviceWorker.ready;
 
         if (!window.isSecureContext && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            alert('❌ Not a Secure Context (HTTPS missing). FCM will not work on this mobile browser.');
+            console.warn('⚠️ Not a Secure Context (HTTPS missing). FCM will not work on this mobile browser.');
         }
 
         console.log('DEBUG: Using VAPID Key:', VAPID_KEY);
@@ -76,8 +74,7 @@ export async function getFCMToken() {
             });
 
             if (token) {
-                // FCM tokens are sensitive (can be used to push notifications to this
-                // device) — only log them in development.
+                // FCM tokens are sensitive — only log them in development.
                 if (import.meta.env.DEV) {
                     console.log('✅ FCM Token obtained:', token);
                 }
@@ -88,14 +85,34 @@ export async function getFCMToken() {
             }
         } catch (tokenError: any) {
             console.error('❌ Error calling getToken:', tokenError);
-            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert(`❌ getToken failed: ${tokenError.message || 'Unknown error'}`);
+
+            // Handle IndexedDB Version mismatch (e.g. "The requested version (1) is less than the existing version (2)")
+            if (tokenError.name === 'VersionError' || tokenError.message?.includes('requested version')) {
+                console.warn('⚠️ FCM IndexedDB version conflict detected. Purging corrupt IndexedDB databases and retrying...');
+                try {
+                    if (window.indexedDB) {
+                        window.indexedDB.deleteDatabase('firebase-messaging-database');
+                        window.indexedDB.deleteDatabase('fcm_vapid_details_db');
+                    }
+                    // Retry once after purging database
+                    const retryToken = await getToken(messaging, {
+                        vapidKey: VAPID_KEY,
+                        serviceWorkerRegistration: registration
+                    });
+                    if (retryToken) {
+                        console.log('✅ FCM Token obtained after IndexedDB purge:', retryToken);
+                        return retryToken;
+                    }
+                } catch (retryError) {
+                    console.error('❌ Retry after IndexedDB purge failed:', retryError);
+                }
             }
+
             if (tokenError.code === 'messaging/token-subscribe-failed' || tokenError.message?.includes('Missing required authentication credential')) {
                 console.error(`👉 POTENTIAL FIX: Check your Google Cloud Console API Key restrictions. ` +
                     `Ensure "${window.location.origin}" (and with trailing slash) is allowed in HTTP Referrers.`);
             }
-            throw tokenError;
+            return null;
         }
 
     } catch (error) {
@@ -107,9 +124,7 @@ export async function getFCMToken() {
 // Register FCM token with backend
 export async function registerFCMToken(forceUpdate = false) {
     if (!messaging) {
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            alert('⚠️ Cannot register FCM token: Messaging is not supported or initialized.');
-        }
+        console.warn('⚠️ Cannot register FCM token: Messaging is not supported or initialized.');
         return null;
     }
 
@@ -154,17 +169,11 @@ export async function registerFCMToken(forceUpdate = false) {
             }
         } catch (apiError: any) {
             console.error('Failed to register token with backend API:', apiError);
-            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                alert(`❌ Backend registration FAILED: ${apiError.response?.data?.message || apiError.message || 'Network error'}. Check if your API URL is correct.`);
-            }
         }
 
         return token;
     } catch (error: any) {
         console.error('❌ Error in registerFCMToken flow:', error);
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            alert(`❌ FCM Flow Error: ${error.message || 'Unknown exception'}`);
-        }
         return null;
     }
 }

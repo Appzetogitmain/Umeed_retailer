@@ -86,8 +86,9 @@ export interface IOrder extends Document {
   // Per-seller acceptance and delivery tracking
   sellerAcceptances?: Array<{
     seller: mongoose.Types.ObjectId;
-    status: "Pending" | "Accepted" | "Rejected";
+    status: "Pending" | "Accepted" | "Rejected" | "Delivered" | "Cancelled" | "Completed";
     acceptedAt?: Date;
+    deliveredAt?: Date;
     deliveryBoy?: mongoose.Types.ObjectId;
     deliveryBoyStatus?: "Assigned" | "Picked Up" | "In Transit" | "Delivered" | "Failed";
     assignedAt?: Date;
@@ -99,6 +100,16 @@ export interface IOrder extends Document {
   customerNotes?: string;
   deliveryInstructions?: string;
   specialRequests?: string;
+
+  // Frozen Rider Earning Breakdown
+  riderEarningBreakdown?: {
+    basePay: number;
+    distancePay: number;
+    peakBonus: number;
+    rainBonus: number;
+    heavyItemBonus: number;
+    totalEarning: number;
+  };
 
   // Cancellation/Return
   cancellationReason?: string;
@@ -335,10 +346,13 @@ const OrderSchema = new Schema<IOrder>(
         },
         status: {
           type: String,
-          enum: ["Pending", "Accepted", "Rejected"],
+          enum: ["Pending", "Accepted", "Rejected", "Delivered", "Cancelled", "Completed"],
           default: "Pending",
         },
         acceptedAt: {
+          type: Date,
+        },
+        deliveredAt: {
           type: Date,
         },
         deliveryBoy: {
@@ -374,6 +388,16 @@ const OrderSchema = new Schema<IOrder>(
     specialRequests: {
       type: String,
       trim: true,
+    },
+
+    // Frozen Rider Earning Breakdown
+    riderEarningBreakdown: {
+      basePay: { type: Number, default: 0 },
+      distancePay: { type: Number, default: 0 },
+      peakBonus: { type: Number, default: 0 },
+      rainBonus: { type: Number, default: 0 },
+      heavyItemBonus: { type: Number, default: 0 },
+      totalEarning: { type: Number, default: 0 },
     },
 
     // Cancellation/Return

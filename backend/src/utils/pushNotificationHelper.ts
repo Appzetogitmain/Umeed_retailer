@@ -18,16 +18,12 @@ export async function sendNotificationToUser(userId: string, payload: PushNotifi
         let tokens: string[] = [];
 
         // Add Web Tokens
-        // @ts-ignore - Fields will be added to model shortly
         if (user.notificationPreferences?.push !== false && user.fcmTokens && user.fcmTokens.length > 0) {
-            // @ts-ignore
             tokens = [...tokens, ...user.fcmTokens];
         }
 
         // Add Mobile Tokens
-        // @ts-ignore
         if (includeMobile && user.notificationPreferences?.push !== false && user.fcmTokenMobile && user.fcmTokenMobile.length > 0) {
-            // @ts-ignore
             tokens = [...tokens, ...user.fcmTokenMobile];
         }
 
@@ -86,5 +82,47 @@ export async function sendNotificationToDeliveryBoy(deliveryBoyId: string, paylo
     } catch (error) {
         console.error(`Error sending notification to delivery boy ${deliveryBoyId}:`, error);
         // Non-blocking error
+    }
+}
+
+/**
+ * Send notification to a specific seller
+ * @param sellerId - The ID of the seller to send to
+ * @param payload - Notification payload
+ * @param includeMobile - Whether to include mobile tokens (default true)
+ */
+export async function sendNotificationToSeller(sellerId: string, payload: PushNotificationPayload, includeMobile: boolean = true) {
+    try {
+        const Seller = (await import('../models/Seller')).default;
+        const seller = await Seller.findById(sellerId);
+        
+        if (!seller) {
+            console.warn(`Seller not found for notification: ${sellerId}`);
+            return;
+        }
+
+        let tokens: string[] = [];
+
+        // Add Web Tokens
+        if (seller.fcmTokens && seller.fcmTokens.length > 0) {
+            tokens = [...tokens, ...seller.fcmTokens];
+        }
+
+        // Add Mobile Tokens
+        if (includeMobile && seller.fcmTokenMobile && seller.fcmTokenMobile.length > 0) {
+            tokens = [...tokens, ...seller.fcmTokenMobile];
+        }
+
+        // Remove duplicates
+        const uniqueTokens = [...new Set(tokens)];
+
+        if (uniqueTokens.length === 0) {
+            return; // No tokens to send to
+        }
+
+        console.log(`Sending notification to seller ${sellerId} (${uniqueTokens.length} tokens)`);
+        await sendPushNotification(uniqueTokens, payload);
+    } catch (error) {
+        console.error(`Error sending notification to seller ${sellerId}:`, error);
     }
 }

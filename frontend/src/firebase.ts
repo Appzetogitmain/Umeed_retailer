@@ -26,10 +26,6 @@ try {
     messaging = getMessaging(app);
 } catch (error: any) {
     console.warn('Firebase Messaging not supported in this environment.', error);
-    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Only alert on mobile to avoid annoying desktop devs
-        alert(`⚠️ Firebase Messaging Init Failed: ${error.message || 'Unknown error'}`);
-    }
 }
 
 export { messaging, getToken, onMessage };

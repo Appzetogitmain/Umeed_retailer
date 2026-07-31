@@ -47,6 +47,17 @@ export async function verifyDeliveryOtp(orderId: string, otp: string, deliveryBo
       throw new Error('Order is already delivered');
     }
 
+    if (deliveryBoyId && order.sellerAcceptances && order.sellerAcceptances.length > 0) {
+      const delIdStr = deliveryBoyId.toString();
+      const myAcceptances = order.sellerAcceptances.filter((sa: any) => {
+        const saDelId = sa.deliveryBoy ? (typeof sa.deliveryBoy === 'object' ? sa.deliveryBoy._id?.toString() : sa.deliveryBoy.toString()) : '';
+        return saDelId === delIdStr;
+      });
+      if (myAcceptances.length > 0 && myAcceptances.every((sa: any) => sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered')) {
+        throw new Error('Your assigned items for this order are already delivered');
+      }
+    }
+
     // Get customer's permanent delivery OTP
     let customerOtp: string | undefined;
 
@@ -65,6 +76,8 @@ export async function verifyDeliveryOtp(orderId: string, otp: string, deliveryBo
     // Developer bypass for testing
     const isMock = (process.env.NODE_ENV !== 'production' || process.env.USE_MOCK_OTP === 'true') && otp === '9999';
 
+    console.log(`[verifyOTP service] customerOtp="${customerOtp}", inputOtp="${otp}", isMock=${isMock}`);
+
     // Verify OTP against customer's permanent OTP
     if (!isMock && customerOtp !== otp) {
       throw new Error('Invalid OTP. Please check and try again.');
@@ -75,6 +88,7 @@ export async function verifyDeliveryOtp(orderId: string, otp: string, deliveryBo
 
     if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryBoyId) {
       const delIdStr = deliveryBoyId.toString();
+      // Mark this rider's assigned sellers as delivered
       order.sellerAcceptances.forEach((sa: any) => {
         const saDelId = sa.deliveryBoy ? (typeof sa.deliveryBoy === 'object' ? sa.deliveryBoy._id?.toString() : sa.deliveryBoy.toString()) : '';
         if (saDelId === delIdStr) {
@@ -84,7 +98,17 @@ export async function verifyDeliveryOtp(orderId: string, otp: string, deliveryBo
         }
       });
 
-      const allSellersDelivered = order.sellerAcceptances.every((sa: any) => sa.status === 'Delivered' || sa.deliveryBoyStatus === 'Delivered');
+      // Order is complete only when ALL sellerAcceptances are delivered
+      // (each sa must be either Delivered, or still Rejected/Pending with no delivery assigned)
+      const allSellersDelivered = order.sellerAcceptances.every((sa: any) => {
+        const saDelId = sa.deliveryBoy ? (typeof sa.deliveryBoy === 'object' ? sa.deliveryBoy._id?.toString() : sa.deliveryBoy.toString()) : null;
+        if (!saDelId) {
+          // No rider assigned → skip (Rejected/Cancelled sellers don't need delivery)
+          return sa.status === 'Rejected' || sa.status === 'Cancelled';
+        }
+        return sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered';
+      });
+
       if (allSellersDelivered) {
         order.status = 'Delivered';
         order.deliveredAt = new Date();

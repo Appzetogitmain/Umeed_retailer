@@ -13,6 +13,63 @@ import WalletTransaction from "../models/WalletTransaction";
 import PlatformWallet from "../models/PlatformWallet";
 
 /**
+ * Calculate Dynamic Rapido-style Rider Earning
+ */
+export const calculateDynamicRiderEarning = async (order: any): Promise<any> => {
+    // @ts-ignore
+    const settings = await AppSettings.getSettings();
+    const config = settings?.riderEarningConfig;
+    
+    // Default config if missing
+    const basePay = config?.basePay ?? 30;
+    const perKmRate = config?.perKmRate ?? 8;
+    const minEarning = config?.minimumEarning ?? 40;
+    const peakBonus = (config?.isPeakModeActive && config?.peakBonus) ? config.peakBonus : 0;
+    const rainBonus = (config?.isRainModeActive && config?.rainBonus) ? config.rainBonus : 0;
+
+    // Calculate Heavy Item Bonus
+    let heavyItemBonus = 0;
+    if (config?.heavyItemBonus && config?.heavyItemWeightThreshold > 0) {
+        let totalWeight = 0;
+        // Check if items are populated
+        if (order.items && order.items.length > 0 && typeof order.items[0] === 'object' && order.items[0].product) {
+            for (const item of order.items) {
+                // if product is populated inside item
+                if (item.product && typeof item.product === 'object' && item.product.weight) {
+                    totalWeight += (item.product.weight * item.quantity);
+                } else if (item.product) {
+                    // product is just an ID, fetch it
+                    const prod = await Product.findById(item.product);
+                    if (prod && prod.weight) {
+                        totalWeight += (prod.weight * item.quantity);
+                    }
+                }
+            }
+        }
+        if (totalWeight >= config.heavyItemWeightThreshold) {
+            heavyItemBonus = config.heavyItemBonus;
+        }
+    }
+
+    const distanceKm = order.deliveryDistanceKm || 0;
+    const distancePay = distanceKm * perKmRate;
+
+    let totalEarning = basePay + distancePay + peakBonus + rainBonus + heavyItemBonus;
+    if (totalEarning < minEarning) {
+        totalEarning = minEarning;
+    }
+
+    return {
+        basePay,
+        distancePay,
+        peakBonus,
+        rainBonus,
+        heavyItemBonus,
+        totalEarning: Math.round(totalEarning * 100) / 100,
+    };
+};
+
+/**
  * Get the effective commission rate for a product/item
  * Priority: 1. SubSubCategory -> 2. SubCategory -> 3. Category -> 4. Seller -> 5. Global
  */
@@ -187,43 +244,19 @@ export const calculateOrderCommissions = async (orderId: string) => {
 
             // Check for distance based commission
             let commissionAmount = 0;
-            let commissionRate = 0;
-            let usedDistanceBased = false;
-
-            try {
-                // @ts-ignore - getSettings is static on model
-                const settings = await AppSettings.getSettings();
-                if (
-                    settings &&
-                    settings.deliveryConfig?.isDistanceBased === true &&
-                    settings.deliveryConfig?.deliveryBoyKmRate &&
-                    order.deliveryDistanceKm &&
-                    order.deliveryDistanceKm > 0
-                ) {
-                    commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
-                    commissionAmount = order.deliveryDistanceKm * commissionRate;
-                    usedDistanceBased = true;
-                    console.log(
-                        `DEBUG: Distance Commission: Dist=${order.deliveryDistanceKm}km, Rate=${commissionRate}/km, Amt=${commissionAmount}`,
-                    );
-                }
-            } catch (err) {
-                console.error("Error checking settings for commission:", err);
-            }
-
-            if (!usedDistanceBased) {
-                // Fallback to percentage based logic
-                commissionRate = await getDeliveryBoyCommissionRate(deliveryBoyId);
-                commissionAmount = (order.subtotal * commissionRate) / 100;
+            
+            if (order.riderEarningBreakdown && order.riderEarningBreakdown.totalEarning > 0) {
+                commissionAmount = order.riderEarningBreakdown.totalEarning;
+            } else {
+                const dynamicEarning = await calculateDynamicRiderEarning(order);
+                commissionAmount = dynamicEarning.totalEarning;
             }
 
             commissions.deliveryBoy = {
                 deliveryBoyId,
-                amount: Math.round(commissionAmount * 100) / 100, // Round to 2 decimals
-                rate: commissionRate,
-                orderAmount: usedDistanceBased
-                    ? order.deliveryDistanceKm || 0
-                    : order.subtotal,
+                amount: commissionAmount,
+                rate: 0,
+                orderAmount: order.subtotal,
             };
         }
 
@@ -410,33 +443,14 @@ export const distributeCommissions = async (orderId: string) => {
                     `Creating missing commission for Delivery Boy ${deliveryBoyId}`,
                 );
 
-                // Calculate Commission Logic
+                // Calculate Commission Logic using dynamic earning
                 let commissionAmount = 0;
-                let commissionRate = 0;
-                let usedDistanceBased = false;
-
-                try {
-                    // @ts-ignore
-                    const settings = await AppSettings.getSettings();
-                    if (
-                        settings &&
-                        settings.deliveryConfig?.isDistanceBased === true &&
-                        settings.deliveryConfig?.deliveryBoyKmRate &&
-                        order.deliveryDistanceKm &&
-                        order.deliveryDistanceKm > 0
-                    ) {
-                        commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
-                        commissionAmount = order.deliveryDistanceKm * commissionRate;
-                        usedDistanceBased = true;
-                    }
-                } catch (err) {
-                    console.error("Error checking settings for commission:", err);
-                }
-
-                if (!usedDistanceBased) {
-                    // Fallback to percentage based logic
-                    commissionRate = await getDeliveryBoyCommissionRate(deliveryBoyId);
-                    commissionAmount = (order.subtotal * commissionRate) / 100;
+                
+                if (order.riderEarningBreakdown && order.riderEarningBreakdown.totalEarning > 0) {
+                    commissionAmount = order.riderEarningBreakdown.totalEarning;
+                } else {
+                    const dynamicEarning = await calculateDynamicRiderEarning(order);
+                    commissionAmount = dynamicEarning.totalEarning;
                 }
 
                 // Create Commission Record
@@ -446,10 +460,8 @@ export const distributeCommissions = async (orderId: string) => {
                             order: order._id,
                             deliveryBoy: order.deliveryBoy,
                             type: "DELIVERY_BOY",
-                            orderAmount: usedDistanceBased
-                                ? order.deliveryDistanceKm || 0
-                                : order.subtotal,
-                            commissionRate,
+                            orderAmount: order.subtotal,
+                            commissionRate: 0,
                             commissionAmount: Math.round(commissionAmount * 100) / 100,
                             status: "Paid",
                             paidAt: new Date(),
@@ -840,29 +852,16 @@ export const calculateOrderBreakdown = async (
 
         // 2. Calculate Delivery Commission Split
         if (order.deliveryBoy) {
-            const settings = await AppSettings.getSettings();
-
-            // Check if distance-based delivery is enabled
-            if (
-                settings?.deliveryConfig?.isDistanceBased &&
-                settings.deliveryConfig.deliveryBoyKmRate &&
-                order.deliveryDistanceKm &&
-                order.deliveryDistanceKm > 0
-            ) {
-                // Distance-based calculation
-                const deliveryBoyKmRate = settings.deliveryConfig.deliveryBoyKmRate;
-                breakdown.deliveryBoyCommission = order.deliveryDistanceKm * deliveryBoyKmRate;
-
-                // Admin gets the rest of the delivery charge
-                breakdown.adminDeliveryCommission = breakdown.totalDeliveryCharge - breakdown.deliveryBoyCommission;
+            // Use dynamic rider earning
+            if (order.riderEarningBreakdown && order.riderEarningBreakdown.totalEarning > 0) {
+                breakdown.deliveryBoyCommission = order.riderEarningBreakdown.totalEarning;
             } else {
-                // Fallback: If no distance-based config, use percentage of order subtotal
-                const deliveryBoy = await Delivery.findById(order.deliveryBoy).session(session || null);
-                const deliveryBoyRate = deliveryBoy?.commissionRate || 5;
-
-                breakdown.deliveryBoyCommission = (order.subtotal * deliveryBoyRate) / 100;
-                breakdown.adminDeliveryCommission = Math.max(0, breakdown.totalDeliveryCharge);
+                const dynamicEarning = await calculateDynamicRiderEarning(order);
+                breakdown.deliveryBoyCommission = dynamicEarning.totalEarning;
             }
+
+            // Admin gets the rest of the delivery charge, or 0 if delivery payout is more than charge
+            breakdown.adminDeliveryCommission = Math.max(0, breakdown.totalDeliveryCharge - breakdown.deliveryBoyCommission);
 
         } else {
             // No delivery boy assigned, all delivery charge goes to admin

@@ -55,6 +55,7 @@ export default function SellerAddProduct() {
     manufacturer: "",
     madeIn: "",
     tax: "",
+    weight: "", // weight in kg
     isReturnable: "No",
     maxReturnDays: "",
     fssaiLicNo: "",
@@ -193,7 +194,8 @@ export default function SellerAddProduct() {
               variationType: product.variationType || "",
               manufacturer: product.manufacturer || "",
               madeIn: product.madeIn || "",
-              tax: (product.tax as any)?._id || product.taxId || (typeof product.tax === 'string' ? product.tax : ""),
+              tax: product.tax ? product.tax.toString() : "",
+              weight: product.weight ? product.weight.toString() : "",
               isReturnable: product.isReturnable ? "Yes" : "No",
               maxReturnDays: product.maxReturnDays?.toString() || "",
               fssaiLicNo: product.fssaiLicNo ? product.fssaiLicNo.replace('FSSAI Lic. No. ', '') : "",
@@ -422,7 +424,12 @@ export default function SellerAddProduct() {
 
     // Basic validation
     if (!formData.productName.trim()) {
-      setUploadError("Please enter a product name.");
+      setUploadError("Product name is required.");
+      return;
+    }
+
+    if (!formData.weight || isNaN(Number(formData.weight)) || Number(formData.weight) <= 0) {
+      setUploadError("Product weight (in kg) is required and must be > 0.");
       return;
     }
 
@@ -502,9 +509,11 @@ export default function SellerAddProduct() {
         seoDescription: formData.seoDescription || undefined,
         smallDescription: formData.smallDescription || undefined,
         tags: tagsArray,
-        manufacturer: formData.manufacturer || undefined,
-        madeIn: formData.madeIn || undefined,
-        taxId: formData.tax || undefined,
+        variationType: formData.variationType,
+        manufacturer: formData.manufacturer,
+        madeIn: formData.madeIn,
+        taxId: formData.tax,
+        weight: formData.weight,
         isReturnable: formData.isReturnable === "Yes",
         maxReturnDays: formData.maxReturnDays
           ? parseInt(formData.maxReturnDays)
@@ -514,7 +523,6 @@ export default function SellerAddProduct() {
         mainImageUrl: mainImageUrl || undefined,
         galleryImageUrls,
         variations: variations,
-        variationType: formData.variationType || undefined,
         isShopByStoreOnly: formData.isShopByStoreOnly === "Yes",
         shopId:
           formData.isShopByStoreOnly === "Yes" && formData.shopId
@@ -564,6 +572,7 @@ export default function SellerAddProduct() {
               galleryImageUrls: [],
               isShopByStoreOnly: "No",
               shopId: "",
+              weight: "",
             });
             setVariations([]);
             setMainImageFile(null);
@@ -988,6 +997,21 @@ export default function SellerAddProduct() {
                     value={formData.madeIn}
                     onChange={handleChange}
                     placeholder="Enter Made In"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Weight (kg) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="weight"
+                    value={formData.weight}
+                    onChange={handleChange}
+                    placeholder="e.g. 1.5"
+                    required
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>

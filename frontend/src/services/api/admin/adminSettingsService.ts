@@ -84,6 +84,17 @@ export interface AppSettings {
     kmRate: number;
     deliveryBoyKmRate?: number;
   };
+  riderEarningConfig?: {
+    basePay?: number;
+    perKmRate?: number;
+    minimumEarning?: number;
+    peakBonus?: number;
+    isPeakModeActive?: boolean;
+    rainBonus?: number;
+    isRainModeActive?: boolean;
+    heavyItemBonus?: number;
+    heavyItemWeightThreshold?: number;
+  };
   gstEnabled: boolean;
   gstRate?: number;
   privacyPolicy?: string;

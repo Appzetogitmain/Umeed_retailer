@@ -7,6 +7,8 @@ import DeliveryBottomNav from '../components/DeliveryBottomNav';
 import { getDashboardStats } from '../../../services/api/delivery/deliveryService';
 import { useDeliveryStatus } from '../context/DeliveryStatusContext';
 
+import { registerFCMToken } from '../../../services/pushNotificationService';
+
 export default function DeliveryDashboard() {
   const navigate = useNavigate();
   const { isOnline, sellersInRangeCount, locationError } = useDeliveryStatus();
@@ -15,6 +17,8 @@ export default function DeliveryDashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    registerFCMToken().catch(err => console.error('Delivery FCM token error:', err));
+
     const fetchStats = async () => {
       try {
         const data = await getDashboardStats();

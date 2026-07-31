@@ -69,6 +69,7 @@ export interface IProduct extends Document {
   pack?: string;
   shelfLife?: string;
   marketer?: string;
+  weight: number; // weight in kg
 
   // Ratings
   rating: number;
@@ -249,6 +250,12 @@ const ProductSchema = new Schema<IProduct>(
     madeIn: {
       type: String,
       trim: true,
+    },
+    weight: {
+      type: Number,
+      required: [true, "Weight (in kg) is required"],
+      min: [0, "Weight cannot be negative"],
+      default: 0
     },
     tax: {
       type: Schema.Types.ObjectId,

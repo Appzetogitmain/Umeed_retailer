@@ -32,7 +32,16 @@ export const createProduct = asyncHandler(
       brand: productData.brandId,
       mainImage: productData.mainImageUrl, // Map mainImageUrl to mainImage
       galleryImages: productData.galleryImageUrls,
+      weight: Number(productData.weight), // Map weight
     };
+
+    // Require weight validation
+    if (newProductData.weight === undefined || isNaN(newProductData.weight) || newProductData.weight <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Product weight (in kg) is required and must be greater than 0",
+      });
+    }
 
     // Map variations: Ensure 'title' from frontend is mapped to 'value' (or name) expected by Schema
     if (newProductData.variations) {
@@ -320,6 +329,18 @@ export const updateProduct = asyncHandler(
     if (updateData.galleryImageUrls) {
       updateData.galleryImages = updateData.galleryImageUrls;
       delete updateData.galleryImageUrls;
+    }
+    
+    // Weight parsing and validation
+    if (updateData.weight !== undefined) {
+      const parsedWeight = Number(updateData.weight);
+      if (isNaN(parsedWeight) || parsedWeight <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Product weight (in kg) must be greater than 0",
+        });
+      }
+      updateData.weight = parsedWeight;
     }
 
     // Validate variations if provided

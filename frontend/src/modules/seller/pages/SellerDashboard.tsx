@@ -6,6 +6,8 @@ import AlertCard from '../components/AlertCard';
 import { getSellerDashboardStats, DashboardStats, NewOrder } from '../../../services/api/dashboardService';
 import { getSellerProfile, toggleShopStatus } from '../../../services/api/auth/sellerAuthService';
 
+import { registerFCMToken } from '../../../services/pushNotificationService';
+
 export default function SellerDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -19,6 +21,8 @@ export default function SellerDashboard() {
   const [sellerStatus, setSellerStatus] = useState<string>('approved');
 
   useEffect(() => {
+    registerFCMToken().catch(err => console.error('Seller FCM token error:', err));
+
     const fetchDashboardData = async () => {
       try {
         setLoading(true);

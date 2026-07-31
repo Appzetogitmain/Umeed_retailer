@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import OrderItem from '../models/OrderItem';
 import mongoose from 'mongoose';
 import { sendNotification } from './notificationService';
+import { sendNotificationToSeller } from '../utils/pushNotificationHelper';
 
 /**
  * Notify all sellers involved in an order about a new order or status change
@@ -62,6 +63,7 @@ export async function notifySellersOfOrderUpdate(
             console.log(`📤 Emitted notification to seller-${sellerId}`);
 
             // Also save notification in the database for history
+
             try {
                 let title = "New Order Received";
                 let message = `You have received a new order #${order.orderNumber} for ₹${notificationData.totalAmount.toFixed(2)}.`;
@@ -88,6 +90,19 @@ export async function notifySellersOfOrderUpdate(
                     }
                 );
                 console.log(`💾 Saved notification for seller-${sellerId} to DB`);
+
+                // Send FCM Push Notification (works outside app / background)
+                await sendNotificationToSeller(sellerId, {
+                    title,
+                    body: message,
+                    data: {
+                        type: type,
+                        orderId: order._id.toString(),
+                        orderNumber: order.orderNumber,
+                        url: `/seller/orders/${order._id}`
+                    }
+                }).catch(pushErr => console.error(`❌ FCM Push notification to seller failed:`, pushErr));
+
             } catch (dbErr) {
                 console.error(`❌ Failed to save seller notification to DB:`, dbErr);
             }

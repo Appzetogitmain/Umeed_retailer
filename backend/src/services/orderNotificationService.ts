@@ -365,7 +365,11 @@ export async function notifyDeliveryBoysForSellerPickup(
         // ---------------------------------
 
         // Calculate rider earning dynamically for this seller's portion
-        let riderEarning = 40; // Default minimum
+        // First we calculate the dynamic earning for the entire order
+        const { calculateDynamicRiderEarning } = await import('./commissionService');
+        const dynamicEarning = await calculateDynamicRiderEarning(order);
+        let riderEarning = dynamicEarning.totalEarning;
+        
         let sellerSubtotal = 0;
         
         // Calculate subtotal for this seller's items
@@ -377,11 +381,6 @@ export async function notifyDeliveryBoysForSellerPickup(
                 })
                 .reduce((sum: number, item: any) => sum + (item.total || 0), 0);
         }
-        
-        // Very basic commission calculation for sub-orders
-        riderEarning = (sellerSubtotal * 5) / 100;
-        if (riderEarning < 40) riderEarning = 40; // minimum
-        riderEarning = Math.round(riderEarning * 100) / 100;
 
         // Find COD amount for this rider
         let codAmount = 0;
@@ -509,43 +508,10 @@ export async function notifyDeliveryBoysOfNewOrder(
         }
         // ---------------------------------
 
-        // Calculate rider earning dynamically based on distance or percentage configuration
-        let riderEarning = 0;
-        try {
-            const AppSettings = require('../models/AppSettings').default;
-            const settings = await AppSettings.findOne();
-            let commissionRate = 0;
-            let usedDistanceBased = false;
-
-            if (
-                settings &&
-                settings.deliveryConfig?.isDistanceBased === true &&
-                settings.deliveryConfig?.deliveryBoyKmRate &&
-                order.deliveryDistanceKm &&
-                order.deliveryDistanceKm > 0
-            ) {
-                commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
-                riderEarning = order.deliveryDistanceKm * commissionRate;
-                usedDistanceBased = true;
-            }
-
-            if (!usedDistanceBased) {
-                // Percentage based fallback (standard 5% or settings default)
-                const rate = 5;
-                riderEarning = (order.subtotal * rate) / 100;
-            }
-        } catch (err) {
-            console.error("Error calculating rider earning for notification:", err);
-            riderEarning = (order.subtotal * 5) / 100;
-        }
-
-        // Ensure we always have a positive earning (at least shipping fee or a standard minimum payout like 40)
-        if (!riderEarning || riderEarning <= 0) {
-            riderEarning = order.shipping || 40;
-        }
-
-        // Round rider earning to 2 decimal places
-        riderEarning = Math.round(riderEarning * 100) / 100;
+        // Calculate rider earning dynamically
+        const { calculateDynamicRiderEarning } = await import('./commissionService');
+        const dynamicEarning = await calculateDynamicRiderEarning(order);
+        let riderEarning = dynamicEarning.totalEarning;
 
         // Prepare order data for notification
         const orderData = {
@@ -693,6 +659,11 @@ export async function handleOrderAcceptance(
                 order.status = 'Processed';
             }
             
+            // Freeze dynamic rider earning breakdown
+            const { calculateDynamicRiderEarning } = await import('./commissionService');
+            const earningBreakdown = await calculateDynamicRiderEarning(order);
+            order.riderEarningBreakdown = earningBreakdown;
+
             await order.save();
         } else {
             // Legacy single-delivery logic
@@ -705,6 +676,11 @@ export async function handleOrderAcceptance(
             order.deliveryBoyStatus = 'Assigned';
             order.assignedAt = new Date();
             order.status = 'Processed'; // Mark as processed when assigned
+
+            // Freeze dynamic rider earning breakdown
+            const { calculateDynamicRiderEarning } = await import('./commissionService');
+            const earningBreakdown = await calculateDynamicRiderEarning(order);
+            order.riderEarningBreakdown = earningBreakdown;
 
             await order.save();
         }

@@ -209,43 +209,41 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
     // Calculate rider earning dynamically
     let riderEarning = 0;
     try {
-        const AppSettings = require('../../../models/AppSettings').default;
-        const settings = await AppSettings.findOne();
-        let commissionRate = 0;
-        let usedDistanceBased = false;
-
-        if (
-            settings &&
-            settings.deliveryConfig?.isDistanceBased === true &&
-            settings.deliveryConfig?.deliveryBoyKmRate &&
-            order.deliveryDistanceKm &&
-            order.deliveryDistanceKm > 0
-        ) {
-            commissionRate = settings.deliveryConfig.deliveryBoyKmRate;
-            riderEarning = order.deliveryDistanceKm * commissionRate;
-            usedDistanceBased = true;
-        }
-
-        if (!usedDistanceBased && order.deliveryBoy) {
-            const Delivery = require('../../../models/Delivery').default;
-            const deliveryBoy = await Delivery.findById(order.deliveryBoy);
-            const rate = (deliveryBoy && deliveryBoy.commissionRate !== undefined && deliveryBoy.commissionRate !== null)
-                ? deliveryBoy.commissionRate
-                : 5; // Fallback to 5%
-            riderEarning = (order.subtotal * rate) / 100;
-        } else if (!usedDistanceBased) {
-            riderEarning = (order.subtotal * 5) / 100;
+        if (order.riderEarningBreakdown && order.riderEarningBreakdown.totalEarning > 0) {
+            riderEarning = order.riderEarningBreakdown.totalEarning;
+        } else {
+            const { calculateDynamicRiderEarning } = await import('../../../services/commissionService');
+            const dynamicEarning = await calculateDynamicRiderEarning(order);
+            riderEarning = dynamicEarning.totalEarning;
         }
     } catch (err) {
         console.error("Error calculating rider earning for order details:", err);
-        riderEarning = (order.subtotal * 5) / 100;
+        riderEarning = 40; // absolute fallback
     }
 
-    if (!riderEarning || riderEarning <= 0) {
-        riderEarning = order.shipping || 40;
+    // Ensure we always have a minimum earning (at least shipping fee or a standard minimum payout like 40)
+    const minEarning = order.shipping || 40;
+    if (riderEarning < minEarning) {
+        riderEarning = minEarning;
     }
 
     riderEarning = Math.round(riderEarning * 100) / 100;
+
+    // Determine this rider's specific delivery status
+    let riderDeliveryStatus = order.status;
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0 && deliveryId) {
+        const myAcceptancesForStatus = order.sellerAcceptances.filter((sa: any) =>
+            sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId)
+        );
+        if (myAcceptancesForStatus.length > 0) {
+            const allMyItemsDelivered = myAcceptancesForStatus.every((sa: any) =>
+                sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered'
+            );
+            if (allMyItemsDelivered) {
+                riderDeliveryStatus = 'Delivered';
+            }
+        }
+    }
 
     const formattedOrder = {
         id: order._id,
@@ -255,6 +253,7 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
         address: `${order.deliveryAddress?.address || ''}, ${order.deliveryAddress?.city || ''}`,
         deliveryAddress: order.deliveryAddress,
         status: order.status,
+        riderStatus: riderDeliveryStatus, // Per-rider delivery status
         items: mapOrderItems(assignedItems), // Real populated items for this rider
         totalAmount: codTotalAmount > 0 ? codTotalAmount : order.total,
         riderEarning: riderEarning, // Added rider earning
@@ -282,7 +281,10 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() != deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
@@ -455,15 +457,38 @@ export const sendDeliveryOtp = asyncHandler(async (req: Request, res: Response) 
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    console.log(`[sendOTP] orderId=${id}, deliveryId=${deliveryId}, isAssigned=${isAssigned}, order.status=${order.status}`);
+    console.log(`[sendOTP] sellerAcceptances=`, JSON.stringify(order.sellerAcceptances?.map((sa: any) => ({
+        deliveryBoy: sa.deliveryBoy?.toString(),
+        status: sa.status,
+        deliveryBoyStatus: sa.deliveryBoyStatus,
+    }))));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
-    if (order.status === 'Delivered') {
+    const isAlreadyDelivered = order.status === 'Delivered' ||
+        (order.sellerAcceptances && order.sellerAcceptances.length > 0 &&
+         order.sellerAcceptances.every((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId) ? (sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered') : true) &&
+         order.sellerAcceptances.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId)));
+
+    if (isAlreadyDelivered) {
         return res.status(400).json({ success: false, message: "Order is already delivered" });
     }
 
-    if (order.status !== 'Picked up' && order.status !== 'Out for Delivery') {
+    const isReadyForOtp = order.status === 'Picked up' || order.status === 'Out for Delivery' ||
+        order.sellerAcceptances?.some((sa: any) =>
+            sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId) &&
+            ['Picked Up', 'In Transit', 'Out for Delivery', 'Assigned'].includes(sa.deliveryBoyStatus)
+        );
+
+    console.log(`[sendOTP] isReadyForOtp=${isReadyForOtp}`);
+
+    if (!isReadyForOtp) {
         return res.status(400).json({ success: false, message: "Order must be picked up before sending delivery OTP" });
     }
 
@@ -506,6 +531,8 @@ export const verifyDeliveryOtpController = asyncHandler(async (req: Request, res
     const { otp } = req.body;
     const deliveryId = req.user?.userId;
 
+    console.log(`[verifyOTP] orderId=${id}, deliveryId=${deliveryId}, otp=${otp}`);
+
     if (!otp) {
         return res.status(400).json({ success: false, message: "OTP is required" });
     }
@@ -515,7 +542,20 @@ export const verifyDeliveryOtpController = asyncHandler(async (req: Request, res
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    console.log(`[verifyOTP] order.deliveryBoy=${order.deliveryBoy}, order.status=${order.status}`);
+    console.log(`[verifyOTP] sellerAcceptances=`, JSON.stringify(order.sellerAcceptances?.map((sa: any) => ({
+        seller: sa.seller?.toString(),
+        deliveryBoy: sa.deliveryBoy?.toString(),
+        status: sa.status,
+        deliveryBoyStatus: sa.deliveryBoyStatus,
+    }))));
+
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    console.log(`[verifyOTP] isAssigned=${isAssigned}`);
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
@@ -596,7 +636,10 @@ export const checkSellerProximity = asyncHandler(async (req: Request, res: Respo
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 
@@ -802,7 +845,10 @@ export const checkCustomerProximity = asyncHandler(async (req: Request, res: Res
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    if (order.deliveryBoy?.toString() !== deliveryId) {
+    const isAssigned = getIdStr(order.deliveryBoy) === getIdStr(deliveryId) ||
+        order.sellerAcceptances?.some((sa: any) => sa.deliveryBoy && getIdStr(sa.deliveryBoy) === getIdStr(deliveryId));
+
+    if (!isAssigned) {
         return res.status(403).json({ success: false, message: "This order is not assigned to you" });
     }
 

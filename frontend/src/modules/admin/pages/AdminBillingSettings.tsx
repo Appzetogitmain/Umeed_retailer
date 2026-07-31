@@ -22,6 +22,17 @@ export default function AdminBillingSettings() {
     const [deliveryBoyKmRate, setDeliveryBoyKmRate] = useState<number>(0);
     const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
 
+    // Dynamic Rider Earning Config
+    const [riderBasePay, setRiderBasePay] = useState(30);
+    const [riderPerKmRate, setRiderPerKmRate] = useState(8);
+    const [riderMinimumEarning, setRiderMinimumEarning] = useState(40);
+    const [riderPeakBonus, setRiderPeakBonus] = useState(0);
+    const [isPeakModeActive, setIsPeakModeActive] = useState(false);
+    const [riderRainBonus, setRiderRainBonus] = useState(0);
+    const [isRainModeActive, setIsRainModeActive] = useState(false);
+    const [riderHeavyItemBonus, setRiderHeavyItemBonus] = useState(0);
+    const [riderHeavyItemThreshold, setRiderHeavyItemThreshold] = useState(5);
+
     // Support Info Config
     const [supportEmail, setSupportEmail] = useState<string>('');
     const [supportPhone, setSupportPhone] = useState<string>('');
@@ -52,9 +63,20 @@ export default function AdminBillingSettings() {
                     setKmRate(data.deliveryConfig.kmRate || 0);
                     setDeliveryBoyKmRate(data.deliveryConfig.deliveryBoyKmRate || 0);
                     setGoogleMapsKey(data.deliveryConfig.googleMapsKey || import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
-                } else {
                     // If no config exists, try to pre-fill from env
                     setGoogleMapsKey(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '');
+                }
+
+                if (data.riderEarningConfig) {
+                    setRiderBasePay(data.riderEarningConfig.basePay ?? 30);
+                    setRiderPerKmRate(data.riderEarningConfig.perKmRate ?? 8);
+                    setRiderMinimumEarning(data.riderEarningConfig.minimumEarning ?? 40);
+                    setRiderPeakBonus(data.riderEarningConfig.peakBonus ?? 0);
+                    setIsPeakModeActive(data.riderEarningConfig.isPeakModeActive ?? false);
+                    setRiderRainBonus(data.riderEarningConfig.rainBonus ?? 0);
+                    setIsRainModeActive(data.riderEarningConfig.isRainModeActive ?? false);
+                    setRiderHeavyItemBonus(data.riderEarningConfig.heavyItemBonus ?? 0);
+                    setRiderHeavyItemThreshold(data.riderEarningConfig.heavyItemWeightThreshold ?? 5);
                 }
             }
         } catch (error: any) {
@@ -82,6 +104,17 @@ export default function AdminBillingSettings() {
                     kmRate,
                     deliveryBoyKmRate,
                     googleMapsKey
+                },
+                riderEarningConfig: {
+                    basePay: riderBasePay,
+                    perKmRate: riderPerKmRate,
+                    minimumEarning: riderMinimumEarning,
+                    peakBonus: riderPeakBonus,
+                    isPeakModeActive,
+                    rainBonus: riderRainBonus,
+                    isRainModeActive,
+                    heavyItemBonus: riderHeavyItemBonus,
+                    heavyItemWeightThreshold: riderHeavyItemThreshold
                 }
             };
 
@@ -188,8 +221,8 @@ export default function AdminBillingSettings() {
                 <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
                     <div className="flex justify-between items-start mb-6 pb-2 border-b">
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-900">Delivery Configuration</h2>
-                            <p className="text-sm text-gray-500">Choose between fixed or distance-based pricing</p>
+                            <h2 className="text-lg font-semibold text-gray-900">Customer Delivery Fee Configuration</h2>
+                            <p className="text-sm text-gray-500">Configure how much the customer will be charged for delivery</p>
                         </div>
 
                         <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
@@ -294,22 +327,7 @@ export default function AdminBillingSettings() {
                                 <p className="mt-1 text-xs text-gray-500">Charged for every km after base distance.</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Delivery Boy Commission (₹/km)
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={deliveryBoyKmRate}
-                                        onChange={(e) => setDeliveryBoyKmRate(Number(e.target.value))}
-                                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                                    />
-                                </div>
-                                <p className="mt-1 text-xs text-gray-500">Amount paid to delivery partner per km.</p>
-                            </div>
+                            {/* Removed deprecated Delivery Boy Commission field from here */}
 
                             <div className="col-span-full">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -327,6 +345,135 @@ export default function AdminBillingSettings() {
                         </motion.div>
                     )}
                 </div>
+
+                {/* Rider Earning Configuration Section */}
+                <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                    <div className="flex justify-between items-start mb-6 pb-2 border-b">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900">Rider Earning Configuration</h2>
+                            <p className="text-sm text-gray-500">Dynamic earning formula for delivery boys</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Base Pay (₹)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={riderBasePay}
+                                onChange={(e) => setRiderBasePay(Number(e.target.value))}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Per KM Rate (₹)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={riderPerKmRate}
+                                onChange={(e) => setRiderPerKmRate(Number(e.target.value))}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Minimum Earning (₹)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={riderMinimumEarning}
+                                onChange={(e) => setRiderMinimumEarning(Number(e.target.value))}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-neutral-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="font-medium text-orange-900">Peak Hours Bonus</label>
+                                <button
+                                    onClick={() => setIsPeakModeActive(!isPeakModeActive)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPeakModeActive ? 'bg-orange-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPeakModeActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">+₹</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={riderPeakBonus}
+                                    onChange={(e) => setRiderPeakBonus(Number(e.target.value))}
+                                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="font-medium text-blue-900">Rain Mode Bonus</label>
+                                <button
+                                    onClick={() => setIsRainModeActive(!isRainModeActive)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isRainModeActive ? 'bg-blue-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isRainModeActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">+₹</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={riderRainBonus}
+                                    onChange={(e) => setRiderRainBonus(Number(e.target.value))}
+                                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 col-span-full md:col-span-1">
+                            <div className="flex justify-between items-center mb-4">
+                                <label className="font-medium text-purple-900">Heavy Item Bonus</label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-purple-700 mb-1">Bonus Amount</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">+₹</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={riderHeavyItemBonus}
+                                            onChange={(e) => setRiderHeavyItemBonus(Number(e.target.value))}
+                                            className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-purple-700 mb-1">Threshold (kg)</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={riderHeavyItemThreshold}
+                                            onChange={(e) => setRiderHeavyItemThreshold(Number(e.target.value))}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Support Contact Settings */}
                 <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Support Contacts</h2>

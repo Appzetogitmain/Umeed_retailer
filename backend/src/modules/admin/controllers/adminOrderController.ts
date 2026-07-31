@@ -216,7 +216,7 @@ export const assignDeliveryBoy = asyncHandler(
       });
     }
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate("items");
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -224,10 +224,15 @@ export const assignDeliveryBoy = asyncHandler(
       });
     }
 
+    // Freeze dynamic rider earning breakdown
+    const { calculateDynamicRiderEarning } = await import("../../../services/commissionService");
+    const earningBreakdown = await calculateDynamicRiderEarning(order);
+
     // Update order
     order.deliveryBoy = deliveryBoyId as any;
     order.deliveryBoyStatus = "Assigned";
     order.assignedAt = new Date();
+    order.riderEarningBreakdown = earningBreakdown;
     await order.save();
 
     // Create or update delivery assignment
