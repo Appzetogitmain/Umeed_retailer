@@ -31,7 +31,10 @@ if (messaging) {
         const notificationTitle = payload.notification?.title || 'New Message';
         const notificationOptions = {
             body: payload.notification?.body || '',
-            icon: '/favicon.ico',
+            icon: '/logo192.png',
+            badge: '/logo192.png',
+            vibrate: [200, 100, 200, 100, 200, 100, 200],
+            requireInteraction: true,
             data: payload.data
         };
 
