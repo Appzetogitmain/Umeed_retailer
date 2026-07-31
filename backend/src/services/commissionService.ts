@@ -977,10 +977,8 @@ export const processCODOrderDelivery = async (
                 order: orderId,
                 deliveryBoy: order.deliveryBoy,
                 type: "DELIVERY_BOY",
-                orderAmount: breakdown.deliveryDistanceKm || breakdown.totalDeliveryCharge,
-                commissionRate: breakdown.deliveryDistanceKm
-                    ? breakdown.deliveryBoyCommission / breakdown.deliveryDistanceKm
-                    : (breakdown.deliveryBoyCommission / breakdown.totalDeliveryCharge) * 100,
+                orderAmount: order.subtotal,
+                commissionRate: 0,
                 commissionAmount: breakdown.deliveryBoyCommission,
                 status: "Paid",
                 paidAt: new Date(),
