@@ -83,15 +83,40 @@ export async function sendPushNotification(tokens: string[], payload: PushNotifi
             },
             data: payload.data || {},
             tokens: tokens,
-            // Mobile Specifics
+            // Web Push (browser) specifics — REQUIRED for web FCM tokens to show notifications in background
+            webpush: {
+                headers: {
+                    Urgency: 'high',
+                },
+                notification: {
+                    title: payload.title,
+                    body: payload.body,
+                    icon: '/logo192.png',
+                    badge: '/logo192.png',
+                    requireInteraction: true,  // Keep visible until user taps
+                    vibrate: [200, 100, 200, 100, 200],
+                    tag: payload.data?.orderId ? `order-${payload.data.orderId}` : 'delivery-notification',
+                    renotify: false,
+                    data: payload.data || {},
+                    actions: [
+                        { action: 'view', title: '✅ View Order' },
+                        { action: 'dismiss', title: '❌ Dismiss' }
+                    ],
+                },
+                fcmOptions: {
+                    link: payload.data?.url || payload.data?.link || '/delivery/dashboard',
+                },
+            },
+            // Mobile Specifics (Android)
             android: {
                 priority: 'high',
                 notification: {
                     sound: 'default',
-                    channelId: 'kosil_notifications', // Ensure this matches your Flutter side channel if defined
+                    channelId: 'kosil_notifications',
                     clickAction: 'FLUTTER_NOTIFICATION_CLICK',
                 },
             },
+            // Mobile Specifics (iOS)
             apns: {
                 payload: {
                     aps: {

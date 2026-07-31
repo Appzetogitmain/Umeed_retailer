@@ -82,10 +82,10 @@ self.addEventListener('notificationclick', (event) => {
     const orderId = data.orderId;
     const action = event.action;
 
-    // If user clicked dismiss action, do nothing
+    // If user clicked dismiss action, just close — do nothing else
     if (action === 'dismiss') return;
 
-    // Build the URL to open — always go to dashboard with openOrder param
+    // 'view' action or direct click on notification body — open the app
     const deliveryDashboardUrl = orderId
         ? `/delivery/dashboard?openOrder=${orderId}`
         : '/delivery/dashboard';
