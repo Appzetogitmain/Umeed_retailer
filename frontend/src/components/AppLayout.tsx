@@ -254,7 +254,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Sticky Header - Show on search page and other non-home pages, excluding account page */}
           {(showHeader || isSearchPage) && (
             <header 
-              className="sticky top-0 z-50 shadow-[0_8px_30px_rgba(245,124,0,0.12)] md:top-[60px] overflow-hidden"
+              className="sticky top-0 z-50 shadow-[0_8px_30px_rgba(245,124,0,0.12)] md:top-[60px] overflow-hidden pt-[max(env(safe-area-inset-top),0.5rem)]"
               style={{
                 background: `linear-gradient(to bottom, ${currentTheme.primary[0]}, ${currentTheme.primary[1]})`,
                 borderBottomLeftRadius: '1.5rem',
