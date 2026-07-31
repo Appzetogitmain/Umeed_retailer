@@ -67,7 +67,7 @@ if (messaging) {
                         headers: { 'Content-Type': 'application/json' }
                     })
                 );
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         self.registration.showNotification(notificationTitle, notificationOptions);
@@ -145,7 +145,7 @@ self.addEventListener('message', (event) => {
                     }
                 }
             }
-        }).catch(() => {});
+        }).catch(() => { });
     }
 
     if (event.data && event.data.type === 'CLEAR_PENDING_ORDER') {
@@ -154,7 +154,7 @@ self.addEventListener('message', (event) => {
         if (orderId) {
             caches.open('delivery-pending-orders').then(cache => {
                 cache.delete(`/pending-order/${orderId}`);
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }
 });
