@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Notification from "../../../models/Notification";
+import Customer from "../../../models/Customer";
+import { sendBulkNotificationToRole } from "../../../utils/pushNotificationHelper";
 
 /**
  * Create a new notification
@@ -40,10 +42,23 @@ export const createNotification = asyncHandler(
       isRead: false,
     });
 
+    // Automatically send push notification to users
+    let pushResult = null;
+    try {
+      pushResult = await sendBulkNotificationToRole(notification);
+      notification.sentAt = new Date();
+      await notification.save();
+    } catch (error) {
+      console.error("Failed to send bulk push notification on create:", error);
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Notification created successfully",
-      data: notification,
+      message: "Notification created and sent successfully",
+      data: {
+        notification,
+        pushResult,
+      },
     });
   }
 );
@@ -205,8 +220,14 @@ export const sendNotification = asyncHandler(
       });
     }
 
-    // Logic to send push notification would go here
-    // e.g. await pushNotificationService.send(notification);
+    // Logic to send push notification
+    let pushResult = null;
+    try {
+      pushResult = await sendBulkNotificationToRole(notification);
+    } catch (error) {
+      console.error("Failed to send bulk push notification:", error);
+      // We don't fail the request if push fails, just log it
+    }
 
     notification.sentAt = new Date();
     await notification.save();
@@ -214,7 +235,10 @@ export const sendNotification = asyncHandler(
     return res.status(200).json({
       success: true,
       message: "Notification sent successfully",
-      data: notification,
+      data: {
+        notification,
+        pushResult
+      },
     });
   }
 );

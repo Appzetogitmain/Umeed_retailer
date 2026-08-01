@@ -10,6 +10,7 @@ import { appConfig } from "../../../services/configService";
 import { getCategories } from "../../../services/api/customerProductService";
 import { Category } from "../../../types/domain";
 import { getHeaderCategoriesPublic } from "../../../services/api/headerCategoryService";
+import { getCustomerNotifications } from "../../../services/api/customerNotificationService";
 import { getIconByName } from "../../../utils/iconLibrary";
 import { useThemeContext } from "../../../context/ThemeContext";
 
@@ -93,6 +94,27 @@ export default function HomeHero({
   const [, setIsSticky] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  // Fetch unread notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await getCustomerNotifications();
+        if (response.success && response.data) {
+          const unreadCount = response.data.filter((n: any) => !n.isRead).length;
+          setUnreadNotifications(unreadCount);
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+    };
+    fetchNotifications();
+    
+    // Set up polling every minute
+    const intervalId = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Format location display text - only show if user has provided location
   const locationDisplayText = useMemo(() => {
@@ -389,15 +411,16 @@ export default function HomeHero({
               />
             </div>
 
-            {/* Right side: Delivery Details - Shifted to right */}
-            <div className="flex flex-col items-end text-right">
-              {/* Delivery time - large, bold, dark grey/black */}
-              <div className="text-neutral-900 font-extrabold text-2xl md:text-3xl mb-0 leading-tight">
+            {/* Right side: Delivery Details & Notifications */}
+            <div className="flex items-center gap-3 md:gap-4 text-right">
+              <div className="flex flex-col items-end text-right">
+                {/* Delivery time */}
+              <div className="text-neutral-900 font-extrabold text-xl md:text-2xl mb-0 leading-tight tracking-tight">
                 {estimatedDeliveryTime || appConfig.estimatedDeliveryTime}
               </div>
               {locationDisplayText && (
                 <div 
-                  className="text-neutral-700 text-[10px] md:text-xs flex items-center justify-end gap-0.5 leading-tight opacity-90 cursor-pointer hover:opacity-100 transition-opacity"
+                  className="text-neutral-700 text-[9px] md:text-[10px] flex items-center justify-end gap-0.5 leading-tight opacity-90 cursor-pointer hover:opacity-100 transition-opacity mt-0.5"
                   onClick={() => setShowLocationChangeModal(true)}
                 >
                   <span className="line-clamp-1 max-w-[150px] md:max-w-[200px]" title={locationDisplayText}>
@@ -420,6 +443,22 @@ export default function HomeHero({
                   </svg>
                 </div>
               )}
+              </div>
+
+              {/* Notification Bell */}
+              <button 
+                onClick={() => navigate("/notifications")}
+                className="relative p-1.5 rounded-full bg-white/50 hover:bg-white/80 transition-colors shadow-sm flex-shrink-0"
+                aria-label="Notifications"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-800">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                {unreadNotifications > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white shadow-sm"></span>
+                )}
+              </button>
             </div>
           </div>
         </div>

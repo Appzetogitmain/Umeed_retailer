@@ -76,6 +76,17 @@ export async function sendPushNotification(tokens: string[], payload: PushNotifi
     }
 
     try {
+        const isOrder = !!(payload.data?.orderId || payload.data?.type === 'ORDER_NEW' || payload.data?.type === 'ORDER_DELIVERED' || payload.data?.type === 'Order');
+        const targetLink = payload.data?.url || payload.data?.link || (isOrder ? '/delivery/dashboard' : '/notifications');
+        const actions = isOrder ? [
+            { action: 'view', title: '✅ View Order' },
+            { action: 'dismiss', title: '❌ Dismiss' }
+        ] : [
+            { action: 'view', title: '✅ Open' },
+            { action: 'dismiss', title: '❌ Close' }
+        ];
+        const notificationTag = payload.data?.orderId ? `order-${payload.data.orderId}` : `notif-${Date.now()}`;
+
         const message: any = {
             notification: {
                 title: payload.title,
@@ -95,16 +106,13 @@ export async function sendPushNotification(tokens: string[], payload: PushNotifi
                     badge: '/logo192.png',
                     requireInteraction: true,  // Keep visible until user taps
                     vibrate: [200, 100, 200, 100, 200],
-                    tag: payload.data?.orderId ? `order-${payload.data.orderId}` : 'delivery-notification',
+                    tag: notificationTag,
                     renotify: false,
                     data: payload.data || {},
-                    actions: [
-                        { action: 'view', title: '✅ View Order' },
-                        { action: 'dismiss', title: '❌ Dismiss' }
-                    ],
+                    actions: actions,
                 },
                 fcmOptions: {
-                    link: payload.data?.url || payload.data?.link || '/delivery/dashboard',
+                    link: targetLink,
                 },
             },
             // Mobile Specifics (Android)

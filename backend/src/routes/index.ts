@@ -29,6 +29,7 @@ import customerCouponRoutes from "./customerCouponRoutes";
 import customerAddressRoutes from "./customerAddressRoutes";
 import customerHomeRoutes from "./customerHomeRoutes";
 import customerCartRoutes from "./customerCartRoutes";
+import customerNotificationRoutes from "./customerNotificationRoutes";
 import wishlistRoutes from "./wishlistRoutes";
 import productReviewRoutes from "./productReviewRoutes";
 import policyRoutes from "./policyRoutes";
@@ -122,6 +123,7 @@ router.use("/customer/coupons", customerCouponRoutes);
 router.use("/customer/addresses", customerAddressRoutes);
 router.use("/customer/home", customerHomeRoutes);
 router.use("/customer/cart", customerCartRoutes);
+router.use("/customer/notifications", customerNotificationRoutes);
 router.use("/customer/wishlist", wishlistRoutes);
 router.use("/customer/reviews", productReviewRoutes);
 // General customer route (must be last to avoid intercepting specific routes)

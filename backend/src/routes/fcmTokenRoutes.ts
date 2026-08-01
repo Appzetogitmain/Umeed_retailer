@@ -39,17 +39,23 @@ router.post('/save', authenticate, async (req: Request, res: Response) => {
         const userId = req.user.userId;
         const userType = req.user.userType;
 
-        // Determine which model to use
+        const uType = (userType || '').toLowerCase();
         let user: any;
-        if (userType === 'Delivery') {
+        if (uType.includes('delivery') || uType.includes('rider')) {
             user = await Delivery.findById(userId);
-        } else if (userType === 'Admin') {
+        } else if (uType.includes('admin')) {
             user = await Admin.findById(userId);
-        } else if (userType === 'Seller') {
+        } else if (uType.includes('seller')) {
             user = await Seller.findById(userId);
-        } else {
-            // Default to Customer for 'Customer' type or fallback
+        } else if (uType.includes('customer')) {
             user = await Customer.findById(userId);
+        }
+
+        if (!user) {
+            user = (await Delivery.findById(userId)) ||
+                   (await Customer.findById(userId)) ||
+                   (await Seller.findById(userId)) ||
+                   (await Admin.findById(userId));
         }
 
         if (!user) {
@@ -149,15 +155,23 @@ router.delete('/remove', authenticate, async (req: Request, res: Response) => {
         const userId = req.user.userId;
         const userType = req.user.userType;
 
+        const uTypeRemove = (userType || '').toLowerCase();
         let user: any;
-        if (userType === 'Delivery') {
+        if (uTypeRemove.includes('delivery') || uTypeRemove.includes('rider')) {
             user = await Delivery.findById(userId);
-        } else if (userType === 'Admin') {
+        } else if (uTypeRemove.includes('admin')) {
             user = await Admin.findById(userId);
-        } else if (userType === 'Seller') {
+        } else if (uTypeRemove.includes('seller')) {
             user = await Seller.findById(userId);
-        } else {
+        } else if (uTypeRemove.includes('customer')) {
             user = await Customer.findById(userId);
+        }
+
+        if (!user) {
+            user = (await Delivery.findById(userId)) ||
+                   (await Customer.findById(userId)) ||
+                   (await Seller.findById(userId)) ||
+                   (await Admin.findById(userId));
         }
 
         if (!user) {

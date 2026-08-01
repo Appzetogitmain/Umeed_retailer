@@ -84,7 +84,7 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
 
   // Register FCM token globally for Delivery Boy & setup foreground handler
   useEffect(() => {
-    registerFCMToken().catch(err => console.error('Delivery FCM token error:', err));
+    registerFCMToken(true).catch(err => console.error('Delivery FCM token error:', err));
     setupForegroundNotificationHandler((payload) => {
       console.log('📬 Delivery App received foreground notification:', payload);
       if (payload.data?.orderId) {

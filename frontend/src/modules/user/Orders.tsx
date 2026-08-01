@@ -58,15 +58,17 @@ export default function Orders() {
         });
 
         let sellerStatus = order.status;
-        if (sa) {
-            if (sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered') {
+        if (order.status === 'Cancelled' || order.status === 'Rejected') {
+            sellerStatus = 'Cancelled';
+        } else if (sa) {
+            if (sa.status === 'Cancelled' || sa.status === 'Rejected') {
+                sellerStatus = 'Cancelled';
+            } else if (sa.deliveryBoyStatus === 'Delivered' || sa.status === 'Delivered') {
                 sellerStatus = 'Delivered';
             } else if (sa.deliveryBoyStatus === 'Picked Up' || sa.deliveryBoyStatus === 'In Transit') {
                 sellerStatus = 'On the way';
             } else if (sa.status === 'Accepted') {
                 sellerStatus = 'Accepted';
-            } else if (sa.status === 'Rejected') {
-                sellerStatus = 'Rejected';
             } else if (sa.status === 'Pending') {
                 sellerStatus = 'Placed';
             }
@@ -109,6 +111,7 @@ export default function Orders() {
       case 'Received':
         return { backgroundColor: '#F3F4F6', color: '#4B5563', borderColor: '#E5E7EB' };
       case 'Cancelled':
+      case 'Rejected':
       case 'Returned':
         return { backgroundColor: '#FEF2F2', color: '#EF4444', borderColor: '#FEE2E2' };
       default:
@@ -206,33 +209,33 @@ export default function Orders() {
               <Link
                 key={order.virtualId}
                 to={`/orders/${order.id}?sellerId=${order.sellerInfo?._id || order.sellerInfo}`}
-                className="block bg-white rounded-2xl border border-neutral-100 p-3 hover:border-purple-100 transition-all active:scale-[0.99]"
+                className="block bg-white rounded-2xl border border-neutral-100 p-2.5 hover:border-purple-100 transition-all active:scale-[0.99]"
               >
                 {/* Header: Icon + ID + Status */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-neutral-50 flex items-center justify-center border border-neutral-100">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-neutral-400">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-neutral-50 flex items-center justify-center border border-neutral-100">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-neutral-400">
                         <path d="M21 8V21H3V8" />
                         <path d="M1 3H23V8H1V3Z" />
                         <path d="M10 12H14" />
                       </svg>
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-neutral-900">Order</span>
-                        <span className="text-[10px] font-medium text-neutral-400 bg-neutral-50 px-1.5 py-0.5 rounded-md border border-neutral-100">#{shortId}</span>
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <span className="text-[11px] font-bold text-neutral-900">Order</span>
+                        <span className="text-[9px] font-medium text-neutral-400 bg-neutral-50 px-1 py-0.2 rounded border border-neutral-100">#{shortId}</span>
                       </div>
-                      <div className="text-[10px] text-neutral-400 font-medium mt-0.5 flex flex-col">
+                      <div className="text-[9px] text-neutral-400 font-medium mt-0.5 flex items-center gap-1.5 leading-none">
                         <span>{formatDate(order.createdAt)}</span>
                         {order.sellerInfo?.storeName && (
-                          <span className="text-neutral-600 font-bold mt-0.5 truncate max-w-[120px]">Store: {order.sellerInfo.storeName}</span>
+                          <span className="text-neutral-600 font-bold truncate max-w-[130px]">Store: {order.sellerInfo.storeName}</span>
                         )}
                       </div>
                     </div>
                   </div>
                   <span
-                    className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border"
+                    className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border"
                     style={statusStyle}
                   >
                     {order.status}
@@ -240,39 +243,39 @@ export default function Orders() {
                 </div>
 
                 {/* Items Row - Tighter */}
-                <div className="flex items-center justify-between gap-4 py-3 border-t border-neutral-50">
+                <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-neutral-50">
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="flex -space-x-3 overflow-hidden">
+                    <div className="flex -space-x-2 overflow-hidden">
                       {order.items.slice(0, 3).map((item: any, idx: number) => (
                         <div key={idx} className="relative z-[idx]">
-                          <div className="w-12 h-12 rounded-lg border border-neutral-100 bg-white p-1 shadow-sm">
+                          <div className="w-8 h-8 rounded-md border border-neutral-100 bg-white p-0.5 shadow-sm">
                             <img 
                               src={normalizeImageUrl(item.product.mainImage || item.product.imageUrl)} 
                               alt={item.product.productName || item.product.name}
                               className="w-full h-full object-contain"
                             />
                           </div>
-                          <div className="absolute -top-1 -right-1 bg-neutral-900 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-sm z-10">
+                          <div className="absolute -top-1 -right-1 bg-neutral-900 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white shadow-sm z-10">
                             {item.quantity}
                           </div>
                         </div>
                       ))}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-neutral-600 font-medium truncate">
+                      <p className="text-[10px] text-neutral-600 font-medium truncate leading-tight">
                         {order.items.map((item: any) => item.product.productName || item.product.name).join(', ')}
                       </p>
                       {order.items.length > 3 && (
-                        <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">
-                          +{order.items.length - 3} more items
+                        <p className="text-[8px] text-neutral-400 font-bold uppercase">
+                          +{order.items.length - 3} more
                         </p>
                       )}
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest leading-none mb-1">Total</div>
-                    <div className="text-base font-black text-neutral-900 leading-none">
+                    <div className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest leading-none mb-0.5">Total</div>
+                    <div className="text-sm font-black text-neutral-900 leading-none">
                       ₹{order.totalAmount.toLocaleString('en-IN')}
                     </div>
                   </div>

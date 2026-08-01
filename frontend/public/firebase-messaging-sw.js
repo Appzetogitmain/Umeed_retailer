@@ -27,31 +27,8 @@ if (messaging) {
     messaging.onBackgroundMessage((payload) => {
         console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-        const notificationTitle = payload.notification?.title || 'New Order!';
-        const notificationBody = payload.notification?.body || 'A new delivery order is waiting for you.';
         const orderId = payload.data?.orderId;
         const orderNumber = payload.data?.orderNumber;
-
-        const notificationOptions = {
-            body: notificationBody,
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-            vibrate: [200, 100, 200, 100, 200, 100, 200],
-            requireInteraction: true, // Keep notification visible until user interacts
-            tag: orderId ? `order-${orderId}` : 'delivery-notification', // Prevent duplicate notifications for same order
-            renotify: false,
-            data: {
-                ...(payload.data || {}),
-                orderId: orderId,
-                orderNumber: orderNumber,
-                url: `/delivery/dashboard?openOrder=${orderId}`,
-                link: `/delivery/dashboard?openOrder=${orderId}`,
-            },
-            actions: [
-                { action: 'accept', title: '✅ View Order' },
-                { action: 'dismiss', title: '❌ Dismiss' }
-            ]
-        };
 
         // Save pending order notification to cache for when app opens
         if (orderId) {
@@ -59,7 +36,6 @@ if (messaging) {
                 type: 'SAVE_PENDING_ORDER',
                 orderId: orderId,
             });
-            // Save in indexedDB-like approach using cache API as backup
             caches.open('delivery-pending-orders').then(cache => {
                 cache.put(
                     `/pending-order/${orderId}`,
@@ -70,7 +46,36 @@ if (messaging) {
             }).catch(() => { });
         }
 
-        self.registration.showNotification(notificationTitle, notificationOptions);
+        // Note: If payload has a 'notification' object, Firebase SDK & OS automatically show the push notification.
+        // We only call showNotification manually if there is NO notification field in payload (data-only push message)
+        if (!payload.notification) {
+            const notificationTitle = payload.data?.title || 'Notification';
+            const notificationBody = payload.data?.body || '';
+            const isOrder = !!(orderId || payload.data?.type === 'ORDER_NEW' || payload.data?.type === 'ORDER_DELIVERED');
+
+            const notificationOptions = {
+                body: notificationBody,
+                icon: '/logo192.png',
+                badge: '/logo192.png',
+                vibrate: [200, 100, 200, 100, 200],
+                requireInteraction: true,
+                tag: orderId ? `order-${orderId}` : `notif-${Date.now()}`,
+                renotify: false,
+                data: {
+                    ...(payload.data || {}),
+                    url: payload.data?.url || payload.data?.link || (isOrder ? `/delivery/dashboard?openOrder=${orderId}` : '/notifications'),
+                },
+                actions: isOrder ? [
+                    { action: 'accept', title: '✅ View Order' },
+                    { action: 'dismiss', title: '❌ Dismiss' }
+                ] : [
+                    { action: 'view', title: '✅ Open' },
+                    { action: 'dismiss', title: '❌ Dismiss' }
+                ]
+            };
+
+            self.registration.showNotification(notificationTitle, notificationOptions);
+        }
     });
 }
 
@@ -80,43 +85,55 @@ self.addEventListener('notificationclick', (event) => {
 
     const data = event.notification.data || {};
     const orderId = data.orderId;
+    const type = data.type;
     const action = event.action;
 
     // If user clicked dismiss action, just close — do nothing else
     if (action === 'dismiss') return;
 
-    // 'view' action or direct click on notification body — open the app
-    const deliveryDashboardUrl = orderId
-        ? `/delivery/dashboard?openOrder=${orderId}`
-        : '/delivery/dashboard';
+    if (type === 'ORDER_DELIVERED') {
+        const customerNotificationsUrl = '/notifications';
+
+        event.waitUntil(
+            clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+                // Check if there is already a customer app open
+                for (const client of clientList) {
+                    const clientUrl = new URL(client.url);
+                    const isCustomerApp = !clientUrl.pathname.startsWith('/delivery') && !clientUrl.pathname.startsWith('/seller') && !clientUrl.pathname.startsWith('/admin');
+
+                    if (isCustomerApp && 'focus' in client) {
+                        client.focus();
+                        client.navigate(customerNotificationsUrl);
+                        return;
+                    }
+                }
+                
+                if (clients.openWindow) {
+                    return clients.openWindow(customerNotificationsUrl);
+                }
+            })
+        );
+        return;
+    }
+
+    // Handle general or order notification click navigation
+    const targetUrl = data.url || data.link || (orderId ? `/delivery/dashboard?openOrder=${orderId}` : '/notifications');
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Check if there is already a delivery tab open
+            // If window already open, focus and navigate
             for (const client of clientList) {
-                const clientUrl = new URL(client.url);
-                const isDeliveryApp = clientUrl.pathname.startsWith('/delivery');
-
-                if (isDeliveryApp && 'focus' in client) {
-                    // App is already open — send a message to show the popup
+                if ('focus' in client) {
                     client.focus();
-                    if ('postMessage' in client && orderId) {
-                        client.postMessage({
-                            type: 'FCM_NOTIFICATION_CLICK',
-                            data: { ...data, orderId },
-                        });
-                    }
-                    // Also navigate to include the orderId in URL as fallback
-                    if ('navigate' in client) {
-                        return client.navigate(deliveryDashboardUrl);
+                    if ('navigate' in client && targetUrl) {
+                        client.navigate(targetUrl);
                     }
                     return;
                 }
             }
 
-            // No existing delivery tab — open a new one
-            if (clients.openWindow) {
-                return clients.openWindow(deliveryDashboardUrl);
+            if (clients.openWindow && targetUrl) {
+                return clients.openWindow(targetUrl);
             }
         })
     );

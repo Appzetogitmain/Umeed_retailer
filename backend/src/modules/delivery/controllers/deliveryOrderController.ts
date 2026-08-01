@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Order from "../../../models/Order";
 import { notifySellersOfOrderUpdate } from "../../../services/sellerNotificationService";
+import { notifyCustomerOfDelivery } from "../../../utils/pushNotificationHelper";
+import mongoose from "mongoose";
 import OrderItem from "../../../models/OrderItem";
 import Seller from "../../../models/Seller";
 import Return from "../../../models/Return";
@@ -340,6 +342,11 @@ export const updateOrderStatus = asyncHandler(async (req: Request, res: Response
         if (order.paymentStatus === 'Paid' || status === 'Delivered') {
             notifySellersOfOrderUpdate(io, order, 'STATUS_UPDATE');
         }
+
+        // Notify customer of delivery success
+        if (status === 'Delivered' && previousStatus !== 'Delivered') {
+            notifyCustomerOfDelivery(order);
+        }
     }
 
     return res.status(200).json({
@@ -599,6 +606,11 @@ export const verifyDeliveryOtpController = asyncHandler(async (req: Request, res
 
                 // Notify sellers of status update
                 notifySellersOfOrderUpdate(io, updatedOrder, 'STATUS_UPDATE');
+            }
+
+            // Notify customer of delivery success (push & db)
+            if (previousStatus !== 'Delivered') {
+                notifyCustomerOfDelivery(updatedOrder);
             }
         }
 

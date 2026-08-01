@@ -1,9 +1,30 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getNotifications } from '../../../services/api/delivery/deliveryService';
 
 export default function DeliveryBottomNav() {
   const location = useLocation();
+  const [hasUnread, setHasUnread] = useState(false);
   
   const isActive = (path: string) => location.pathname === path;
+
+  useEffect(() => {
+    const checkUnread = async () => {
+      try {
+        const notifications = await getNotifications();
+        if (Array.isArray(notifications)) {
+          const unread = notifications.some((n: any) => !n.isRead);
+          setHasUnread(unread);
+        }
+      } catch (err) {
+        // Quiet fail for bottom nav polling
+      }
+    };
+
+    checkUnread();
+    const interval = setInterval(checkUnread, 30000);
+    return () => clearInterval(interval);
+  }, [location.pathname]);
 
   const navItems = [
     {
@@ -11,7 +32,6 @@ export default function DeliveryBottomNav() {
       label: 'Home',
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Grid of 9 squares */}
           <rect x="3" y="3" width="6" height="6" fill={isActive('/delivery') ? '#f97316' : '#9ca3af'} />
           <rect x="11" y="3" width="6" height="6" fill={isActive('/delivery') ? '#f97316' : '#9ca3af'} />
           <rect x="19" y="3" width="2" height="6" fill={isActive('/delivery') ? '#f97316' : '#9ca3af'} />
@@ -29,7 +49,6 @@ export default function DeliveryBottomNav() {
       label: 'Orders',
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Delivery truck with speed lines */}
           <path
             d="M2 17H4L5 12H19L20 17H22M2 17C2 18.1046 2.89543 19 4 19C5.10457 19 6 18.1046 6 17M2 17C2 15.8954 2.89543 15 4 15C5.10457 15 6 15.8954 6 17M22 17C22 18.1046 21.1046 19 20 19C18.8954 19 18 18.1046 18 17M22 17C22 15.8954 21.1046 15 20 15C18.8954 15 18 15.8954 18 17M6 17H18M5 12L4 7H2M20 12L21 7H22"
             stroke={isActive('/delivery/orders') ? '#f97316' : '#9ca3af'}
@@ -38,7 +57,6 @@ export default function DeliveryBottomNav() {
             strokeLinejoin="round"
             fill="none"
           />
-          {/* Speed lines */}
           <path d="M8 10H10M12 10H14" stroke={isActive('/delivery/orders') ? '#f97316' : '#9ca3af'} strokeWidth="2" strokeLinecap="round" fill="none" />
         </svg>
       ),
@@ -46,6 +64,7 @@ export default function DeliveryBottomNav() {
     {
       path: '/delivery/notifications',
       label: 'Notification',
+      badge: hasUnread,
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -92,10 +111,13 @@ export default function DeliveryBottomNav() {
           <Link
             key={item.path}
             to={item.path}
-            className="flex flex-col items-center justify-center flex-1 h-full"
+            className="flex flex-col items-center justify-center flex-1 h-full relative"
           >
-            <div className={`${isActive(item.path) ? 'text-neutral-700' : 'text-neutral-500'}`}>
+            <div className={`relative ${isActive(item.path) ? 'text-neutral-700' : 'text-neutral-500'}`}>
               {item.icon}
+              {item.badge && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              )}
             </div>
             <span
               className={`text-xs mt-0.5 ${
@@ -110,4 +132,3 @@ export default function DeliveryBottomNav() {
     </nav>
   );
 }
-

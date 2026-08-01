@@ -234,9 +234,9 @@ export default function AdminNotification() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Page Content */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 pb-24">
         {/* Header with Title and Breadcrumb */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           
