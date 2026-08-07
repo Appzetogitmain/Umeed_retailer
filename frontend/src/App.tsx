@@ -162,6 +162,9 @@ const SellerReturnRequest = lazy(
 const SellerAccountSettings = lazy(
   () => import("./modules/seller/pages/SellerAccountSettings"),
 );
+const SellerBulkUpload = lazy(
+  () => import("./modules/seller/pages/SellerBulkUpload"),
+);
 const SellerLogin = lazy(() => import("./modules/seller/pages/SellerLogin"));
 const SellerSignUp = lazy(() => import("./modules/seller/pages/SellerSignUp"));
 
@@ -587,6 +590,10 @@ function AppContent() {
                                     <Route
                                       path="product/add"
                                       element={<SellerAddProduct />}
+                                    />
+                                    <Route
+                                      path="product/bulk-upload"
+                                      element={<SellerBulkUpload />}
                                     />
                                     <Route
                                       path="product/edit/:id"

@@ -21,6 +21,20 @@ const ALLOWED_DOCUMENT_TYPES = [
   "application/pdf",
 ];
 
+const ALLOWED_BULK_TYPES = [
+  // .xlsx (Excel 2007+)
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  // .xls (old Excel) — some OS / browsers report this for .xlsx too
+  "application/vnd.ms-excel",
+  // .zip variants — different OS/browsers send different MIME types
+  "application/zip",
+  "application/x-zip",
+  "application/x-zip-compressed",
+  "application/octet-stream",   // generic binary — Chrome/Windows often sends this for .zip
+  "multipart/x-zip",
+  "application/x-compressed",
+];
+
 // Memory storage for multer (files will be stored in memory as buffers)
 const storage = multer.memoryStorage();
 
@@ -53,6 +67,27 @@ const documentFileFilter = (
     cb(
       new Error(
         `Invalid file type. Allowed types: ${ALLOWED_DOCUMENT_TYPES.join(", ")}`
+      )
+    );
+  }
+};
+
+// File filter for bulk upload files (Excel and Zip)
+const bulkFileFilter = (
+  _req: Request,
+  file: any,
+  cb: multer.FileFilterCallback
+) => {
+  const mimeOk = ALLOWED_BULK_TYPES.includes(file.mimetype);
+  // Extension-based fallback — browsers on different OSes send different MIME types for the same file
+  const extOk = /\.(xlsx|xls|zip)$/i.test(file.originalname);
+
+  if (mimeOk || extOk) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        `Invalid file type '${file.mimetype}'. Please upload an Excel (.xlsx) or ZIP (.zip) file.`
       )
     );
   }
@@ -92,6 +127,15 @@ export const uploadMultipleDocuments = multer({
     fileSize: MAX_DOCUMENT_SIZE,
   },
   fileFilter: documentFileFilter,
+});
+
+// Multer instance for bulk uploads
+export const uploadBulkFiles = multer({
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB for zip files
+  },
+  fileFilter: bulkFileFilter,
 });
 
 // Error handler middleware for multer errors

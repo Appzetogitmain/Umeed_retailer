@@ -10,8 +10,13 @@ import {
   bulkUpdateStock,
   getShops,
 } from "../modules/seller/controllers/productController";
+import {
+  bulkValidateProducts,
+  bulkImportProducts,
+} from "../modules/seller/controllers/bulkUploadController";
 import { getBrands } from "../modules/admin/controllers/adminProductController";
 import { authenticate, requireUserType } from "../middleware/auth";
+import { uploadBulkFiles, handleUploadError } from "../middleware/upload";
 
 const router = Router();
 
@@ -24,6 +29,19 @@ router.get("/brands", getBrands);
 
 // Get all active shops - sellers need this for shop-by-store-only products
 router.get("/shops", getShops);
+
+// Bulk upload endpoints
+router.post(
+  "/bulk-upload/validate",
+  uploadBulkFiles.fields([
+    { name: "excelFile", maxCount: 1 },
+    { name: "imagesZip", maxCount: 1 },
+  ]),
+  handleUploadError,
+  bulkValidateProducts
+);
+
+router.post("/bulk-upload/import", bulkImportProducts);
 
 // Create product
 router.post("/", createProduct);

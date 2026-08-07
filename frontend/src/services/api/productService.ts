@@ -224,7 +224,32 @@ export const updateProductStatus = async (
 /**
  * Get all active shops (for seller to select when creating shop-by-store-only products)
  */
-export const getShops = async (): Promise<ApiResponse<Shop[]>> => {
-  const response = await api.get<ApiResponse<Shop[]>>("/products/shops");
+export const getShops = async (): Promise<ApiResponse<any>> => {
+  const response = await api.get<ApiResponse<any>>("/products/shops");
   return response.data;
 };
+
+export async function validateBulkProducts(
+  formData: FormData
+): Promise<ApiResponse<any>> {
+  const response = await api.post<ApiResponse<any>>(
+    "/products/bulk-upload/validate",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return response.data;
+}
+
+export async function importBulkProducts(
+  products: any[]
+): Promise<ApiResponse<any>> {
+  const response = await api.post<ApiResponse<any>>(
+    "/products/bulk-upload/import",
+    { products }
+  );
+  return response.data;
+}
