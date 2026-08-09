@@ -39,13 +39,13 @@ export const bulkValidateProducts = asyncHandler(
 
     // ── Parse Excel ──────────────────────────────────────────────────────────
     const workbook = xlsx.read(excelBuffer, { type: "buffer" });
-    const productSheet = workbook.Sheets["Products"];
+    let productSheet = workbook.Sheets["Products"] || workbook.Sheets[workbook.SheetNames[0]];
     const variationSheet = workbook.Sheets["Variations"];
 
     if (!productSheet) {
       return res.status(400).json({
         success: false,
-        message: "Excel file must contain a 'Products' sheet",
+        message: "Excel file is empty or invalid",
       });
     }
 
@@ -223,9 +223,14 @@ export const bulkValidateProducts = asyncHandler(
 
       // === Brand lookup (optional) ===
       let brandId = null;
+      let newBrandName = null;
       if (row["Brand"]) {
-        brandId = findBrandId(row["Brand"]);
-        if (!brandId) errors.push(`Brand '${row["Brand"]}' not found`);
+        const brandStr = row["Brand"].toString().trim();
+        brandId = findBrandId(brandStr);
+        if (!brandId) {
+          // Keep it to be created during import
+          newBrandName = brandStr;
+        }
       }
 
       // === Tax lookup (optional) ===
@@ -331,6 +336,7 @@ export const bulkValidateProducts = asyncHandler(
           subcategoryId: subCategoryId,
           subSubCategoryId: subSubCategoryId,
           brandId: brandId,
+          newBrandName: newBrandName,
           taxId: taxId,
           variationType: variationType,
 
@@ -404,6 +410,15 @@ export const bulkImportProducts = asyncHandler(
     for (let i = 0; i < products.length; i++) {
       const p = products[i];
       try {
+        let finalBrandId = p.brandId;
+        if (!finalBrandId && p.newBrandName) {
+          let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${p.newBrandName}$`, "i") } });
+          if (!existingBrand) {
+            existingBrand = await Brand.create({ name: p.newBrandName });
+          }
+          finalBrandId = existingBrand._id;
+        }
+
         const newProduct = {
           // Core identifiers
           seller: sellerId,
@@ -411,7 +426,7 @@ export const bulkImportProducts = asyncHandler(
           category: p.categoryId,
           subcategory: p.subcategoryId,
           subSubCategory: p.subSubCategoryId,
-          brand: p.brandId,
+          brand: finalBrandId,
           tax: p.taxId,
 
           // Product info

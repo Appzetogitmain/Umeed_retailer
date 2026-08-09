@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import Product from "../../../models/Product";
 import Shop from "../../../models/Shop";
 import Category from "../../../models/Category";
-import SubCategory from "../../../models/SubCategory";
 import { asyncHandler } from "../../../utils/asyncHandler";
+import Brand from "../../../models/Brand";
 
 /**
  * Create a new product
@@ -82,7 +82,22 @@ export const createProduct = asyncHandler(
     if (!newProductData.headerCategoryId)
       delete newProductData.headerCategoryId;
     if (!newProductData.subcategory) delete newProductData.subcategory;
-    if (!newProductData.brand) delete newProductData.brand;
+    
+    // Handle Custom Brand (Name or ID)
+    if (newProductData.brand) {
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(newProductData.brand);
+      if (!isObjectId) {
+        // It's a custom brand name. Find it or create it.
+        const brandName = newProductData.brand.trim();
+        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${brandName}$`, "i") } });
+        if (!existingBrand) {
+          existingBrand = await Brand.create({ name: brandName });
+        }
+        newProductData.brand = existingBrand._id;
+      }
+    } else {
+      delete newProductData.brand;
+    }
 
     // Handle Tax: Frontend sends taxId, Model expects 'tax' (string) or something else?
     // Checking SellerAddProduct.tsx sending taxId -> formData.tax
@@ -315,7 +330,20 @@ export const updateProduct = asyncHandler(
       delete updateData.subSubCategoryId;
     }
     if (updateData.brandId) {
-      updateData.brand = updateData.brandId;
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(updateData.brandId);
+      if (!isObjectId) {
+        const brandName = updateData.brandId.trim();
+        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${brandName}$`, "i") } });
+        if (!existingBrand) {
+          existingBrand = await Brand.create({ name: brandName });
+        }
+        updateData.brand = existingBrand._id;
+      } else {
+        updateData.brand = updateData.brandId;
+      }
+      delete updateData.brandId;
+    } else if (updateData.brandId === null || updateData.brandId === "") {
+      updateData.brand = null;
       delete updateData.brandId;
     }
     if (updateData.taxId) {

@@ -19,6 +19,7 @@ import {
   getHeaderCategoriesAdmin,
   HeaderCategory,
 } from "../../../services/api/headerCategoryService";
+import { useToast } from "../../../context/ToastContext";
 
 interface CategoryFormModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export default function CategoryFormModal({
   mode,
   allCategories,
 }: CategoryFormModalProps) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
     image: "",
@@ -369,12 +371,10 @@ export default function CategoryFormModal({
       await onSubmit(submitData);
       onClose();
     } catch (error: any) {
-      setErrors({
-        submit:
-          error.response?.data?.message ||
+      const errorMessage = error.response?.data?.message ||
           error.message ||
-          "Failed to save category. Please try again.",
-      });
+          "Failed to save category. Please try again.";
+      showToast(errorMessage, 'error');
     } finally {
       setSubmitting(false);
       setUploading(false);
@@ -437,13 +437,6 @@ export default function CategoryFormModal({
               <p className="text-base font-semibold text-blue-900">
                 {parentCategory.name}
               </p>
-            </div>
-          )}
-
-          {/* Error Messages */}
-          {errors.submit && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{errors.submit}</p>
             </div>
           )}
 

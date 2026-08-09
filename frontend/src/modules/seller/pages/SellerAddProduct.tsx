@@ -184,7 +184,7 @@ export default function SellerAddProduct() {
                 product.subSubCategory ||
                 "",
               publish: product.publish ? "Yes" : "No",
-              brand: (product.brand as any)?._id || product.brandId || "",
+              brand: (product.brand as any)?.name || (product.brand as any)?._id || product.brandId || "",
               tags: product.tags.join(", "),
               smallDescription: product.smallDescription || "",
               seoTitle: product.seoTitle || "",
@@ -779,20 +779,21 @@ export default function SellerAddProduct() {
 
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Select Brand
+                    Select or Type Brand
                   </label>
-                  <select
+                  <input
+                    list="brand-options"
                     name="brand"
                     value={formData.brand}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white">
-                    <option value="">Select Brand</option>
+                    placeholder="Type or select brand"
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                  />
+                  <datalist id="brand-options">
                     {brands.map((brand) => (
-                      <option key={brand._id} value={brand._id}>
-                        {brand.name}
-                      </option>
+                      <option key={brand._id} value={brand.name} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">

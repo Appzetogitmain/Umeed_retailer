@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 
 export interface CustomError extends Error {
   statusCode?: number;
@@ -7,12 +8,12 @@ export interface CustomError extends Error {
   name: string;
 }
 
-export const errorHandler = (
+export const errorHandler = async (
   err: CustomError,
   _req: Request,
   res: Response,
   _next: NextFunction
-): void => {
+): Promise<void> => {
   // Log error for debugging
   console.error('Error:', err);
 
@@ -25,7 +26,31 @@ export const errorHandler = (
     message = 'Duplicate field value entered';
     if (err.keyValue) {
       const field = Object.keys(err.keyValue)[0];
+      const value = err.keyValue[field];
       message = `Duplicate value for field: ${field}`;
+
+      // Special handling for Category Name
+      if (field === 'name' && err.message && err.message.includes('categories')) {
+        try {
+          const Category = mongoose.model('Category');
+          const existingCategory = await Category.findOne({ name: value });
+          if (existingCategory) {
+             if (existingCategory.parentId) {
+               const parent = await Category.findById(existingCategory.parentId);
+               if (parent && parent.parentId) {
+                 message = `'${value}' already exists as a Sub-SubCategory! Please use a different name.`;
+               } else {
+                 message = `'${value}' already exists as a Sub-Category! Please use a different name.`;
+               }
+             } else {
+               message = `'${value}' already exists as a Main Category! Please use a different name.`;
+             }
+          }
+        } catch (e) {
+           console.error("Error looking up duplicate category:", e);
+           // Ignore error and stick to default message
+        }
+      }
     }
   }
 

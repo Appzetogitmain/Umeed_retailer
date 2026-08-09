@@ -92,12 +92,13 @@ app.use(cors(corsOptions));
 // can differ in key order/whitespace and break signature verification.
 app.use(
   express.json({
+    limit: "50mb",
     verify: (req: Request, _res: Response, buf: Buffer) => {
       (req as any).rawBody = buf;
     },
   })
 );
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Initialize Socket.io
@@ -152,6 +153,3 @@ startServer().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
-// Force restart trigger - updated tax uniqueness
-
