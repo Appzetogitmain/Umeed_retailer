@@ -582,7 +582,7 @@ export default function SellerAddProduct() {
           }
           setSuccessMessage("");
           // Navigate to product list
-          navigate("/seller/product/list");
+          navigate(isAdmin ? "/admin/product/list" : "/seller/product/list");
         }, 1500);
       } else {
         setUploadError(response.message || "Failed to create product");

@@ -6,10 +6,16 @@ export const UPLOADS_ROOT = path.resolve(__dirname, '../../uploads');
 export const DIRS = [
   'products',
   'categories',
+  'subcategories',
   'banners',
   'profile',
   'store',
   'documents',
+  'coupons',
+  'stores',
+  'returns',
+  'brands',
+  'seller',
   'temp',
 ];
 
