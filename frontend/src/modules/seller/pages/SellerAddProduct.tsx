@@ -202,7 +202,7 @@ export default function SellerAddProduct() {
               totalAllowedQuantity:
                 product.totalAllowedQuantity?.toString() || "10",
               mainImageUrl: product.mainImageUrl || product.mainImage || "",
-              galleryImageUrls: product.galleryImageUrls || [],
+              galleryImageUrls: product.galleryImages || product.galleryImageUrls || [],
               isShopByStoreOnly: (product as any).isShopByStoreOnly
                 ? "Yes"
                 : "No",
@@ -520,8 +520,8 @@ export default function SellerAddProduct() {
           : undefined,
         totalAllowedQuantity: parseInt(formData.totalAllowedQuantity || "10"),
         fssaiLicNo: formData.fssaiLicNo ? `FSSAI Lic. No. ${formData.fssaiLicNo}` : undefined,
-        mainImageUrl: mainImageUrl || undefined,
-        galleryImageUrls,
+        mainImage: mainImageUrl || undefined,
+        galleryImages: galleryImageUrls,
         variations: variations,
         isShopByStoreOnly: formData.isShopByStoreOnly === "Yes",
         shopId:
