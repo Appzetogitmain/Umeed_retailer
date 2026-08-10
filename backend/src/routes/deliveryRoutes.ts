@@ -37,6 +37,7 @@ router.get("/returns/active", deliveryOrderController.getActiveReturnPickups);
 router.put("/returns/:id/accept", deliveryOrderController.acceptReturnPickup);
 router.put("/returns/:id/status", deliveryOrderController.updateReturnPickupStatus);
 router.get("/orders/:id", deliveryOrderController.getOrderDetails); // Specific order details
+router.get("/orders/:id/pickup-availability", deliveryOrderController.getPickupAvailability);
 router.get("/orders/:id/seller-locations", deliveryOrderController.getSellerLocationsForOrder);
 router.put("/orders/:id/status", deliveryOrderController.updateOrderStatus);
 router.post("/orders/:id/send-delivery-otp", deliveryOrderController.sendDeliveryOtp);

@@ -716,25 +716,20 @@ export async function handleOrderAcceptance(
             state.acceptedBy = normalizedDeliveryBoyId;
         }
 
-        // Emit order-accepted event to all delivery boys who were notified
+        // Broadcast order-accepted to every connected delivery socket, not just the
+        // ones tracked in state.notifiedDeliveryBoys. That in-memory list is lost on
+        // a server restart (or absent entirely on a different process in a clustered
+        // deployment) — relying on it alone meant other riders who had this order's
+        // popup open would never see it dismissed. Their client-side handler already
+        // filters by orderId, so this is a harmless no-op for anyone not showing it.
+        io.emit('order-accepted', {
+            orderId,
+            sellerId,
+            acceptedBy: normalizedDeliveryBoyId,
+        });
+
         if (state) {
-            for (const notifiedId of state.notifiedDeliveryBoys) {
-                const notifiedIdString = String(notifiedId).trim();
-                io.to(`delivery-${notifiedIdString}`).emit('order-accepted', {
-                    orderId,
-                    sellerId,
-                    acceptedBy: normalizedDeliveryBoyId,
-                });
-            }
-            // Clean up notification state
             notificationStates.delete(stateKey);
-        } else {
-            // If no state, emit to the accepting delivery boy
-            io.to(`delivery-${normalizedDeliveryBoyId}`).emit('order-accepted', {
-                orderId,
-                sellerId,
-                acceptedBy: normalizedDeliveryBoyId,
-            });
         }
 
         // Emit delivery-boy-accepted event to customer for tracking

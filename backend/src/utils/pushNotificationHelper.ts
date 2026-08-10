@@ -2,6 +2,46 @@ import Customer from '../models/Customer';
 import Notification from '../models/Notification';
 import { sendPushNotification, PushNotificationPayload } from '../services/firebaseAdmin';
 
+// FCM error codes that mean the token will never work again (app uninstalled,
+// browser data cleared, token rotated, etc.) — safe to remove permanently.
+const DEAD_TOKEN_CODES = new Set([
+    'messaging/registration-token-not-registered',
+    'messaging/invalid-registration-token',
+    'messaging/invalid-argument',
+]);
+
+/**
+ * Remove FCM tokens that Firebase reported as permanently dead from a
+ * recipient's fcmTokens/fcmTokenMobile arrays, based on a sendEachForMulticast
+ * response. Without this, dead tokens accumulate forever, get retried on every
+ * single push, and pollute the token list so it's hard to tell which device is
+ * actually still receiving notifications.
+ */
+async function pruneDeadTokens(
+    model: any,
+    docId: string,
+    sentTokens: string[],
+    response: any
+) {
+    if (!Array.isArray(response?.responses)) return; // e.g. Firebase not initialized — nothing to prune from
+
+    const responses: Array<{ success: boolean; error?: { code?: string } }> = response.responses;
+    const deadTokens = sentTokens.filter(
+        (_, idx) => !responses[idx]?.success && DEAD_TOKEN_CODES.has(responses[idx]?.error?.code || '')
+    );
+    if (deadTokens.length === 0) return;
+
+    try {
+        await model.updateOne(
+            { _id: docId },
+            { $pullAll: { fcmTokens: deadTokens, fcmTokenMobile: deadTokens } }
+        );
+        console.log(`🧹 Pruned ${deadTokens.length} dead FCM token(s) for ${model.modelName} ${docId}`);
+    } catch (err) {
+        console.error(`Error pruning dead FCM tokens for ${model.modelName} ${docId}:`, err);
+    }
+}
+
 /**
  * Send notification to a specific user
  * @param userId - The ID of the user to send to
@@ -36,7 +76,8 @@ export async function sendNotificationToUser(userId: string, payload: PushNotifi
         }
 
         console.log(`Sending notification to user ${userId} (${uniqueTokens.length} tokens)`);
-        await sendPushNotification(uniqueTokens, payload);
+        const response = await sendPushNotification(uniqueTokens, payload);
+        if (response) await pruneDeadTokens(Customer, userId, uniqueTokens, response);
     } catch (error) {
         console.error(`Error sending notification to user ${userId}:`, error);
         // Non-blocking error
@@ -80,7 +121,8 @@ export async function sendNotificationToDeliveryBoy(deliveryBoyId: string, paylo
         }
 
         console.log(`Sending notification to delivery boy ${deliveryBoyId} (${uniqueTokens.length} tokens)`);
-        await sendPushNotification(uniqueTokens, payload);
+        const response = await sendPushNotification(uniqueTokens, payload);
+        if (response) await pruneDeadTokens(Delivery, deliveryBoyId, uniqueTokens, response);
     } catch (error) {
         console.error(`Error sending notification to delivery boy ${deliveryBoyId}:`, error);
         // Non-blocking error
@@ -123,7 +165,8 @@ export async function sendNotificationToSeller(sellerId: string, payload: PushNo
         }
 
         console.log(`Sending notification to seller ${sellerId} (${uniqueTokens.length} tokens)`);
-        await sendPushNotification(uniqueTokens, payload);
+        const response = await sendPushNotification(uniqueTokens, payload);
+        if (response) await pruneDeadTokens(Seller, sellerId, uniqueTokens, response);
     } catch (error) {
         console.error(`Error sending notification to seller ${sellerId}:`, error);
     }

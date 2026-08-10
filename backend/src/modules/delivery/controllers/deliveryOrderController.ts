@@ -268,6 +268,36 @@ export const getOrderDetails = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
+ * Check whether a broadcasted pickup is still available to accept.
+ * Used by the delivery app to clear stale "new order" popups that were
+ * persisted locally (e.g. across a page refresh) after another rider has
+ * already accepted the same pickup in the meantime.
+ */
+export const getPickupAvailability = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { sellerId } = req.query;
+
+    const order = await Order.findById(id).select('deliveryBoy sellerAcceptances status');
+    if (!order) {
+        return res.status(200).json({ success: true, data: { available: false } });
+    }
+
+    if (['Delivered', 'Cancelled', 'Rejected', 'Returned'].includes(order.status)) {
+        return res.status(200).json({ success: true, data: { available: false } });
+    }
+
+    let available: boolean;
+    if (sellerId && order.sellerAcceptances && order.sellerAcceptances.length > 0) {
+        const sub = order.sellerAcceptances.find((sa: any) => sa.seller.toString() === String(sellerId));
+        available = !!sub && !sub.deliveryBoy;
+    } else {
+        available = !order.deliveryBoy;
+    }
+
+    return res.status(200).json({ success: true, data: { available } });
+});
+
+/**
  * Update Order Status
  */
 export const updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {

@@ -246,24 +246,35 @@ export default function Orders() {
                 <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-neutral-50">
                   <div className="flex items-center gap-2 overflow-hidden">
                     <div className="flex -space-x-2 overflow-hidden">
-                      {order.items.slice(0, 3).map((item: any, idx: number) => (
+                      {order.items.slice(0, 3).map((item: any, idx: number) => {
+                        // Prefer the order item's own snapshot (productName/productImage,
+                        // taken at order time) over the live product ref — the product
+                        // may have since been deleted, in which case item.product is null.
+                        const itemImage = item.productImage || item.product?.mainImage || item.product?.imageUrl;
+                        const itemName = item.productName || item.product?.productName || item.product?.name || "Product";
+                        return (
                         <div key={idx} className="relative z-[idx]">
                           <div className="w-8 h-8 rounded-md border border-neutral-100 bg-white p-0.5 shadow-sm">
-                            <img 
-                              src={normalizeImageUrl(item.product.mainImage || item.product.imageUrl)} 
-                              alt={item.product.productName || item.product.name}
-                              className="w-full h-full object-contain"
-                            />
+                            {itemImage ? (
+                              <img
+                                src={normalizeImageUrl(itemImage)}
+                                alt={itemName}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs">📦</div>
+                            )}
                           </div>
                           <div className="absolute -top-1 -right-1 bg-neutral-900 text-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white shadow-sm z-10">
                             {item.quantity}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-neutral-600 font-medium truncate leading-tight">
-                        {order.items.map((item: any) => item.product.productName || item.product.name).join(', ')}
+                        {order.items.map((item: any) => item.productName || item.product?.productName || item.product?.name || "Product").join(', ')}
                       </p>
                       {order.items.length > 3 && (
                         <p className="text-[8px] text-neutral-400 font-bold uppercase">

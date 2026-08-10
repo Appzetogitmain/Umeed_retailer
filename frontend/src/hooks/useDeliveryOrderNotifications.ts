@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import { OrderNotificationData } from '../services/api/delivery/deliveryOrderNotificationService';
-import { acceptOrder, rejectOrder } from '../services/api/delivery/deliveryOrderNotificationService';
+import { acceptOrder, rejectOrder, checkPickupAvailability } from '../services/api/delivery/deliveryOrderNotificationService';
 import { getSocketBaseURL } from '../services/api/config';
 
 interface NotificationState {
@@ -61,6 +61,47 @@ export const useDeliveryOrderNotifications = () => {
     useEffect(() => {
         savePersistedNotifications(state.currentNotification, state.notificationQueue);
     }, [state.currentNotification, state.notificationQueue]);
+
+    // Validate any notification restored from localStorage against the server.
+    // A popup can be persisted across a refresh, but by the time the page reloads
+    // another rider may have already accepted that same pickup — the real-time
+    // 'order-accepted' socket event that would normally dismiss it was missed
+    // entirely (this tab's old socket was gone before/while it fired). Re-check
+    // once on mount and drop anything no longer available.
+    useEffect(() => {
+        const toCheck = [
+            ...(persisted.currentNotification ? [persisted.currentNotification] : []),
+            ...(persisted.notificationQueue || []),
+        ];
+        if (toCheck.length === 0) return;
+
+        (async () => {
+            const staleIds = new Set<string>();
+            await Promise.all(
+                toCheck.map(async (notif) => {
+                    const available = await checkPickupAvailability(notif.orderId, notif.sellerId);
+                    if (!available) staleIds.add(notif.orderId);
+                })
+            );
+            if (staleIds.size === 0) return;
+
+            setState(prev => {
+                const currentIsStale = prev.currentNotification && staleIds.has(prev.currentNotification.orderId);
+                const filteredQueue = prev.notificationQueue.filter(n => !staleIds.has(n.orderId));
+                if (currentIsStale) {
+                    const nextNotification = filteredQueue[0] || null;
+                    return {
+                        ...prev,
+                        currentNotification: nextNotification,
+                        notificationQueue: filteredQueue.slice(nextNotification ? 1 : 0),
+                    };
+                }
+                return { ...prev, notificationQueue: filteredQueue };
+            });
+        })();
+        // Only ever run once, against whatever was restored from localStorage at mount time.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const socketRef = useRef<Socket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);

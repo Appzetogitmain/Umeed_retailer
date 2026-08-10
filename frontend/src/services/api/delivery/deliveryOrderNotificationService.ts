@@ -1,4 +1,5 @@
 import { Socket } from 'socket.io-client';
+import api from '../config';
 
 export interface OrderNotificationData {
     orderId: string;
@@ -37,6 +38,28 @@ export interface RejectOrderResponse {
     message: string;
     allRejected: boolean;
 }
+
+/**
+ * Check whether a broadcasted pickup is still available to accept.
+ * Used to clear stale locally-persisted "new order" popups (e.g. after a page
+ * refresh) once another rider has already accepted the same pickup.
+ */
+export const checkPickupAvailability = async (
+    orderId: string,
+    sellerId?: string
+): Promise<boolean> => {
+    try {
+        const response = await api.get(`/delivery/orders/${orderId}/pickup-availability`, {
+            params: sellerId ? { sellerId } : undefined,
+        });
+        return !!response.data?.data?.available;
+    } catch (error) {
+        // If the check itself fails (network blip, order deleted, etc.), don't
+        // block the popup on an ambiguous error — let the accept attempt itself
+        // be the final authority.
+        return true;
+    }
+};
 
 /**
  * Accept an order via WebSocket
