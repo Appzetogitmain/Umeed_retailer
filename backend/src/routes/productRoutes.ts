@@ -5,6 +5,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  bulkDeleteProducts,
   updateStock,
   updateProductStatus,
   bulkUpdateStock,
@@ -57,6 +58,9 @@ router.put("/:id", updateProduct);
 
 // Delete product
 router.delete("/:id", deleteProduct);
+
+// Bulk delete products (only own products)
+router.post("/bulk-delete", bulkDeleteProducts);
 
 // Update stock for a product variation
 router.patch("/:id/variations/:variationId/stock", updateStock);

@@ -144,6 +144,7 @@ router.get("/products", productController.getProducts);
 router.get("/products/:id", productController.getProductById);
 router.put("/products/:id", productController.updateProduct);
 router.delete("/products/:id", productController.deleteProduct);
+router.post("/products/bulk-delete", productController.bulkDeleteProducts);
 // Product approval no longer needed - products show directly in list
 // router.patch("/products/:id/approve", productController.approveProductRequest);
 router.post("/products/bulk-import", productController.bulkImportProducts);

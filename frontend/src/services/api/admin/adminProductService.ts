@@ -516,6 +516,26 @@ export const deleteProduct = async (id: string): Promise<ApiResponse<void>> => {
 };
 
 /**
+ * Bulk delete products (admin can delete any product)
+ */
+export const bulkDeleteProducts = async (
+  productIds: string[]
+): Promise<
+  ApiResponse<{
+    deleted: string[];
+    failed: Array<{ id: string; reason: string }>;
+  }>
+> => {
+  const response = await api.post<
+    ApiResponse<{
+      deleted: string[];
+      failed: Array<{ id: string; reason: string }>;
+    }>
+  >("/admin/products/bulk-delete", { productIds });
+  return response.data;
+};
+
+/**
  * Approve/reject product request
  */
 export const approveProductRequest = async (

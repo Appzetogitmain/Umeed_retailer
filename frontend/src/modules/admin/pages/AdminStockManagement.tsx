@@ -4,11 +4,13 @@ import {
   getProducts,
   getCategories,
   deleteProduct,
+  bulkDeleteProducts,
   type Product,
   type Category,
 } from "../../../services/api/admin/adminProductService";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
 import { useAuth } from "../../../context/AuthContext";
+import ConfirmDialog from "../../../components/ConfirmDialog";
 
 interface ProductVariation {
   id: string;
@@ -45,6 +47,13 @@ export default function AdminStockManagement() {
   const [filterSeller, setFilterSeller] = useState("All Sellers");
   const [filterStatus, setFilterStatus] = useState("All Products");
   const [filterStock, setFilterStock] = useState(location.state?.filterStock || "All Products");
+
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch products and categories
   const fetchData = async () => {
@@ -119,21 +128,71 @@ export default function AdminStockManagement() {
     }
   }, [location.state?.filterStock]);
 
-  const handleDelete = async (productId: string) => {
-    if (window.confirm("Are you sure you want to delete this product?")) {
-      try {
-        const response = await deleteProduct(productId);
-        if (response.success || response.message === "Product deleted successfully") {
-          alert("Product deleted successfully");
-          fetchData();
-        } else {
-          alert("Failed to delete product");
-        }
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        alert("An error occurred while deleting the product");
+  const handleDelete = (productId: string) => {
+    setDeleteTarget(productId);
+  };
+
+  const confirmSingleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const response = await deleteProduct(deleteTarget);
+      if (response.success || response.message === "Product deleted successfully") {
+        setSelectedProductIds((prev) => {
+          const next = new Set(prev);
+          next.delete(deleteTarget);
+          return next;
+        });
+        alert("Product deleted successfully");
+        fetchData();
+      } else {
+        alert("Failed to delete product");
       }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      alert("An error occurred while deleting the product");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedProductIds.size === 0) return;
+    setIsDeleting(true);
+    try {
+      const response = await bulkDeleteProducts(Array.from(selectedProductIds));
+      if (response.success) {
+        const { deleted, failed } = response.data;
+        alert(
+          failed?.length
+            ? `${deleted.length} product(s) deleted. ${failed.length} could not be deleted.`
+            : `${deleted.length} product(s) deleted successfully.`
+        );
+        setSelectedProductIds(new Set());
+        fetchData();
+      } else {
+        alert(response.message || "Failed to delete products");
+      }
+    } catch (error) {
+      console.error("Error bulk deleting products:", error);
+      alert("An error occurred while deleting the products");
+    } finally {
+      setIsDeleting(false);
+      setIsBulkDeleteOpen(false);
+    }
+  };
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
   };
 
   const handleEdit = (productId: string) => {
@@ -327,6 +386,26 @@ export default function AdminStockManagement() {
   const endIndex = startIndex + rowsPerPage;
   const displayedProducts = sortedProducts.slice(startIndex, endIndex);
 
+  // Unique product ids currently visible on this page (for select-all)
+  const pageProductIds = Array.from(
+    new Set(displayedProducts.map((p) => p.productId))
+  );
+  const isAllOnPageSelected =
+    pageProductIds.length > 0 &&
+    pageProductIds.every((id) => selectedProductIds.has(id));
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (isAllOnPageSelected) {
+        pageProductIds.forEach((id) => next.delete(id));
+      } else {
+        pageProductIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const handleExport = () => {
     const headers = [
       "Variation Id",
@@ -471,6 +550,19 @@ export default function AdminStockManagement() {
                 </select>
               </div>
               <div className="flex items-center gap-2">
+                {selectedProductIds.size > 0 && (
+                  <button
+                    onClick={() => setIsBulkDeleteOpen(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    Delete Selected ({selectedProductIds.size})
+                  </button>
+                )}
                 <button
                   onClick={handleExport}
                   className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors">
@@ -511,6 +603,15 @@ export default function AdminStockManagement() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-neutral-50 text-xs font-bold text-neutral-800 border-b border-neutral-200">
+                  <th className="p-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      className="w-4 h-4 cursor-pointer accent-teal-600"
+                      aria-label="Select all products on this page"
+                    />
+                  </th>
                   <th
                     className="p-4 cursor-pointer hover:bg-neutral-100 transition-colors"
                     onClick={() => handleSort("id")}>
@@ -571,7 +672,7 @@ export default function AdminStockManagement() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="p-8 text-center text-neutral-400">
                       Loading products...
                     </td>
@@ -585,7 +686,7 @@ export default function AdminStockManagement() {
                 ) : displayedProducts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="p-8 text-center text-neutral-400">
                       No products found.
                     </td>
@@ -595,6 +696,15 @@ export default function AdminStockManagement() {
                     <tr
                       key={product.id}
                       className="hover:bg-neutral-50 transition-colors text-sm text-neutral-700 border-b border-neutral-200">
+                      <td className="p-4 align-middle">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.has(product.productId)}
+                          onChange={() => toggleSelectProduct(product.productId)}
+                          className="w-4 h-4 cursor-pointer accent-teal-600"
+                          aria-label={`Select ${product.name}`}
+                        />
+                      </td>
                       <td className="p-4 align-middle">
                         {product.id.slice(-6)}
                       </td>
@@ -737,6 +847,24 @@ export default function AdminStockManagement() {
         <a href="#" className="text-blue-600 hover:underline">Speedoo - Your Order Our Priority
         </a>
       </footer>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete product?"
+        description="This will permanently delete this product for all sellers and customers. This action cannot be undone."
+        loading={isDeleting}
+        onConfirm={confirmSingleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={isBulkDeleteOpen}
+        title={`Delete ${selectedProductIds.size} product(s)?`}
+        description="This will permanently delete the selected products from the database. This action cannot be undone."
+        loading={isDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setIsBulkDeleteOpen(false)}
+      />
     </div>
   );
 }

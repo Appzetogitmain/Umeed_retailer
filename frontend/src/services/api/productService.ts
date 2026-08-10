@@ -208,6 +208,26 @@ export const deleteProduct = async (id: string): Promise<ApiResponse<void>> => {
 };
 
 /**
+ * Bulk delete products (only own products)
+ */
+export const bulkDeleteProducts = async (
+  productIds: string[]
+): Promise<
+  ApiResponse<{
+    deleted: string[];
+    failed: Array<{ id: string; reason: string }>;
+  }>
+> => {
+  const response = await api.post<
+    ApiResponse<{
+      deleted: string[];
+      failed: Array<{ id: string; reason: string }>;
+    }>
+  >("/products/bulk-delete", { productIds });
+  return response.data;
+};
+
+/**
  * Update product status (publish, popular, dealOfDay)
  */
 export const updateProductStatus = async (

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   getProducts,
   deleteProduct,
+  bulkDeleteProducts,
   Product,
   ProductVariation,
 } from "../../../services/api/productService";
@@ -14,6 +15,7 @@ import { useAuth } from "../../../context/AuthContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { normalizeImageUrl } from "../../../utils/imageUrl";
+import ConfirmDialog from "../../../components/ConfirmDialog";
 
 // ... (interfaces remain same)
 
@@ -44,6 +46,12 @@ export default function SellerProductList() {
   const [allCategories, setAllCategories] = useState<apiCategory[]>([]);
   const { user } = useAuth();
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch categories
   useEffect(() => {
@@ -126,20 +134,73 @@ export default function SellerProductList() {
     sortDirection,
   ]);
 
-  const handleDelete = async (productId: string) => {
+  const handleDelete = (productId: string) => {
+    setDeleteTarget(productId);
+  };
+
+  const confirmSingleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      const response = await deleteProduct(productId);
+      const response = await deleteProduct(deleteTarget);
       if (
         response.success ||
         response.message === "Product deleted successfully"
       ) {
+        setSelectedProductIds((prev) => {
+          const next = new Set(prev);
+          next.delete(deleteTarget);
+          return next;
+        });
         fetchProducts();
       } else {
-        console.error("Failed to delete product");
+        alert(response.message || "Failed to delete product");
       }
     } catch (error) {
       console.error("Error deleting product:", error);
+      alert("An error occurred while deleting the product");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedProductIds.size === 0) return;
+    setIsDeleting(true);
+    try {
+      const response = await bulkDeleteProducts(Array.from(selectedProductIds));
+      if (response.success) {
+        const { deleted, failed } = response.data;
+        alert(
+          failed?.length
+            ? `${deleted.length} product(s) deleted. ${failed.length} could not be deleted.`
+            : `${deleted.length} product(s) deleted successfully.`
+        );
+        setSelectedProductIds(new Set());
+        fetchProducts();
+      } else {
+        alert(response.message || "Failed to delete products");
+      }
+    } catch (error) {
+      console.error("Error bulk deleting products:", error);
+      alert("An error occurred while deleting the products");
+    } finally {
+      setIsDeleting(false);
+      setIsBulkDeleteOpen(false);
+    }
+  };
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
   };
 
   const handleEdit = (productId: string) => {
@@ -241,6 +302,35 @@ export default function SellerProductList() {
   const displayedVariations = useServerPagination
     ? filteredVariations
     : filteredVariations.slice(startIndex, endIndex);
+
+  // Unique product ids currently visible on this page (for select-all).
+  // Resolved the same way as handleEdit/handleDelete: prefer the matched
+  // product's Mongo _id, falling back to the row's productId.
+  const pageProductIds = Array.from(
+    new Set(
+      displayedVariations.map((v) => {
+        const product = products.find(
+          (p) => (p.productId || p._id) === v.productId
+        );
+        return product ? product._id : v.productId;
+      })
+    )
+  );
+  const isAllOnPageSelected =
+    pageProductIds.length > 0 &&
+    pageProductIds.every((id) => selectedProductIds.has(id));
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (isAllOnPageSelected) {
+        pageProductIds.forEach((id) => next.delete(id));
+      } else {
+        pageProductIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -352,6 +442,19 @@ export default function SellerProductList() {
               </select>
             </div>
             <div className="relative flex gap-2">
+              {selectedProductIds.size > 0 && (
+                <button
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                  Delete Selected ({selectedProductIds.size})
+                </button>
+              )}
               <button
                 onClick={() => navigate('/seller/product/bulk-upload')}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors">
@@ -506,6 +609,15 @@ export default function SellerProductList() {
           <table className="w-full text-left border-collapse border border-neutral-200">
             <thead>
               <tr className="bg-neutral-50 text-xs font-bold text-neutral-800">
+                <th className="p-4 w-10 border border-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={isAllOnPageSelected}
+                    onChange={toggleSelectAllOnPage}
+                    className="w-4 h-4 cursor-pointer accent-teal-600"
+                    aria-label="Select all products on this page"
+                  />
+                </th>
                 <th className="p-4 w-16 border border-neutral-200">
                   <div className="flex items-center justify-between">
                     Product Id
@@ -596,11 +708,21 @@ export default function SellerProductList() {
                 const hasMultipleVariations =
                   product && product.variations.length > 1;
                 const isExpanded = expandedProducts.has(variation.productId);
+                const productKey = product ? product._id : variation.productId;
 
                 return (
                   <tr
                     key={`${variation.productId}-${variation.variationId}`}
                     className="hover:bg-neutral-50 transition-colors text-sm text-neutral-700">
+                    <td className="p-4 align-middle border border-neutral-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.has(productKey)}
+                        onChange={() => toggleSelectProduct(productKey)}
+                        className="w-4 h-4 cursor-pointer accent-teal-600"
+                        aria-label={`Select ${variation.productName}`}
+                      />
+                    </td>
                     <td className="p-4 align-middle border border-neutral-200">
                       <div className="flex items-center gap-2">
                         {isFirstVariation && hasMultipleVariations && (
@@ -717,7 +839,7 @@ export default function SellerProductList() {
               {displayedVariations.length === 0 && (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={13}
                     className="p-8 text-center text-neutral-400 border border-neutral-200">
                     No products found.
                   </td>
@@ -807,6 +929,24 @@ export default function SellerProductList() {
         </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete product?"
+        description="This will permanently delete this product and remove it from your store. This action cannot be undone."
+        loading={isDeleting}
+        onConfirm={confirmSingleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={isBulkDeleteOpen}
+        title={`Delete ${selectedProductIds.size} product(s)?`}
+        description="This will permanently delete the selected products and remove them from your store. This action cannot be undone."
+        loading={isDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setIsBulkDeleteOpen(false)}
+      />
     </div>
   );
 }

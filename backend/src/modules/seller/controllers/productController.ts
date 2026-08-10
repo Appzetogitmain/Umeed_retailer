@@ -4,6 +4,7 @@ import Shop from "../../../models/Shop";
 import Category from "../../../models/Category";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Brand from "../../../models/Brand";
+import { cleanupProductReferences } from "../../../utils/productCleanup";
 
 /**
  * Create a new product
@@ -497,9 +498,65 @@ export const deleteProduct = asyncHandler(
       });
     }
 
+    await cleanupProductReferences([product._id]);
+
     return res.status(200).json({
       success: true,
       message: "Product deleted successfully",
+    });
+  }
+);
+
+/**
+ * Bulk delete products (seller can only delete their own products)
+ */
+export const bulkDeleteProducts = asyncHandler(
+  async (req: Request, res: Response) => {
+    const sellerId = (req as any).user.userId;
+    const { productIds } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Product IDs array is required",
+      });
+    }
+
+    const results = {
+      deleted: [] as string[],
+      failed: [] as Array<{ id: string; reason: string }>,
+    };
+
+    // Only match products actually owned by this seller - forged/foreign IDs
+    // simply won't be found and will be reported as failed.
+    const ownedProducts = await Product.find({
+      _id: { $in: productIds },
+      seller: sellerId,
+    }).select("_id");
+    const ownedIds = ownedProducts.map((p) => p._id.toString());
+
+    for (const productId of productIds) {
+      if (!ownedIds.includes(productId)) {
+        results.failed.push({
+          id: productId,
+          reason: "Product not found or not owned by you",
+        });
+      }
+    }
+
+    if (ownedIds.length > 0) {
+      await Product.deleteMany({
+        _id: { $in: ownedIds },
+        seller: sellerId,
+      });
+      await cleanupProductReferences(ownedIds);
+      results.deleted = ownedIds;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Bulk delete completed: ${results.deleted.length} deleted, ${results.failed.length} failed`,
+      data: results,
     });
   }
 );

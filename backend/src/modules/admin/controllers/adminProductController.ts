@@ -8,6 +8,7 @@ import Inventory from "../../../models/Inventory";
 import Seller from "../../../models/Seller";
 import HeaderCategory from "../../../models/HeaderCategory";
 import { cache } from "../../../utils/cache";
+import { cleanupProductReferences } from "../../../utils/productCleanup";
 
 // ==================== Category Controllers ====================
 
@@ -1121,12 +1122,58 @@ export const deleteProduct = asyncHandler(
       });
     }
 
-    // Delete inventory record
-    await Inventory.findOneAndDelete({ product: id });
+    await cleanupProductReferences([product._id]);
 
     return res.status(200).json({
       success: true,
       message: "Product deleted successfully",
+    });
+  }
+);
+
+/**
+ * Bulk delete products (admin can delete any product across all sellers)
+ */
+export const bulkDeleteProducts = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { productIds } = req.body;
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Product IDs array is required",
+      });
+    }
+
+    const results = {
+      deleted: [] as string[],
+      failed: [] as Array<{ id: string; reason: string }>,
+    };
+
+    const existingProducts = await Product.find({
+      _id: { $in: productIds },
+    }).select("_id");
+    const existingIds = existingProducts.map((p) => p._id.toString());
+
+    for (const productId of productIds) {
+      if (!existingIds.includes(productId)) {
+        results.failed.push({
+          id: productId,
+          reason: "Product not found",
+        });
+      }
+    }
+
+    if (existingIds.length > 0) {
+      await Product.deleteMany({ _id: { $in: existingIds } });
+      await cleanupProductReferences(existingIds);
+      results.deleted = existingIds;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Bulk delete completed: ${results.deleted.length} deleted, ${results.failed.length} failed`,
+      data: results,
     });
   }
 );
