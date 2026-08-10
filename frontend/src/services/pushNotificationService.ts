@@ -191,10 +191,13 @@ export function setupForegroundNotificationHandler(handler?: (payload: any) => v
         }
 
         // Show a system notification even in foreground
-        // This ensures the notification appears in the "notification center" 
+        // This ensures the notification appears in the "notification center"
         // while the user is actively using the app.
-        if (Notification.permission === 'granted' && payload.notification) {
-            const { title, body } = payload.notification;
+        // Messages are sent data-only (see backend firebaseAdmin.ts) so title/body
+        // live under payload.data, not payload.notification.
+        const title = payload.notification?.title || payload.data?.title;
+        const body = payload.notification?.body || payload.data?.body;
+        if (Notification.permission === 'granted' && (title || body)) {
             const notificationTitle = title || 'Speedoo Notification';
             const notificationOptions = {
                 body: body,

@@ -78,38 +78,25 @@ export async function sendPushNotification(tokens: string[], payload: PushNotifi
     try {
         const isOrder = !!(payload.data?.orderId || payload.data?.type === 'ORDER_NEW' || payload.data?.type === 'ORDER_DELIVERED' || payload.data?.type === 'Order');
         const targetLink = payload.data?.url || payload.data?.link || (isOrder ? '/delivery/dashboard' : '/notifications');
-        const actions = isOrder ? [
-            { action: 'view', title: '✅ View Order' },
-            { action: 'dismiss', title: '❌ Dismiss' }
-        ] : [
-            { action: 'view', title: '✅ Open' },
-            { action: 'dismiss', title: '❌ Close' }
-        ];
-        const notificationTag = payload.data?.orderId ? `order-${payload.data.orderId}` : `notif-${Date.now()}`;
 
         const message: any = {
-            notification: {
+            // Deliberately data-only (no top-level/webpush `notification` field).
+            // When a `notification` field is present, the browser's own push
+            // stack decides whether to auto-display it or hand off to the page/SW,
+            // and that decision is inconsistent for a backgrounded-but-not-closed
+            // tab (sometimes goes to foreground onMessage, sometimes nowhere).
+            // Data-only messages are always routed deterministically: to the page's
+            // onMessage() if a tab is visible, otherwise to the service worker's
+            // onBackgroundMessage() — covering "backgrounded" and "closed" the same way.
+            data: {
+                ...(payload.data || {}),
                 title: payload.title,
                 body: payload.body,
             },
-            data: payload.data || {},
             tokens: tokens,
-            // Web Push (browser) specifics — REQUIRED for web FCM tokens to show notifications in background
             webpush: {
                 headers: {
                     Urgency: 'high',
-                },
-                notification: {
-                    title: payload.title,
-                    body: payload.body,
-                    icon: '/logo192.png',
-                    badge: '/logo192.png',
-                    requireInteraction: true,  // Keep visible until user taps
-                    vibrate: [200, 100, 200, 100, 200],
-                    tag: notificationTag,
-                    renotify: false,
-                    data: payload.data || {},
-                    actions: actions,
                 },
                 fcmOptions: {
                     link: targetLink,

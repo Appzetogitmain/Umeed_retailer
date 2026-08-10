@@ -604,87 +604,116 @@ export async function handleOrderAcceptance(
         const stateKey = sellerId ? `${orderId}-${sellerId}` : orderId;
         const state = notificationStates.get(stateKey);
         const normalizedDeliveryBoyId = String(deliveryBoyId).trim();
+        const deliveryBoyObjectId = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
 
-        // 1. In-Memory Check (Preferred)
+        // 1. In-Memory Fast-Path (same-process optimization only)
+        // notificationStates is a local Map per Node process — under a clustered/
+        // multi-instance deployment (e.g. PM2 cluster mode) two riders' requests can
+        // land on different processes and this check alone would NOT catch the race.
+        // The atomic findOneAndUpdate below is the actual source of truth; this block
+        // only short-circuits the common same-process case a little earlier.
         if (state) {
-            // Check if already accepted in memory
             if (state.acceptedBy) {
                 return { success: false, message: 'Order already accepted by another delivery boy' };
             }
-
-            // Ensure delivery boy is registered in notified list if they received broadcast
-            if (!state.notifiedDeliveryBoys.has(normalizedDeliveryBoyId)) {
-                state.notifiedDeliveryBoys.add(normalizedDeliveryBoyId);
-            }
-
-            // Check if this delivery boy already rejected
             if (state.rejectedDeliveryBoys.has(normalizedDeliveryBoyId)) {
                 return { success: false, message: 'You have already rejected this order' };
             }
-
-            // Mark as accepted in memory
-            state.acceptedBy = normalizedDeliveryBoyId;
+            if (!state.notifiedDeliveryBoys.has(normalizedDeliveryBoyId)) {
+                state.notifiedDeliveryBoys.add(normalizedDeliveryBoyId);
+            }
         } else {
             console.log(`⚠️ Notification state missing for order ${stateKey}. Checking database for fallback...`);
         }
 
-        // Update order in database
-        const order = await Order.findById(orderId);
-        if (!order) {
+        // Read-only lookup, just to decide which assignment shape this order uses
+        // and to confirm it exists. The actual "did I win the race" check happens
+        // in the atomic update below, not here.
+        const orderCheck: any = await Order.findById(orderId).select('sellerAcceptances').lean();
+        if (!orderCheck) {
             return { success: false, message: 'Order not found' };
         }
 
-        if (sellerId && order.sellerAcceptances && order.sellerAcceptances.length > 0) {
-            // Per-seller acceptance logic
-            const sellerIdStr = sellerId.toString();
-            const acceptanceIndex = order.sellerAcceptances.findIndex((sa: any) => sa.seller.toString() === sellerIdStr);
-            if (acceptanceIndex === -1) {
-                 return { success: false, message: 'Seller sub-order not found' };
-            }
-            if (order.sellerAcceptances[acceptanceIndex].deliveryBoy) {
-                 return { success: false, message: 'This pickup is already assigned to another rider' };
+        const usePerSellerFlow = !!(sellerId && orderCheck.sellerAcceptances && orderCheck.sellerAcceptances.length > 0);
+        let updatedOrder;
+
+        if (usePerSellerFlow) {
+            // Atomic per-seller assignment: the filter requires this seller's pickup to
+            // still be unassigned at the moment MongoDB applies the update, so if two
+            // riders race, only the first write can possibly match — the second gets
+            // matchedCount 0 and updatedOrder comes back null.
+            updatedOrder = await Order.findOneAndUpdate(
+                {
+                    _id: orderId,
+                    sellerAcceptances: {
+                        $elemMatch: { seller: new mongoose.Types.ObjectId(sellerId), deliveryBoy: null },
+                    },
+                },
+                {
+                    $set: {
+                        'sellerAcceptances.$.deliveryBoy': deliveryBoyObjectId,
+                        'sellerAcceptances.$.deliveryBoyStatus': 'Assigned',
+                        'sellerAcceptances.$.assignedAt': new Date(),
+                    },
+                },
+                { new: true }
+            );
+
+            if (!updatedOrder) {
+                const sellerIdStr = sellerId!.toString();
+                const subExists = orderCheck.sellerAcceptances?.some((sa: any) => sa.seller.toString() === sellerIdStr);
+                return {
+                    success: false,
+                    message: !subExists ? 'Seller sub-order not found' : 'This pickup is already assigned to another rider',
+                };
             }
 
-            order.sellerAcceptances[acceptanceIndex].deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
-            order.sellerAcceptances[acceptanceIndex].deliveryBoyStatus = 'Assigned';
-            order.sellerAcceptances[acceptanceIndex].assignedAt = new Date();
-
-            // Set main deliveryBoy as fallback if not set yet
-            if (!order.deliveryBoy) {
-                order.deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
-                order.deliveryBoyStatus = 'Assigned';
-                order.assignedAt = new Date();
-            }
-            
-            // Also update main status to Processed if it's currently Accepted
-            if (order.status === 'Accepted') {
-                order.status = 'Processed';
-            }
-            
-            // Freeze dynamic rider earning breakdown
-            const { calculateDynamicRiderEarning } = await import('./commissionService');
-            const earningBreakdown = await calculateDynamicRiderEarning(order);
-            order.riderEarningBreakdown = earningBreakdown;
-
-            await order.save();
+            // Best-effort fallback fields — informational only, not safety-critical,
+            // so a plain conditional update (not read-then-write) is enough here.
+            await Order.updateOne(
+                { _id: orderId, deliveryBoy: null },
+                { $set: { deliveryBoy: deliveryBoyObjectId, deliveryBoyStatus: 'Assigned', assignedAt: new Date() } }
+            );
+            await Order.updateOne(
+                { _id: orderId, status: 'Accepted' },
+                { $set: { status: 'Processed' } }
+            );
         } else {
-            // Legacy single-delivery logic
-            if (order.deliveryBoy) {
+            // Atomic legacy single-delivery assignment — same compare-and-swap idea:
+            // only succeeds if deliveryBoy is still unset at update time.
+            updatedOrder = await Order.findOneAndUpdate(
+                { _id: orderId, deliveryBoy: null },
+                {
+                    $set: {
+                        deliveryBoy: deliveryBoyObjectId,
+                        deliveryBoyStatus: 'Assigned',
+                        assignedAt: new Date(),
+                        status: 'Processed',
+                    },
+                },
+                { new: true }
+            );
+
+            if (!updatedOrder) {
                 return { success: false, message: 'Order already assigned to another delivery boy' };
             }
+        }
 
-            // Assign order to delivery boy
-            order.deliveryBoy = new mongoose.Types.ObjectId(normalizedDeliveryBoyId);
-            order.deliveryBoyStatus = 'Assigned';
-            order.assignedAt = new Date();
-            order.status = 'Processed'; // Mark as processed when assigned
-
-            // Freeze dynamic rider earning breakdown
+        // Freeze dynamic rider earning breakdown (informational, not safety-critical —
+        // the assignment above has already been won atomically by this point).
+        try {
             const { calculateDynamicRiderEarning } = await import('./commissionService');
-            const earningBreakdown = await calculateDynamicRiderEarning(order);
-            order.riderEarningBreakdown = earningBreakdown;
+            const earningBreakdown = await calculateDynamicRiderEarning(updatedOrder);
+            updatedOrder.riderEarningBreakdown = earningBreakdown;
+            await updatedOrder.save();
+        } catch (earnError) {
+            console.error('Error freezing rider earning breakdown on acceptance:', earnError);
+        }
 
-            await order.save();
+        // DB has now authoritatively confirmed this rider won the assignment —
+        // safe to mark the in-memory state for same-process fast-path checks.
+        if (state) {
+            state.acceptedBy = normalizedDeliveryBoyId;
         }
 
         // Emit order-accepted event to all delivery boys who were notified

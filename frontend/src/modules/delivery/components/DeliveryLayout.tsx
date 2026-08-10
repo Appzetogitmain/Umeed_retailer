@@ -116,7 +116,11 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
     };
   }, [loadAndShowOrder]);
 
-  // On app startup: ask Service Worker if there is any pending order notification (app was closed when notification came)
+  // Ask Service Worker if there is any pending order notification.
+  // Runs on mount (app was closed/cold-started when notification came), and again
+  // every time the tab regains visibility/focus — because tapping a notification
+  // for an already-open background tab often just refocuses it (no navigation, no
+  // remount), so a mount-only check would miss any order that arrived while backgrounded.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
@@ -134,8 +138,25 @@ function DeliveryLayoutContent({ children }: DeliveryLayoutContentProps) {
 
     // Small delay to let auth hydrate before we try to fetch order details
     const timer = setTimeout(askSWForPendingOrder, 1200);
-    return () => clearTimeout(timer);
-  }, []); // Only run once on mount
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        askSWForPendingOrder();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    // Covers bfcache restores (tab resumed from a frozen/suspended state) on browsers
+    // that fire pageshow without a corresponding visibilitychange.
+    window.addEventListener('pageshow', handleVisibilityOrFocus);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('pageshow', handleVisibilityOrFocus);
+    };
+  }, []);
 
   // Handle URL query param ?openOrder=xyz (when user clicks OS notification tray item → app opens)
   useEffect(() => {
