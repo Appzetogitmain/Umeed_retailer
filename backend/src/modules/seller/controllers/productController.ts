@@ -90,7 +90,8 @@ export const createProduct = asyncHandler(
       if (!isObjectId) {
         // It's a custom brand name. Find it or create it.
         const brandName = newProductData.brand.trim();
-        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${brandName}$`, "i") } });
+        const escapedBrandName = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${escapedBrandName}$`, "i") } });
         if (!existingBrand) {
           existingBrand = await Brand.create({ name: brandName });
         }
@@ -334,7 +335,8 @@ export const updateProduct = asyncHandler(
       const isObjectId = /^[0-9a-fA-F]{24}$/.test(updateData.brandId);
       if (!isObjectId) {
         const brandName = updateData.brandId.trim();
-        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${brandName}$`, "i") } });
+        const escapedBrandName = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let existingBrand = await Brand.findOne({ name: { $regex: new RegExp(`^${escapedBrandName}$`, "i") } });
         if (!existingBrand) {
           existingBrand = await Brand.create({ name: brandName });
         }
