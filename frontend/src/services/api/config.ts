@@ -129,8 +129,18 @@ api.interceptors.response.use(
     return response;
   },
   (error: any) => {
+    // Handle 413 Payload Too Large globally
+    if (error.response?.status === 413) {
+      const msg = "File size is too large. Please upload a smaller file.";
+      error.message = msg;
+      if (!error.response.data) error.response.data = {};
+      // Ensure we don't overwrite a meaningful backend message if it's already a JSON with message
+      if (typeof error.response.data === 'string' || !error.response.data.message) {
+        error.response.data.message = msg;
+      }
+    }
+
     // Only handle 401 (Unauthorized) for auto-logout
-    // 403 (Forbidden) means user is authenticated but doesn't have permission - DO NOT LOGOUT
     if (error.response?.status === 401) {
       // Check if this is an authentication endpoint (OTP verification, etc.)
       // Don't redirect for auth endpoints - let the component handle the error
