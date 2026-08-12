@@ -6,6 +6,13 @@ export interface IOrder extends Document {
   orderNumber: string;
   orderDate: Date;
 
+  // Sales channel. Defaults to "App" for backward compatibility with existing
+  // orders (which predate this field). "POS" identifies in-store sales created
+  // by a seller via the POS billing module.
+  source: "App" | "Web" | "POS";
+  // Set only when source === "POS": the seller who rang up the sale.
+  posSeller?: mongoose.Types.ObjectId;
+
   // Customer Info
   customer: mongoose.Types.ObjectId;
   customerName: string;
@@ -132,6 +139,16 @@ const OrderSchema = new Schema<IOrder>(
     orderDate: {
       type: Date,
       default: Date.now,
+    },
+
+    source: {
+      type: String,
+      enum: ["App", "Web", "POS"],
+      default: "App",
+    },
+    posSeller: {
+      type: Schema.Types.ObjectId,
+      ref: "Seller",
     },
 
     // Customer Info
@@ -436,6 +453,7 @@ OrderSchema.index({ customer: 1, orderDate: -1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ orderDate: -1 });
 OrderSchema.index({ deliveryBoy: 1 });
+OrderSchema.index({ source: 1, posSeller: 1, orderDate: -1 });
 // OrderSchema.index({ orderNumber: 1 });
 
 const Order = mongoose.models.Order || mongoose.model<IOrder>("Order", OrderSchema);

@@ -29,6 +29,11 @@ export interface Product {
   _id: string;
   productId?: string;
   productName: string;
+  price?: number;
+  discPrice?: number;
+  stock?: number;
+  sku?: string;
+  barcode?: string;
   seller: string | any; // Updated to allow populated object
   headerCategoryId?: string | any; // Updated to allow populated object
   category?: string | any; // Updated to allow populated object

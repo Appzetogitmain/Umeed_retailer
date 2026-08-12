@@ -9,35 +9,7 @@ import mongoose from 'mongoose';
 import Seller from '../../../models/Seller';
 import { getRoadDistances } from '../../../services/mapService';
 import AppSettings from '../../../models/AppSettings';
-
-// Helper to calculate item price matching frontend logic
-const calculateItemPrice = (product: any, variationSelector: any) => {
-    let variation = null;
-    let variationId = variationSelector;
-
-    // Handle if variationSelector is an object
-    if (variationSelector && typeof variationSelector === 'object' && variationSelector._id) {
-        variationId = variationSelector._id;
-    }
-
-    if (variationId && product.variations?.length) {
-        variation = product.variations.find((v: any) =>
-            (v._id && v._id.toString() === variationId.toString()) ||
-            (v.id && v.id === variationId)
-        );
-    }
-
-    let finalPrice = variation?.price || product.price || 0;
-
-    // Priority: Variation Discount -> Product Discount -> Variation Price -> Product Price
-    if (variation?.discPrice && variation.discPrice > 0) {
-        finalPrice = variation.discPrice;
-    } else if (product.discPrice && product.discPrice > 0) {
-        finalPrice = product.discPrice;
-    }
-
-    return finalPrice;
-};
+import { resolveItemUnitPrice as calculateItemPrice } from '../../../utils/pricing';
 
 // Helper to calculate cart total with location filtering
 const calculateCartTotal = async (cartId: any, nearbySellerIds: mongoose.Types.ObjectId[] = []) => {

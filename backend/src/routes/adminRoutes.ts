@@ -158,6 +158,10 @@ router.patch("/orders/:id/status", orderController.updateOrderStatus);
 router.patch("/orders/:id/assign-delivery", orderController.assignDeliveryBoy);
 router.get("/orders/export/csv", orderController.exportOrders);
 
+// ==================== POS (in-store sales) Monitoring Routes ====================
+router.get("/pos/orders", orderController.getPosOrders);
+router.get("/pos/summary", orderController.getPosSummary);
+
 // ==================== Return Request Routes ====================
 router.get("/return-requests", orderController.getReturnRequests);
 router.get("/return-requests/:id", orderController.getReturnRequestById);

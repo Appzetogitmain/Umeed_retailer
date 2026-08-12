@@ -10,6 +10,8 @@ import { notifySellersOfOrderUpdate } from "../../../services/sellerNotification
 import { generateDeliveryOtp } from "../../../services/deliveryOtpService";
 import { Server as SocketIOServer } from "socket.io";
 import { calculateDeliveryStuff } from "./customerCartController";
+import { resolveItemUnitPrice } from "../../../utils/pricing";
+import { decrementProductStock } from "../../../utils/stockDecrement";
 
 // Create a new order
 export const createOrder = async (req: Request, res: Response) => {
@@ -169,98 +171,12 @@ export const createOrder = async (req: Request, res: Response) => {
                 throw new Error("Invalid item quantity");
             }
 
-            // Atomically check stock and decrement to prevent race conditions
-            let product;
+            // Atomically check stock and decrement to prevent race conditions.
             // The frontend sends variation info as 'variant' or 'variation'
             // In the product model, it's stored in 'variations' array
             const variationValue = item.variant || item.variation;
 
-            if (variationValue) {
-                // Try to decrement stock for the specific variation first
-                // We check variations._id, variations.value, variations.title, or variations.pack
-                product = session
-                    ? await Product.findOneAndUpdate(
-                        {
-                            _id: item.product.id,
-                            $or: [
-                                { "variations._id": mongoose.isValidObjectId(variationValue) ? variationValue : new mongoose.Types.ObjectId() },
-                                { "variations.value": variationValue },
-                                { "variations.title": variationValue },
-                                { "variations.pack": variationValue }
-                            ],
-                            "variations.stock": { $gte: qty }
-                        },
-                        { $inc: { "variations.$.stock": -qty, stock: -qty } },
-                        { session, new: true }
-                    )
-                    : await Product.findOneAndUpdate(
-                        {
-                            _id: item.product.id,
-                            $or: [
-                                { "variations._id": mongoose.isValidObjectId(variationValue) ? variationValue : new mongoose.Types.ObjectId() },
-                                { "variations.value": variationValue },
-                                { "variations.title": variationValue },
-                                { "variations.pack": variationValue }
-                            ],
-                            "variations.stock": { $gte: qty }
-                        },
-                        { $inc: { "variations.$.stock": -qty, stock: -qty } },
-                        { new: true }
-                    );
-            }
-
-            if (!product) {
-                // If we are here, either variationValue wasn't provided, or it didn't match any variation with enough stock.
-                // We'll try to find the product first to see if it has variations.
-                const checkProduct = await Product.findById(item.product.id);
-
-                if (checkProduct && checkProduct.variations && checkProduct.variations.length > 0) {
-                    // Check if the variationValue exists in product's variations
-                    const hasVariation = variationValue ? checkProduct.variations.some((v: any) => 
-                        (v._id && v._id.toString() === variationValue) ||
-                        v.value === variationValue ||
-                        v.title === variationValue ||
-                        v.pack === variationValue
-                    ) : false;
-
-                    // If a variation was provided and it actually exists on the product, it means that variation is out of stock.
-                    if (variationValue && hasVariation) {
-                        throw new Error(`Insufficient stock for variation: ${variationValue}`);
-                    }
-
-                    // If no variation was provided, or if the variation ID is stale/invalid, fall back to the first variation.
-                    product = session
-                        ? await Product.findOneAndUpdate(
-                            {
-                                _id: item.product.id,
-                                "variations.0.stock": { $gte: qty }
-                            },
-                            { $inc: { "variations.0.stock": -qty, stock: -qty } },
-                            { session, new: true }
-                        )
-                        : await Product.findOneAndUpdate(
-                            {
-                                _id: item.product.id,
-                                "variations.0.stock": { $gte: qty }
-                            },
-                            { $inc: { "variations.0.stock": -qty, stock: -qty } },
-                            { new: true }
-                        );
-                } else {
-                    // No variations, just decrement top-level stock
-                    product = session
-                        ? await Product.findOneAndUpdate(
-                            { _id: item.product.id, stock: { $gte: qty } },
-                            { $inc: { stock: -qty } },
-                            { session, new: true }
-                        )
-                        : await Product.findOneAndUpdate(
-                            { _id: item.product.id, stock: { $gte: qty } },
-                            { $inc: { stock: -qty } },
-                            { new: true }
-                        );
-                }
-            }
+            const product = await decrementProductStock(item.product.id, qty, variationValue, session);
 
             if (!product) {
                 throw new Error(`Insufficient stock or product not found: ${item.product.name || 'ID: ' + item.product.id}${variationValue ? ' (' + variationValue + ')' : ''}`);
@@ -286,11 +202,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 selectedVariation = product.variations[0];
             }
 
-            const itemPrice = (selectedVariation?.discPrice && selectedVariation.discPrice > 0)
-                ? selectedVariation.discPrice
-                : (product.discPrice && product.discPrice > 0)
-                    ? product.discPrice
-                    : (selectedVariation?.price || product.price || 0);
+            const itemPrice = resolveItemUnitPrice(product, selectedVariation || variationValue);
             const itemTotal = itemPrice * qty;
             calculatedSubtotal += itemTotal;
 

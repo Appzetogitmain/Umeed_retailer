@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface IPaymentMethod extends Document {
   name: string;
-  type: "COD" | "Online" | "Wallet" | "UPI" | "Card" | "Net Banking";
+  type: "COD" | "Online" | "Wallet" | "UPI" | "Card" | "Net Banking" | "Cash";
   isActive: boolean;
   icon?: string;
   description?: string;
@@ -24,7 +24,7 @@ const PaymentMethodSchema = new Schema<IPaymentMethod>(
     },
     type: {
       type: String,
-      enum: ["COD", "Online", "Wallet", "UPI", "Card", "Net Banking"],
+      enum: ["COD", "Online", "Wallet", "UPI", "Card", "Net Banking", "Cash"],
       required: [true, "Payment method type is required"],
     },
     isActive: {

@@ -22,6 +22,69 @@ interface SellerSidebarProps {
 const menuItems: MenuItem[] = [
   { label: "Dashboard", path: "/seller" },
   { label: "Orders", path: "/seller/orders" },
+  {
+    label: "POS",
+    path: "/seller/pos",
+    hasSubmenu: true,
+    submenuItems: [
+      {
+        label: "New Sale",
+        path: "/seller/pos",
+        icon: (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        ),
+      },
+      {
+        label: "Sale History",
+        path: "/seller/pos/history",
+        icon: (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round">
+            <path d="M3 3v5h5"></path>
+            <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+            <path d="M12 7v5l4 2"></path>
+          </svg>
+        ),
+      },
+      {
+        label: "Sales Report",
+        path: "/seller/pos/report",
+        icon: (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        ),
+      },
+    ],
+  },
   { label: "Category", path: "/seller/category" },
   { label: "SubCategory", path: "/seller/subcategory" },
   {

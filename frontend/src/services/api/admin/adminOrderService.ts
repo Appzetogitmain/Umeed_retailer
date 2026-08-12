@@ -32,6 +32,8 @@ export interface Order {
   _id: string;
   orderNumber: string;
   orderDate: string;
+  source?: "App" | "Web" | "POS";
+  posSeller?: string | { _id: string; storeName: string; sellerName: string };
   customer: string | { name: string; email: string; phone: string };
   customerName: string;
   customerEmail: string;
@@ -203,6 +205,49 @@ export const processReturnRequest = async (
     `/admin/returns/${id}/process`,
     data
   );
+  return response.data;
+};
+
+export interface PosSummary {
+  totalOrders: number;
+  totalRevenue: number;
+  byPaymentMethod: { paymentMethod: string; orders: number; revenue: number }[];
+  bySeller: { sellerId: string; storeName: string; orders: number; revenue: number }[];
+}
+
+export interface GetPosOrdersParams {
+  page?: number;
+  limit?: number;
+  paymentStatus?: string;
+  seller?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+}
+
+/**
+ * Get all sellers' POS (in-store) orders, with seller/date/payment filters.
+ */
+export const getPosOrders = async (
+  params?: GetPosOrdersParams
+): Promise<ApiResponse<Order[]>> => {
+  const response = await api.get<ApiResponse<Order[]>>("/admin/pos/orders", {
+    params,
+  });
+  return response.data;
+};
+
+/**
+ * Overall POS sales summary (total revenue/orders, by payment method, by seller).
+ */
+export const getPosSummary = async (params?: {
+  seller?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<ApiResponse<PosSummary>> => {
+  const response = await api.get<ApiResponse<PosSummary>>("/admin/pos/summary", {
+    params,
+  });
   return response.data;
 };
 

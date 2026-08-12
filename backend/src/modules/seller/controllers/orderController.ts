@@ -29,7 +29,9 @@ export const getOrders = asyncHandler(
     const orderItems = await OrderItem.find({ seller: sellerId }).distinct("order");
 
     // Build query - filter by orders containing this seller's items
-    const query: any = { _id: { $in: orderItems } };
+    // POS (in-store) sales are excluded from this online-order view; they have
+    // their own dedicated history at /seller/pos/orders.
+    const query: any = { _id: { $in: orderItems }, source: { $ne: "POS" } };
 
     // Date range filter
     if (dateFrom || dateTo) {

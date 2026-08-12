@@ -181,6 +181,8 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
       { productName: { $regex: search, $options: "i" } },
       { smallDescription: { $regex: search, $options: "i" } },
       { tags: { $in: [new RegExp(search as string, "i")] } },
+      { sku: { $regex: search, $options: "i" } },
+      { barcode: { $regex: search, $options: "i" } },
     ];
   }
 

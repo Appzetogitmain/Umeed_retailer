@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import { asyncHandler } from "../../../utils/asyncHandler";
 import Order from "../../../models/Order";
 import OrderItem from "../../../models/OrderItem";
@@ -22,9 +23,14 @@ export const getAllOrders = asyncHandler(
       dateFrom,
       dateTo,
       search,
+      source,
     } = req.query;
 
     const query: any = {};
+
+    // Default admin order view excludes POS (in-store) sales, which have their
+    // own dedicated monitoring page at /admin/pos; pass ?source=POS to include them.
+    query.source = source ? source : { $ne: "POS" };
 
     if (status) query.status = status;
     if (paymentStatus) query.paymentStatus = paymentStatus;
@@ -54,6 +60,7 @@ export const getAllOrders = asyncHandler(
       Order.find(query)
         .populate("customer", "name email phone")
         .populate("deliveryBoy", "name mobile")
+        .populate("posSeller", "storeName sellerName")
         .populate("items")
         .sort({ orderDate: -1 })
         .skip(skip)
@@ -675,3 +682,86 @@ export const exportOrders = asyncHandler(
     res.send(csvContent);
   }
 );
+
+/**
+ * Admin POS monitoring: list all sellers' POS (in-store) orders with
+ * seller/date/payment filters. Delegates to the same query/pagination
+ * shape as getAllOrders, forced to source: "POS".
+ */
+export const getPosOrders = (req: Request, res: Response, next: any) => {
+  req.query.source = "POS";
+  return (getAllOrders as any)(req, res, next);
+};
+
+/**
+ * Admin POS reports: overall stats for in-store sales, grouped by seller
+ * and payment method, with optional seller/date filters.
+ */
+export const getPosSummary = asyncHandler(async (req: Request, res: Response) => {
+  const { seller, dateFrom, dateTo } = req.query;
+
+  const match: any = { source: "POS" };
+  if (seller) match.posSeller = new mongoose.Types.ObjectId(seller as string);
+  if (dateFrom || dateTo) {
+    match.orderDate = {};
+    if (dateFrom) match.orderDate.$gte = new Date(dateFrom as string);
+    if (dateTo) {
+      const endDay = new Date(dateTo as string);
+      endDay.setHours(23, 59, 59, 999);
+      match.orderDate.$lte = endDay;
+    }
+  }
+
+  const [overall, byPaymentMethod, bySeller] = await Promise.all([
+    Order.aggregate([
+      { $match: match },
+      { $group: { _id: null, orders: { $sum: 1 }, revenue: { $sum: "$total" } } },
+    ]),
+    Order.aggregate([
+      { $match: match },
+      { $group: { _id: "$paymentMethod", orders: { $sum: 1 }, revenue: { $sum: "$total" } } },
+    ]),
+    Order.aggregate([
+      { $match: match },
+      { $group: { _id: "$posSeller", orders: { $sum: 1 }, revenue: { $sum: "$total" } } },
+      {
+        $lookup: {
+          from: "sellers",
+          localField: "_id",
+          foreignField: "_id",
+          as: "sellerInfo",
+        },
+      },
+      { $unwind: { path: "$sellerInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          sellerId: "$_id",
+          storeName: "$sellerInfo.storeName",
+          orders: 1,
+          revenue: 1,
+        },
+      },
+      { $sort: { revenue: -1 } },
+    ]),
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    message: "POS summary fetched successfully",
+    data: {
+      totalOrders: overall[0]?.orders || 0,
+      totalRevenue: Math.round((overall[0]?.revenue || 0) * 100) / 100,
+      byPaymentMethod: byPaymentMethod.map((p) => ({
+        paymentMethod: p._id,
+        orders: p.orders,
+        revenue: Math.round(p.revenue * 100) / 100,
+      })),
+      bySeller: bySeller.map((s) => ({
+        sellerId: s.sellerId,
+        storeName: s.storeName || "Unknown",
+        orders: s.orders,
+        revenue: Math.round(s.revenue * 100) / 100,
+      })),
+    },
+  });
+});

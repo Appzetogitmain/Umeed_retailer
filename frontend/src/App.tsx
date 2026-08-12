@@ -156,6 +156,16 @@ const SellerWallet = lazy(() => import("./modules/seller/pages/SellerWallet"));
 const SellerSalesReport = lazy(
   () => import("./modules/seller/pages/SellerSalesReport"),
 );
+const SellerPOS = lazy(() => import("./modules/seller/pages/SellerPOS"));
+const SellerPosOrders = lazy(
+  () => import("./modules/seller/pages/SellerPosOrders"),
+);
+const SellerPosOrderDetail = lazy(
+  () => import("./modules/seller/pages/SellerPosOrderDetail"),
+);
+const SellerPosReport = lazy(
+  () => import("./modules/seller/pages/SellerPosReport"),
+);
 const SellerReturnRequest = lazy(
   () => import("./modules/seller/pages/SellerReturnRequest"),
 );
@@ -244,6 +254,9 @@ const AdminShopByStore = lazy(
 const AdminBanners = lazy(() => import("./modules/admin/pages/AdminBanners"));
 const AdminAllOrders = lazy(
   () => import("./modules/admin/pages/AdminAllOrders"),
+);
+const AdminPosOrders = lazy(
+  () => import("./modules/admin/pages/AdminPosOrders"),
 );
 const AdminPendingOrders = lazy(
   () => import("./modules/admin/pages/AdminPendingOrders"),
@@ -628,6 +641,22 @@ function AppContent() {
                                       element={<SellerSalesReport />}
                                     />
                                     <Route
+                                      path="pos"
+                                      element={<SellerPOS />}
+                                    />
+                                    <Route
+                                      path="pos/history"
+                                      element={<SellerPosOrders />}
+                                    />
+                                    <Route
+                                      path="pos/history/:id"
+                                      element={<SellerPosOrderDetail />}
+                                    />
+                                    <Route
+                                      path="pos/report"
+                                      element={<SellerPosReport />}
+                                    />
+                                    <Route
                                       path="account-settings"
                                       element={<SellerAccountSettings />}
                                     />
@@ -810,6 +839,10 @@ function AppContent() {
                                     <Route
                                       path="orders/all"
                                       element={<AdminAllOrders />}
+                                    />
+                                    <Route
+                                      path="pos"
+                                      element={<AdminPosOrders />}
                                     />
                                     <Route
                                       path="orders/pending"
