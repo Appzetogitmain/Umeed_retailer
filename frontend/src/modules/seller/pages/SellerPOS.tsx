@@ -46,6 +46,7 @@ export default function SellerPOS() {
   const [customerResults, setCustomerResults] = useState<PosCustomer[]>([]);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const customerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,11 +103,21 @@ export default function SellerPOS() {
   }, []);
 
   const selectCustomer = (customer: PosCustomer) => {
+    setSelectedCustomer(customer);
     setCustomerName(customer.name);
-    setCustomerPhone(customer.phone);
-    setCustomerEmail(customer.email);
-    setCustomerSearch('');
+    setCustomerPhone(customer.phone || '');
+    setCustomerEmail(customer.email || '');
+    setCustomerSearch(customer.name);
+    setCustomerResults([]);
     setShowCustomerDropdown(false);
+  };
+
+  const clearSelectedCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerEmail('');
+    setCustomerSearch('');
   };
 
   const addToCart = (product: Product, variation?: ProductVariation) => {
@@ -200,6 +211,8 @@ export default function SellerPOS() {
         setCustomerName('');
         setCustomerEmail('');
         setCustomerPhone('');
+        setCustomerSearch('');
+        setSelectedCustomer(null);
         setDiscountValue('');
         setTaxValue('');
         setNotes('');
@@ -374,15 +387,26 @@ export default function SellerPOS() {
                 placeholder="Search registered customer..."
                 value={customerSearch}
                 onChange={(e) => {
+                  if (selectedCustomer) clearSelectedCustomer();
                   setCustomerSearch(e.target.value);
                   runCustomerSearch(e.target.value);
                 }}
                 onFocus={() => {
                   if (customerResults.length > 0) setShowCustomerDropdown(true);
                 }}
-                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                className="w-full px-2 py-1.5 border border-green-300 rounded text-xs bg-green-50 focus:outline-none focus:ring-1 focus:ring-green-500"
+                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 150)}
+                className={`w-full px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500 ${selectedCustomer ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'border-green-300 bg-green-50'}`}
               />
+              {selectedCustomer && (
+                <button
+                  type="button"
+                  onClick={clearSelectedCustomer}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500 text-xs"
+                  title="Clear selected customer"
+                >
+                  ✕
+                </button>
+              )}
               {showCustomerDropdown && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded shadow-lg max-h-40 overflow-y-auto">
                   {searchingCustomer ? (
@@ -393,8 +417,11 @@ export default function SellerPOS() {
                     customerResults.map((c) => (
                       <div
                         key={c._id}
-                        onClick={() => selectCustomer(c)}
-                        className="px-3 py-2 hover:bg-neutral-50 cursor-pointer border-b border-neutral-100 last:border-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // prevent blur from closing dropdown before click
+                          selectCustomer(c);
+                        }}
+                        className="px-3 py-2 hover:bg-green-50 cursor-pointer border-b border-neutral-100 last:border-0"
                       >
                         <p className="text-xs font-medium text-neutral-900">{c.name}</p>
                         <p className="text-[10px] text-neutral-500">{c.phone} &middot; {c.email || 'No email'}</p>
@@ -405,22 +432,26 @@ export default function SellerPOS() {
               )}
             </div>
             
-            <div className="text-[10px] font-semibold text-neutral-500 uppercase">Or Enter Manually:</div>
+            {!selectedCustomer && (
+              <div className="text-[10px] font-semibold text-neutral-500 uppercase">Or Enter Manually:</div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
                 placeholder="Customer name (optional)"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="px-2 py-1.5 border border-neutral-300 rounded text-xs"
+                onChange={(e) => { setSelectedCustomer(null); setCustomerName(e.target.value); }}
+                readOnly={!!selectedCustomer}
+                className={`px-2 py-1.5 border rounded text-xs ${selectedCustomer ? 'border-green-400 bg-green-50 text-green-900 font-medium cursor-default' : 'border-neutral-300'}`}
               />
               <input
                 type="text"
                 placeholder="Phone (optional)"
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                className="px-2 py-1.5 border border-neutral-300 rounded text-xs"
+                onChange={(e) => { setSelectedCustomer(null); setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
+                readOnly={!!selectedCustomer}
+                className={`px-2 py-1.5 border rounded text-xs ${selectedCustomer ? 'border-green-400 bg-green-50 text-green-900 font-medium cursor-default' : 'border-neutral-300'}`}
               />
             </div>
             
@@ -428,8 +459,9 @@ export default function SellerPOS() {
               type="email"
               placeholder="Email (optional)"
               value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              className="w-full px-2 py-1.5 border border-neutral-300 rounded text-xs"
+              onChange={(e) => { setSelectedCustomer(null); setCustomerEmail(e.target.value); }}
+              readOnly={!!selectedCustomer}
+              className={`w-full px-2 py-1.5 border rounded text-xs ${selectedCustomer ? 'border-green-400 bg-green-50 text-green-900 font-medium cursor-default' : 'border-neutral-300'}`}
             />
 
             <div className="grid grid-cols-2 gap-2">
