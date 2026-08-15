@@ -9,6 +9,7 @@ import {
 } from "../../services/api/customerProductService";
 import { useLocation as useLocationContext } from "../../hooks/useLocation";
 import { useThemeContext } from "../../context/ThemeContext";
+import { calculateProductPrice } from "../../utils/priceUtils";
 
 export default function CategoryPage() {
    const { id } = useParams<{ id: string }>();
@@ -24,6 +25,8 @@ export default function CategoryPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [filterSearchQuery, setFilterSearchQuery] = useState("");
   const [selectedFilterCategory, setSelectedFilterCategory] = useState("Type");
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("recommended");
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryLoading, setCategoryLoading] = useState(true);
@@ -126,8 +129,100 @@ export default function CategoryPage() {
     }
   }, [id, selectedSubcategory, category?._id, userLocation]);
 
-  // Client-side filtering removed in favor of backend subcategory filtering
-  const categoryProducts = products;
+  const getProductType = (product: any) => {
+    const name = (product.name || product.productName || "").toLowerCase();
+    const cleanName = name
+      .replace(/^(fresh|organic|premium|best|new|pure)\\s+/i, "")
+      .trim();
+
+    const commonTypes = [
+      { keywords: ["tomato", "tomatoes"], display: "Tomato" },
+      { keywords: ["potato", "potatoes"], display: "Potato" },
+      { keywords: ["chilli", "chili", "chilies"], display: "Chilli" },
+      { keywords: ["onion", "onions"], display: "Onion" },
+      { keywords: ["apple", "apples"], display: "Apple" },
+      { keywords: ["banana", "bananas"], display: "Banana" },
+      { keywords: ["oil", "refined", "mustard"], display: "Oil" },
+      { keywords: ["ghee"], display: "Ghee" },
+      { keywords: ["sugar"], display: "Sugar" },
+      { keywords: ["salt", "namak"], display: "Salt" },
+      { keywords: ["rice", "chawal"], display: "Rice" },
+      { keywords: ["atta", "flour", "maida", "suji", "besan"], display: "Flour" },
+      { keywords: ["dal", "lentil", "moong", "toor", "urad", "chana", "masoor"], display: "Dal" },
+      { keywords: ["masala", "spice", "powder", "turmeric", "coriander", "cumin", "jeera", "pepper", "clove", "cardamom", "elaichi"], display: "Masala" },
+      { keywords: ["tea", "chai"], display: "Tea" },
+      { keywords: ["coffee"], display: "Coffee" },
+      { keywords: ["biscuit", "cookies", "parle", "britannia", "sunfeast"], display: "Biscuit" },
+      { keywords: ["namkeen", "bhujia", "mixture", "sev", "chips", "kurkure", "lays"], display: "Namkeen" },
+      { keywords: ["milk", "dudh"], display: "Milk" },
+      { keywords: ["bread"], display: "Bread" },
+      { keywords: ["butter", "makhan"], display: "Butter" },
+      { keywords: ["cheese"], display: "Cheese" },
+      { keywords: ["paneer"], display: "Paneer" },
+      { keywords: ["soap", "sabon"], display: "Soap" },
+      { keywords: ["shampoo", "conditioner"], display: "Shampoo" },
+      { keywords: ["detergent", "surf", "washing", "tide", "ariel"], display: "Detergent" },
+      { keywords: ["cleaner", "phenyl", "harpic", "lizol"], display: "Cleaner" },
+      { keywords: ["paste", "toothbrush", "colgate", "pepsodent", "sensodyne"], display: "Oral Care" },
+      { keywords: ["noodle", "maggi", "yippee"], display: "Noodles" },
+      { keywords: ["pasta"], display: "Pasta" },
+      { keywords: ["ketchup", "sauce"], display: "Sauce" },
+      { keywords: ["jam", "jelly"], display: "Jam" },
+      { keywords: ["pickle", "achar"], display: "Pickle" },
+      { keywords: ["dry fruit", "almond", "cashew", "kaju", "badam", "raisin", "kishmish", "pistachio", "pista", "walnut", "akhrot"], display: "Dry Fruits" },
+    ];
+
+    for (const type of commonTypes) {
+      if (type.keywords.some((keyword) => cleanName.includes(keyword))) {
+        return type.display;
+      }
+    }
+    
+    if (cleanName) {
+      const firstWord = cleanName.split(" ")[0];
+      if (firstWord.length > 2) {
+        return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+      }
+    }
+    
+    return "Other";
+  };
+
+  // Client-side filtering and sorting
+  const categoryProducts = useMemo(() => {
+    let result = [...products];
+
+    if (selectedFilters.length > 0) {
+      result = result.filter((product) => {
+        const productType = getProductType(product);
+        return selectedFilters.includes(productType);
+      });
+    }
+
+    switch (sortBy) {
+      case "price-low":
+        result.sort((a, b) => {
+          const priceA = calculateProductPrice(a).displayPrice;
+          const priceB = calculateProductPrice(b).displayPrice;
+          return priceA - priceB;
+        });
+        break;
+      case "price-high":
+        result.sort((a, b) => {
+          const priceA = calculateProductPrice(a).displayPrice;
+          const priceB = calculateProductPrice(b).displayPrice;
+          return priceB - priceA;
+        });
+        break;
+      case "newest":
+        result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        break;
+      default:
+        break;
+    }
+
+    return result;
+  }, [products, selectedFilters, sortBy]);
 
   if ((categoryLoading || loading) && !products.length && !category) {
     return null; // Let global IconLoader handle it
@@ -169,88 +264,33 @@ export default function CategoryPage() {
 
   // Extract filter options from products
   const getFilterOptions = () => {
-    const categoryProducts = products.filter((p) => p.categoryId === id);
     const filterMap = new Map<string, number>();
 
-    categoryProducts.forEach((product) => {
-      // Extract main ingredient/type from product name
-      const name = product.name.toLowerCase();
-      // Remove common prefixes like "fresh", "organic", etc.
-      const cleanName = name
-        .replace(/^(fresh|organic|premium|best|new)\s+/i, "")
-        .trim();
-
-      const commonTypes = [
-        { keywords: ["tomato", "tomatoes"], display: "Tomato" },
-        { keywords: ["potato", "potatoes"], display: "Potato" },
-        { keywords: ["chilli", "chili", "chilies"], display: "Chilli" },
-        { keywords: ["spinach"], display: "Spinach" },
-        { keywords: ["brinjal", "eggplant"], display: "Brinjal" },
-        { keywords: ["onion", "onions"], display: "Onion" },
-        { keywords: ["peanut", "peanuts"], display: "Peanuts" },
-        { keywords: ["lemon", "lemons"], display: "Lemon" },
-        { keywords: ["mushroom", "mushrooms"], display: "Mushroom" },
-        {
-          keywords: ["capsicum", "bell pepper", "pepper"],
-          display: "Capsicum",
-        },
-        { keywords: ["ginger"], display: "Ginger" },
-        { keywords: ["carrot", "carrots"], display: "Carrot" },
-        { keywords: ["fenugreek", "methi"], display: "Fenugreek" },
-        { keywords: ["broccoli"], display: "Broccoli" },
-        { keywords: ["cucumber", "cucumbers"], display: "Cucumber" },
-        { keywords: ["cabbage"], display: "Cabbage" },
-        { keywords: ["cauliflower"], display: "Cauliflower" },
-        { keywords: ["ladyfinger", "okra"], display: "Ladyfinger" },
-        { keywords: ["beans"], display: "Beans" },
-        { keywords: ["peas"], display: "Peas" },
-        { keywords: ["garlic"], display: "Garlic" },
-        { keywords: ["apple", "apples"], display: "Apple" },
-        { keywords: ["banana", "bananas"], display: "Banana" },
-        { keywords: ["orange", "oranges"], display: "Orange" },
-        { keywords: ["mango", "mangoes"], display: "Mango" },
-      ];
-
-      for (const type of commonTypes) {
-        if (type.keywords.some((keyword) => cleanName.includes(keyword))) {
-          filterMap.set(type.display, (filterMap.get(type.display) || 0) + 1);
-          break;
-        }
-      }
+    products.forEach((product) => {
+      const type = getProductType(product);
+      filterMap.set(type, (filterMap.get(type) || 0) + 1);
     });
 
     return Array.from(filterMap.entries())
       .map(([name, count]) => ({ name, count, icon: getIconForFilter(name) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
   };
 
   const getIconForFilter = (name: string): string => {
     const iconMap: Record<string, string> = {
-      Tomato: "🍅",
-      Potato: "🥔",
-      Chilli: "🌶️",
-      Spinach: "🥬",
-      Brinjal: "🍆",
-      Onion: "🧅",
-      Peanuts: "🥜",
-      Lemon: "🍋",
-      Mushroom: "🍄",
-      Capsicum: "🫑",
-      Ginger: "🫚",
-      Carrot: "🥕",
-      Fenugreek: "🌿",
-      Broccoli: "🥦",
-      Cucumber: "🥒",
-      Cabbage: "🥬",
-      Cauliflower: "🥦",
-      Apple: "🍎",
-      Banana: "🍌",
-      Orange: "🍊",
-      Mango: "🥭",
+      Tomato: "🍅", Potato: "🥔", Chilli: "🌶️", Spinach: "🥬", Brinjal: "🍆", Onion: "🧅",
+      Peanuts: "🥜", Lemon: "🍋", Mushroom: "🍄", Capsicum: "🫑", Ginger: "🫚", Carrot: "🥕",
+      Fenugreek: "🌿", Broccoli: "🥦", Cucumber: "🥒", Cabbage: "🥬", Cauliflower: "🥦",
+      Apple: "🍎", Banana: "🍌", Orange: "🍊", Mango: "🥭",
+      Oil: "🛢️", Ghee: "🧈", Sugar: "🧊", Salt: "🧂", Rice: "🍚", Flour: "🌾",
+      Dal: "🫘", Masala: "🌶️", Tea: "🍵", Coffee: "☕", Biscuit: "🍪", Namkeen: "🥨",
+      Milk: "🥛", Bread: "🍞", Butter: "🧈", Cheese: "🧀", Paneer: "🧀",
+      Soap: "🧼", Shampoo: "🧴", Detergent: "🫧", Cleaner: "🧽", "Oral Care": "🪥",
+      Noodles: "🍜", Pasta: "🍝", Sauce: "🥫", Jam: "🍯", Pickle: "🫙", "Dry Fruits": "🥜"
     };
-    return iconMap[name] || "🥬";
+    return iconMap[name] || "📦";
   };
-
   const filterOptions = getFilterOptions();
   const filteredOptions = filterOptions.filter((option) =>
     option.name.toLowerCase().includes(filterSearchQuery.toLowerCase())
@@ -419,7 +459,9 @@ export default function CategoryPage() {
             </button>
 
             {/* Sort Button */}
-            <button className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 rounded-md hover:bg-neutral-50 transition-colors flex-shrink-0 whitespace-nowrap">
+            <button 
+              onClick={() => setIsSortOpen(true)}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 rounded-md hover:bg-neutral-50 transition-colors flex-shrink-0 whitespace-nowrap">
               <svg
                 width="12"
                 height="12"
@@ -668,6 +710,72 @@ export default function CategoryPage() {
                     disabled={selectedFilters.length === 0}>
                     Apply
                   </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Sort Modal */}
+      <AnimatePresence>
+        {isSortOpen && (
+          <>
+            <style>{`
+              nav[class*="fixed bottom-0"] {
+                display: none !important;
+              }
+            `}</style>
+            <div className="fixed inset-0 z-[100]">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setIsSortOpen(false)}
+              />
+
+              {/* Modal */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl flex flex-col pb-4">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-neutral-200">
+                  <h2 className="text-base font-bold text-neutral-900">
+                    Sort By
+                  </h2>
+                </div>
+
+                {/* Content */}
+                <div className="p-2 space-y-1 mt-2">
+                  {[
+                    { id: "recommended", label: "Recommended" },
+                    { id: "price-low", label: "Price: Low to High" },
+                    { id: "price-high", label: "Price: High to Low" },
+                    { id: "newest", label: "Newest Arrivals" },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => {
+                        setSortBy(option.id);
+                        setIsSortOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-3.5 rounded-lg text-sm font-medium transition-colors \${
+                        sortBy === option.id 
+                          ? 'bg-neutral-50 text-neutral-900' 
+                          : 'text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                      style={sortBy === option.id ? { color: currentTheme.primary[2], backgroundColor: `${currentTheme.primary[2]}15` } : {}}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
               </motion.div>
             </div>
