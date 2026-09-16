@@ -6,6 +6,7 @@ import { asyncHandler } from "../../../utils/asyncHandler";
 import Seller from "../../../models/Seller";
 import WalletTransaction from "../../../models/WalletTransaction";
 import { notifyDeliveryBoysOfNewOrder } from "../../../services/orderNotificationService";
+import { buildSellerNotificationData, clearSellerNotificationState } from "../../../services/sellerNotificationService";
 import { Server as SocketIOServer } from "socket.io";
 
 /**
@@ -353,6 +354,13 @@ export const updateOrderStatus = asyncHandler(
 
     await order.save();
 
+    // The seller has now actually resolved this order - clear the pending
+    // "new order" notification state so a future reconnect doesn't replay a
+    // stale popup for an order they've already accepted/rejected.
+    if (mappedStatus === 'Accepted' || mappedStatus === 'Rejected') {
+        clearSellerNotificationState(order._id.toString(), sellerId.toString());
+    }
+
     // Trigger delivery notification if THIS seller accepts the order
     if (mappedStatus === 'Accepted' && isSellerStatusUpdate) {
         try {
@@ -428,5 +436,53 @@ export const updateOrderStatus = asyncHandler(
         status: order.status,
       },
     });
+  }
+);
+
+/**
+ * Reconstruct the "new order" notification popup for a single order, scoped
+ * to the authenticated seller. Used by the seller frontend to recover a
+ * popup that was lost client-side (page reload, tab discarded while
+ * backgrounded, etc.) instead of relying solely on the live socket replay -
+ * also serves as the source of truth to confirm a locally-persisted popup
+ * hasn't already been resolved elsewhere in the meantime.
+ */
+export const getOrderNotificationSnapshot = asyncHandler(
+  async (req: Request, res: Response) => {
+    const sellerId = (req as any).user.userId;
+    const { id } = req.params;
+
+    const notAvailable = { pending: false, notification: null };
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(200).json({ success: true, data: notAvailable });
+    }
+
+    if (["Cancelled", "Rejected", "Delivered", "Returned"].includes(order.status)) {
+      return res.status(200).json({ success: true, data: notAvailable });
+    }
+
+    const sellerItems = await OrderItem.find({ order: id, seller: sellerId });
+    if (sellerItems.length === 0) {
+      return res.status(200).json({ success: true, data: notAvailable });
+    }
+
+    let pending = false;
+    if (order.sellerAcceptances && order.sellerAcceptances.length > 0) {
+      const acceptance = order.sellerAcceptances.find(
+        (sa: any) => sa.seller.toString() === sellerId.toString()
+      );
+      pending = !!acceptance && acceptance.status === "Pending";
+    } else {
+      pending = order.status === "Received";
+    }
+
+    if (!pending) {
+      return res.status(200).json({ success: true, data: notAvailable });
+    }
+
+    const notification = buildSellerNotificationData(order, sellerId.toString(), sellerItems, "NEW_ORDER");
+    return res.status(200).json({ success: true, data: { pending: true, notification } });
   }
 );
