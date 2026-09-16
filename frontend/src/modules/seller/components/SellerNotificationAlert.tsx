@@ -13,6 +13,8 @@ const SellerNotificationAlert: React.FC<SellerNotificationAlertProps> = ({ notif
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const hasUserInteractedRef = useRef(false);
 
   const handleStatusUpdate = async (status: string) => {
     if (!notification) return;
@@ -32,15 +34,57 @@ const SellerNotificationAlert: React.FC<SellerNotificationAlertProps> = ({ notif
     }
   };
 
+  // Create and play the alert sound with proper autoplay-blocked handling.
+  // A background/never-interacted-with tab is very likely to have browser
+  // autoplay-with-sound blocked - the previous version just logged the
+  // failure to console with no visible fallback, so the seller could miss a
+  // new order entirely with no indication anything went wrong.
   useEffect(() => {
-    if (notification) {
-      // Play sound when notification arrives
-      if (audioRef.current) {
-        audioRef.current.volume = volume;
-        audioRef.current.play().catch(err => console.error('Error playing sound:', err));
+    if (!notification) return;
+
+    hasUserInteractedRef.current = false;
+    setAudioError(null);
+
+    const audio = new Audio('/assets/sound/seller_alert.mp3');
+    audio.loop = true;
+    audio.volume = volume;
+    audioRef.current = audio;
+
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate([200, 100, 200, 100, 200]);
+      } catch {
+        // Vibration not supported/blocked - non-fatal.
       }
     }
-  }, [notification]);
+
+    const attemptPlay = async () => {
+      try {
+        await audio.play();
+        hasUserInteractedRef.current = true;
+        setAudioError(null);
+      } catch (err) {
+        const name = (err as { name?: string })?.name;
+        if (name === 'NotAllowedError') {
+          setAudioError('Tap anywhere to enable sound');
+        } else if (name === 'NotSupportedError') {
+          setAudioError('Audio not supported');
+        } else {
+          setAudioError('Audio playback failed');
+        }
+      }
+    };
+    attemptPlay();
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+    // Only re-run when the order actually changes - volume is applied via
+    // the separate effect below, and re-creating the Audio object on every
+    // volume tick would restart playback from the beginning each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notification?.orderId]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -48,15 +92,24 @@ const SellerNotificationAlert: React.FC<SellerNotificationAlertProps> = ({ notif
     }
   }, [volume]);
 
+  const handleUserInteraction = async () => {
+    if (hasUserInteractedRef.current || !audioRef.current) return;
+    try {
+      await audioRef.current.play();
+      hasUserInteractedRef.current = true;
+      setAudioError(null);
+    } catch {
+      // Still blocked - leave the prompt showing for the next attempt.
+    }
+  };
+
   if (!notification) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm">
-      <audio
-        ref={audioRef}
-        src="/assets/sound/seller_alert.mp3"
-        loop
-      />
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm"
+      onClick={handleUserInteraction}
+    >
 
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
         {/* Header */}
@@ -88,6 +141,15 @@ const SellerNotificationAlert: React.FC<SellerNotificationAlertProps> = ({ notif
 
         {/* Content */}
         <div className="p-6 max-h-[70vh] overflow-y-auto">
+          {audioError && (
+            <button
+              type="button"
+              onClick={handleUserInteraction}
+              className="w-full mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium rounded-lg px-3 py-2 text-left"
+            >
+              🔇 {audioError}
+            </button>
+          )}
           {/* Volume Control */}
           <div className="mb-6 bg-neutral-50 p-3 rounded-lg flex items-center gap-4">
             <span className="text-neutral-500">

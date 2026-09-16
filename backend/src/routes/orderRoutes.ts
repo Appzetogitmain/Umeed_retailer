@@ -3,6 +3,7 @@ import {
   getOrders,
   getOrderById,
   updateOrderStatus,
+  getOrderNotificationSnapshot,
 } from "../modules/seller/controllers/orderController";
 import { authenticate, requireUserType } from "../middleware/auth";
 
@@ -17,6 +18,9 @@ router.get("/", getOrders);
 
 // Get order by ID
 router.get("/:id", getOrderById);
+
+// Reconstruct the pending "new order" notification popup for this order
+router.get("/:id/notification-snapshot", getOrderNotificationSnapshot);
 
 // Update order status
 router.patch("/:id/status", updateOrderStatus);
