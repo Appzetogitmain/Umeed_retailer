@@ -236,7 +236,7 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
     .populate("subcategory", "name")
     .populate("subSubCategory", "name")
     .populate("brand", "name")
-    .populate("tax", "name percentage")
+    .populate("tax", "name percentage status")
     .sort(sort)
     .skip(skip)
     .limit(limitNum)

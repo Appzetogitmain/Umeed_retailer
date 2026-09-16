@@ -12,6 +12,7 @@ interface CartLine {
   unitPrice: number;
   availableStock: number;
   quantity: number;
+  taxRate: number;
 }
 
 const resolveUnitPrice = (product: Product, variation?: ProductVariation): number => {
@@ -21,6 +22,17 @@ const resolveUnitPrice = (product: Product, variation?: ProductVariation): numbe
   }
   if (product.discPrice && product.discPrice > 0) return product.discPrice;
   return product.price || 0;
+};
+
+// Tax is assigned per-product (not per-variation) - mirrors the same
+// product.tax -> Active percentage priority the backend uses in
+// calculateItemTax, so the pre-checkout bill preview matches what's charged.
+const resolveTaxRate = (product: Product): number => {
+  const tax = product.tax as { percentage?: number; status?: string } | string | undefined;
+  if (tax && typeof tax === 'object' && tax.percentage && tax.status !== 'Inactive') {
+    return Number(tax.percentage) || 0;
+  }
+  return 0;
 };
 
 export default function SellerPOS() {
@@ -144,6 +156,7 @@ export default function SellerPOS() {
           unitPrice: resolveUnitPrice(product, variation),
           availableStock: stock,
           quantity: 1,
+          taxRate: resolveTaxRate(product),
         },
       ];
     });
@@ -153,6 +166,52 @@ export default function SellerPOS() {
     setTimeout(() => {
       setAddedFlash((prev) => ({ ...prev, [key]: false }));
     }, 1000);
+  };
+
+  // A barcode scanner acts as a keyboard wedge: it types the code then sends
+  // Enter. On an exact SKU/barcode match for a simple (no-variation) product,
+  // add it straight to the cart so scanning items is a single scan-and-go
+  // motion instead of scan -> find in list -> click Add.
+  const handleSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const query = search.trim();
+    if (!query) return;
+
+    const findExact = (list: Product[]) =>
+      list.filter(
+        (p) =>
+          p.sku?.toLowerCase() === query.toLowerCase() ||
+          p.barcode?.toLowerCase() === query.toLowerCase()
+      );
+
+    let matches = findExact(results);
+    if (matches.length === 0) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setSearching(true);
+      try {
+        const response = await getProducts({ search: query, limit: 10, status: 'published' });
+        if (response.success) {
+          setResults(response.data);
+          matches = findExact(response.data);
+        }
+      } catch {
+        // Non-fatal: fall through and let the seller pick from whatever the search shows
+      } finally {
+        setSearching(false);
+      }
+    }
+
+    if (matches.length === 1 && (!matches[0].variations || matches[0].variations.length === 0)) {
+      if ((matches[0].stock ?? 0) > 0) {
+        addToCart(matches[0]);
+        setSearch('');
+        setResults([]);
+        searchInputRef.current?.focus();
+      } else {
+        setError(`${matches[0].productName} is out of stock`);
+      }
+    }
   };
 
   const updateQuantity = (key: string, quantity: number) => {
@@ -173,9 +232,14 @@ export default function SellerPOS() {
       ? Math.min(discountType === 'percent' ? subtotal * (discountNum / 100) : discountNum, subtotal)
       : 0;
   const afterDiscount = Math.max(0, subtotal - estimatedDiscount);
-  const estimatedTax = taxNum > 0
+  // Auto-calculated from each product's assigned tax rate, same as the
+  // backend's calculateItemTax - shown whenever the seller hasn't typed a
+  // manual override, so the preview always matches what gets charged.
+  const autoTax = cart.reduce((sum, line) => sum + (line.unitPrice * line.quantity * line.taxRate) / 100, 0);
+  const isManualTax = taxNum > 0;
+  const estimatedTax = isManualTax
     ? (taxType === 'percent' ? afterDiscount * (taxNum / 100) : taxNum)
-    : 0;
+    : autoTax;
   const estimatedTotal = Math.max(0, afterDiscount + estimatedTax);
 
   const handleCompleteSale = async () => {
@@ -217,7 +281,7 @@ export default function SellerPOS() {
         setTaxValue('');
         setNotes('');
         setTimeout(() => {
-          navigate(`/seller/pos/history/${response.data.id}`);
+          navigate(`/seller/pos/history/${response.data.id}`, { state: { autoPrint: true } });
         }, 1200);
       } else {
         setError(response.message || 'Failed to complete sale');
@@ -256,6 +320,7 @@ export default function SellerPOS() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search by product name, SKU, or scan barcode"
               className="w-full px-3 py-2 border border-neutral-300 rounded text-sm text-neutral-900 bg-white focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
             />
@@ -476,12 +541,17 @@ export default function SellerPOS() {
               <input
                 type="number"
                 min={0}
-                placeholder="0"
+                placeholder="Auto"
                 value={taxValue}
                 onChange={(e) => setTaxValue(e.target.value)}
                 className="px-2 py-1.5 border border-neutral-300 rounded text-xs"
               />
             </div>
+            {!isManualTax && (
+              <p className="text-[10px] text-neutral-400 -mt-1.5">
+                Tax auto-applied from each product&apos;s tax rate. Enter a value above to override.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <select
@@ -528,7 +598,7 @@ export default function SellerPOS() {
                 <span>- ₹{estimatedDiscount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-neutral-600">
-                <span>Tax</span>
+                <span>Tax{!isManualTax && estimatedTax > 0 ? ' (auto)' : ''}</span>
                 <span>+ ₹{estimatedTax.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-semibold text-neutral-900 text-base pt-1 border-t border-neutral-100">

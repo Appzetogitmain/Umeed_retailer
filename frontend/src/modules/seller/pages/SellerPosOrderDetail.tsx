@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { getPosOrderById, PosOrderDetail } from '../../../services/api/posService';
 
 export default function SellerPosOrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [order, setOrder] = useState<PosOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const hasAutoPrinted = useRef(false);
 
   useEffect(() => {
     if (!id) return;
@@ -29,6 +31,16 @@ export default function SellerPosOrderDetail() {
     };
     fetchOrder();
   }, [id]);
+
+  // Landing here right after "Complete Sale" (see SellerPOS.tsx) should print
+  // immediately with no extra click, per the "process and print" requirement.
+  useEffect(() => {
+    const state = location.state as { autoPrint?: boolean } | null;
+    if (order && state?.autoPrint && !hasAutoPrinted.current) {
+      hasAutoPrinted.current = true;
+      setTimeout(() => window.print(), 300);
+    }
+  }, [order, location.state]);
 
   const handlePrint = () => window.print();
 
@@ -141,7 +153,7 @@ export default function SellerPosOrderDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6 -mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6">
-      <div className="bg-white border-b border-neutral-200 px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+      <div className="bg-white border-b border-neutral-200 px-3 sm:px-4 md:px-6 py-3 sm:py-4 print:hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
           <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">POS Receipt</h1>
           <div className="flex items-center gap-2 text-xs sm:text-sm">
@@ -156,7 +168,7 @@ export default function SellerPosOrderDetail() {
 
       <div className="px-3 sm:px-4 md:px-6">
         <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
-          <div className="bg-green-600 text-white px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="bg-green-600 text-white px-4 sm:px-6 py-3 flex items-center justify-between print:hidden">
             <h2 className="text-base sm:text-lg font-semibold">Order #{order.orderNumber}</h2>
             <div className="flex gap-2">
               <button
