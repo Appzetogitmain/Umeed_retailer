@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../services/jwtService';
 import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from '../config/corsOrigins';
 import { handleOrderAcceptance, handleOrderRejection, notificationStates } from '../services/orderNotificationService';
+import { getPendingSellerNotifications } from '../services/sellerNotificationService';
 import Order from '../models/Order';
 import DeliveryTracking from '../models/DeliveryTracking';
 
@@ -199,6 +200,16 @@ export const initializeSocket = (httpServer: HttpServer) => {
                 message: 'Successfully joined seller notifications room',
                 sellerId: normalizedSellerId
             });
+
+            // Replay any NEW_ORDER notification(s) still awaiting this seller's
+            // Accept/Reject - covers a reconnecting socket (tab reopened,
+            // backgrounded-then-foregrounded, or a page reload) so the seller
+            // doesn't lose track of an order that's still sitting unresolved.
+            const pendingNotifications = getPendingSellerNotifications(normalizedSellerId);
+            for (const notification of pendingNotifications) {
+                console.log(`🔄 Replaying pending seller-notification to reconnected seller ${normalizedSellerId} for order ${notification.orderId}`);
+                socket.emit('seller-notification', notification);
+            }
         });
 
         // Delivery boy joins notification room
