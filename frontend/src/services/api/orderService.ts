@@ -115,3 +115,18 @@ export const updateOrderStatus = async (id: string, data: UpdateOrderStatusData)
   const response = await api.patch<ApiResponse<{ id: string; status: string }>>(`/orders/${id}/status`, data);
   return response.data;
 };
+
+/**
+ * Reconstruct the pending "new order" notification popup for a single order.
+ * Used to revalidate a locally-persisted popup (has it already been resolved
+ * elsewhere?) and to recover one that was lost client-side (reload, tab
+ * discarded while backgrounded) but is still awaiting this seller's decision.
+ */
+export const getOrderNotificationSnapshot = async (
+  orderId: string
+): Promise<ApiResponse<{ pending: boolean; notification: unknown }>> => {
+  const response = await api.get<ApiResponse<{ pending: boolean; notification: unknown }>>(
+    `/orders/${orderId}/notification-snapshot`
+  );
+  return response.data;
+};

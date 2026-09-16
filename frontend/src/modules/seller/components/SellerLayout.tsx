@@ -1,7 +1,7 @@
 import { ReactNode, useState, useCallback, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 import SellerSidebar from './SellerSidebar';
-import { useSellerSocket, SellerNotification } from '../hooks/useSellerSocket';
+import { useSellerSocket } from '../hooks/useSellerSocket';
 import SellerNotificationAlert from './SellerNotificationAlert';
 import {
   getSellerNotifications,
@@ -31,9 +31,9 @@ interface SellerLayoutProps {
 
 export default function SellerLayout({ children }: SellerLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeNotification, setActiveNotification] = useState<SellerNotification | null>(null);
   const [notifications, setNotifications] = useState<DBNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { currentNotification, clearCurrentNotification } = useSellerSocket();
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -51,20 +51,20 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const handleNotificationReceived = useCallback((notification: SellerNotification) => {
-    setActiveNotification(notification);
-    // Refresh the notifications list automatically to show the new db-persisted notification in the dropdown
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  useSellerSocket(handleNotificationReceived);
+  // Refresh the notifications list automatically so the new db-persisted
+  // notification shows up in the dropdown as soon as a popup arrives.
+  useEffect(() => {
+    if (currentNotification) {
+      fetchNotifications();
+    }
+  }, [currentNotification, fetchNotifications]);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
   const closeNotification = () => {
-    setActiveNotification(null);
+    clearCurrentNotification();
   };
 
   const handleMarkRead = async (id: string) => {
@@ -95,7 +95,7 @@ export default function SellerLayout({ children }: SellerLayoutProps) {
     <div className="flex min-h-screen bg-neutral-50">
       {/* Real-time Notification Alert */}
       <SellerNotificationAlert
-        notification={activeNotification}
+        notification={currentNotification}
         onClose={closeNotification}
       />
 
