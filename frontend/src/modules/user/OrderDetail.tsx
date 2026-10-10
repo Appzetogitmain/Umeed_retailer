@@ -695,6 +695,20 @@ export default function OrderDetail() {
     }
   }, [socketOrderStatus, orderStatus, id, fetchOrderById]);
 
+  // Coins are credited right when the order is delivered; if the order we have
+  // still says "Pending", re-fetch a few times so the earned coins show up.
+  const [coinRefetches, setCoinRefetches] = useState(0);
+  useEffect(() => {
+    if (!id || orderStatus !== "Delivered" || order?.loyaltyEarnStatus !== "Pending" || coinRefetches >= 3) return;
+    const t = setTimeout(() => {
+      fetchOrderById(id).then((fetchedOrder) => {
+        if (fetchedOrder) setOrder(fetchedOrder);
+        setCoinRefetches((n) => n + 1);
+      });
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [id, orderStatus, order?.loyaltyEarnStatus, coinRefetches, fetchOrderById]);
+
   // Sync instructions from order
   useEffect(() => {
     if (order) {
@@ -1270,6 +1284,50 @@ export default function OrderDetail() {
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Coins earned on a delivered order */}
+      {orderStatus === "Delivered" && order && ((order.loyaltyCoinsToEarn || 0) > 0 || (order.loyaltyCoinsRedeemed || 0) > 0) && (() => {
+        const perRupee = (order as any).loyaltyCoinsPerRupee || 10;
+        const credited = order.loyaltyEarnStatus === "Credited";
+        const coins = credited ? order.loyaltyCoinsEarned || 0 : order.loyaltyCoinsToEarn || 0;
+        return (
+          <div className="px-4 mt-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl bg-gradient-to-r from-[#FFC107] to-[#B95F15] p-4 text-white shadow-md">
+              {coins > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-white/25 flex items-center justify-center text-2xl flex-shrink-0">🪙</div>
+                  <div className="flex-1 min-w-0">
+                    {credited ? (
+                      <>
+                        <p className="text-base font-extrabold">You earned {coins} coins!</p>
+                        <p className="text-xs font-medium opacity-95">Worth ₹{(coins / perRupee).toFixed(2)} · added to your coin wallet</p>
+                      </>
+                    ) : order.loyaltyEarnStatus === "Pending" ? (
+                      <>
+                        <p className="text-base font-extrabold">{coins} coins on the way</p>
+                        <p className="text-xs font-medium opacity-95">Worth ₹{(coins / perRupee).toFixed(2)} · being added to your wallet</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold">No coins were earned on this order</p>
+                    )}
+                  </div>
+                  <Link to="/coins" className="text-xs font-bold bg-white text-[#B95F15] px-3 py-1.5 rounded-full flex-shrink-0">
+                    View
+                  </Link>
+                </div>
+              )}
+              {(order.loyaltyCoinsRedeemed || 0) > 0 && (
+                <p className={`text-xs font-medium opacity-95 ${coins > 0 ? "mt-2 pt-2 border-t border-white/30" : ""}`}>
+                  You used {order.loyaltyCoinsRedeemed} coins and saved ₹{Number(order.loyaltyDiscount || 0).toFixed(2)} on this order
+                </p>
+              )}
+            </motion.div>
+          </div>
+        );
+      })()}
 
       {/* Map Section */}
       {!showConfirmation &&
