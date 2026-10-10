@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import OrderCoinsBadge from "../components/OrderCoinsBadge";
 import { Link } from "react-router-dom";
 import { Input } from "../../../components/ui/input";
 import { jsPDF } from "jspdf";
@@ -980,6 +981,7 @@ export default function AdminShippedOrders() {
                       </td>
                       <td className="px-4 sm:px-6 py-3 text-sm text-neutral-900 font-medium">
                         ₹{order.total?.toFixed(2) || "0.00"}
+                        <OrderCoinsBadge order={order as any} />
                       </td>
                       <td className="px-4 sm:px-6 py-3">
                         <Link to={`/admin/orders/${order._id}`}>

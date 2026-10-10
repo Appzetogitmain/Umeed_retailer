@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getOrderById, updateOrderStatus, Order } from '../../../services/api/admin/adminOrderService';
+import { earnText, usedText } from '../components/OrderCoinsBadge';
 
 export default function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -183,6 +184,7 @@ export default function AdminOrderDetail() {
                     <th className="text-right py-2 px-2">Price</th>
                     <th className="text-right py-2 px-2">Qty</th>
                     <th className="text-right py-2 px-2">Total</th>
+                    <th className="text-right py-2 px-2">Coins to earn</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,6 +207,15 @@ export default function AdminOrderDetail() {
                         <td className="text-right py-3 px-2">{item.quantity || 0}</td>
                         <td className="text-right py-3 px-2 font-medium">
                           ₹{item.total?.toFixed(2) || '0.00'}
+                        </td>
+                        <td className="text-right py-3 px-2">
+                          {(item.loyaltyCoins || 0) > 0 ? (
+                            <span className={item.status === 'Returned' || item.status === 'Cancelled' ? 'text-neutral-400 line-through' : 'text-yellow-700 font-medium'}>
+                              🪙 {item.loyaltyCoins}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400">—</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -306,18 +317,46 @@ export default function AdminOrderDetail() {
                 <span>Total:</span>
                 <span>₹{order.total?.toFixed(2) || '0.00'}</span>
               </div>
-              {((order as any).loyaltyCoinsToEarn || 0) > 0 && (
-                <div className="flex justify-between text-xs text-neutral-600">
-                  <span>Coins to earn on delivery:</span>
-                  <span>
-                    {(order as any).loyaltyEarnStatus === 'Credited'
-                      ? `${(order as any).loyaltyCoinsEarned} credited`
-                      : `${(order as any).loyaltyCoinsToEarn} (${(order as any).loyaltyEarnStatus})`}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* Loyalty Coins */}
+          {(() => {
+            const o: any = order;
+            const earn = earnText(o);
+            const used = usedText(o);
+            const perRupee = o.loyaltyCoinsPerRupee || 10;
+            const toEarn = o.loyaltyEarnStatus === 'Credited' ? (o.loyaltyCoinsEarned || 0) : (o.loyaltyCoinsToEarn || 0);
+            return (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4">🪙 Loyalty Coins</h2>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-start gap-3">
+                    <div>
+                      <p className="text-neutral-600">Coins customer earns</p>
+                      <p className="text-xs text-neutral-500">{earn ? earn.detail : 'No coin-earning products in this order'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{toEarn} coins</p>
+                      <p className="text-xs text-neutral-500">worth ₹{(toEarn / perRupee).toFixed(2)}</p>
+                      {earn && <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${earn.tone}`}>{o.loyaltyEarnStatus}</span>}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-start gap-3 border-t pt-3">
+                    <div>
+                      <p className="text-neutral-600">Coins customer used</p>
+                      <p className="text-xs text-neutral-500">{used ? used.detail : 'No coins redeemed on this order'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{o.loyaltyCoinsRedeemed || 0} coins</p>
+                      <p className="text-xs text-neutral-500">-₹{Number(o.loyaltyDiscount || 0).toFixed(2)}</p>
+                      {used && <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${used.tone}`}>{o.loyaltyRedeemStatus}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Delivery Information */}
           {deliveryBoy && (
