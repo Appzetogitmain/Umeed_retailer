@@ -15,6 +15,12 @@ export interface IOrderItem extends Document {
   quantity: number;
   total: number;
 
+  // Platform-funded discount allocated to this line (order-sequence + coupon + coins).
+  // total - discountShare = what the customer actually paid for this line.
+  discountShare?: number;
+  // Loyalty coins this line earns on delivery (frozen at order time)
+  loyaltyCoins?: number;
+
   // Variation
   variation?: string;
 
@@ -73,6 +79,17 @@ const OrderItemSchema = new Schema<IOrderItem>(
       type: Number,
       required: [true, "Total is required"],
       min: [0, "Total cannot be negative"],
+    },
+
+    discountShare: {
+      type: Number,
+      default: 0,
+      min: [0, "Discount share cannot be negative"],
+    },
+    loyaltyCoins: {
+      type: Number,
+      default: 0,
+      min: [0, "Loyalty coins cannot be negative"],
     },
 
     // Variation

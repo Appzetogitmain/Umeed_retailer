@@ -42,6 +42,10 @@ export interface IProduct extends Document {
     status?: string;
   }>;
 
+  // Loyalty coins earned per purchase (admin-managed only)
+  loyaltyCoinType: "none" | "fixed" | "percent";
+  loyaltyCoinValue: number; // fixed: coins per unit; percent: % of line value returned as coins
+
   // Status Flags
   publish: boolean;
   popular: boolean;
@@ -221,6 +225,18 @@ const ProductSchema = new Schema<IProduct>(
         },
       ],
       default: [],
+    },
+
+    // Loyalty coins (admin-managed only)
+    loyaltyCoinType: {
+      type: String,
+      enum: ["none", "fixed", "percent"],
+      default: "none",
+    },
+    loyaltyCoinValue: {
+      type: Number,
+      default: 0,
+      min: [0, "Loyalty coin value cannot be negative"],
     },
 
     // Status Flags

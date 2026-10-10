@@ -39,8 +39,10 @@ import customerTrackingRoutes from "../modules/customer/routes/trackingRoutes";
 import deliveryTrackingRoutes from "../modules/delivery/routes/trackingRoutes";
 import customerBannerRoutes from "./customerBannerRoutes";
 import paymentRoutes from "./paymentRoutes";
+import customerLoyaltyRoutes from "./customerLoyaltyRoutes";
 import {
   createOrder,
+  getCheckoutQuote,
   getMyOrders,
   getOrderById,
   cancelOrder,
@@ -110,6 +112,8 @@ router.post(
   requireUserType("Customer"),
   createOrder
 );
+// Checkout quote (must be before /customer/orders/:id)
+router.post("/customer/orders/quote", authenticate, requireUserType("Customer"), getCheckoutQuote);
 router.get("/customer/orders", authenticate, requireUserType("Customer"), getMyOrders);
 router.get("/customer/orders/:id", authenticate, requireUserType("Customer"), getOrderById);
 router.post("/customer/orders/:id/cancel", authenticate, requireUserType("Customer"), cancelOrder);
@@ -121,6 +125,7 @@ router.get("/customer/returns", authenticate, requireUserType("Customer"), custo
 router.get("/customer/returns/:id", authenticate, requireUserType("Customer"), customerGetReturnRequestById);
 
 router.use("/customer/coupons", customerCouponRoutes);
+router.use("/customer/loyalty", customerLoyaltyRoutes);
 router.use("/customer/addresses", customerAddressRoutes);
 router.use("/customer/home", customerHomeRoutes);
 router.use("/customer/cart", customerCartRoutes);

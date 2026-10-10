@@ -23,9 +23,13 @@ import WishlistButton from "../../components/WishlistButton";
 
 import {
   getCoupons,
-  validateCoupon,
   Coupon as ApiCoupon,
 } from "../../services/api/customerCouponService";
+import {
+  getCheckoutQuote,
+  cancelOrder as cancelCustomerOrder,
+  CheckoutQuote,
+} from "../../services/api/customerOrderService";
 import { appConfig } from "../../services/configService";
 import {
   getAddresses,
@@ -93,6 +97,12 @@ export default function Checkout() {
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "Online">("COD");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Server-computed bill (same calculation the server uses when placing the order)
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteNonce, setQuoteNonce] = useState(0);
+  const [useCoins, setUseCoins] = useState(false);
 
   // Profile completion modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -185,6 +195,66 @@ export default function Checkout() {
     };
     fetchInitialData();
   }, []);
+
+  const buildQuoteItems = () =>
+    (cart?.items || [])
+      .filter((item) => item && item.product)
+      .map((item) => ({
+        product: { id: item.product.id || (item.product as { _id?: string })._id || "" },
+        quantity: item.quantity,
+        variant: item.variant,
+      }));
+
+  const quoteAddress = () => ({
+    latitude: selectedAddress?.latitude ?? userLocation?.latitude,
+    longitude: selectedAddress?.longitude ?? userLocation?.longitude,
+  });
+
+  const quoteItemsKey = JSON.stringify(
+    buildQuoteItems().map((i) => [i.product.id, i.quantity, i.variant])
+  );
+
+  // Fetch the bill from the server whenever anything that affects it changes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const items = buildQuoteItems();
+    if (items.length === 0) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await getCheckoutQuote({
+          items,
+          address: quoteAddress(),
+          couponCode: selectedCoupon?.code,
+          useCoins,
+        });
+        if (cancelled || !res.success) return;
+        setQuote(res.data);
+        if (selectedCoupon && !res.data.coupon.applied) {
+          setCouponError(res.data.coupon.error || "Coupon no longer applies");
+          setSelectedCoupon(null);
+          setValidatedDiscount(0);
+          showGlobalToast(res.data.coupon.error || "Coupon removed", "error");
+        }
+        if (useCoins && !res.data.loyalty.applied) {
+          setUseCoins(false);
+        }
+      } catch (err) {
+        console.error("Failed to load checkout total", err);
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteItemsKey, selectedAddress?.id, selectedAddress?.latitude, selectedAddress?.longitude, selectedCoupon?.code, useCoins, isAuthenticated, quoteNonce]);
 
   // Fetch similar products dynamically
   useEffect(() => {
@@ -304,10 +374,10 @@ export default function Checkout() {
     }, 0),
   };
 
-  const threshold = cart.freeDeliveryThreshold ?? appConfig.freeDeliveryThreshold;
+  const threshold = quote?.freeDeliveryThreshold ?? cart.freeDeliveryThreshold ?? appConfig.freeDeliveryThreshold;
   const amountNeededForFreeDelivery = Math.max(
     0,
-    threshold - (displayCart.total || 0)
+    Math.round((threshold - (quote ? quote.subtotal : displayCart.total || 0)) * 100) / 100
   );
   const cartItem = displayItems[0];
 
@@ -317,72 +387,57 @@ export default function Checkout() {
     return sum + mrp * (item.quantity || 0);
   }, 0);
 
-  const discountedTotal = displayCart.total;
-  const savedAmount = itemsTotal - discountedTotal;
-  const handlingCharge = cart.platformFee ?? appConfig.platformFee;
-  const deliveryCharge = cart.estimatedDeliveryFee ?? (displayCart.total >= threshold ? 0 : appConfig.deliveryFee);
+  // All amounts below come from the server quote, so the bill shown here is
+  // exactly what createOrder charges (and what Razorpay / COD collects).
+  const discountedTotal = quote ? quote.subtotal : displayCart.total;
+  const savedAmount = Math.max(0, Math.round((itemsTotal - discountedTotal) * 100) / 100);
+  const handlingCharge = quote ? quote.platformFee : (cart.platformFee ?? appConfig.platformFee);
+  const deliveryCharge = quote
+    ? quote.deliveryFee
+    : cart.estimatedDeliveryFee ?? (displayCart.total >= threshold ? 0 : appConfig.deliveryFee);
 
-  // Recalculate or use validated discount
-  // If we have a selected coupon, we should re-validate if cart total changes,
-  // but for simplicity, we'll re-calculate locally if possible or trust the previous validation if acceptable (better to re-validate)
-  const subtotalBeforeCoupon =
-    discountedTotal + handlingCharge + deliveryCharge;
+  const currentCouponDiscount = quote?.coupon.applied ? quote.coupon.discount : 0;
+  const orderSequenceDiscount = quote?.orderSequence.applied ? quote.orderSequence.discount : 0;
+  const coinDiscount = quote?.loyalty.applied ? quote.loyalty.discount : 0;
+  const orderSequenceLabel = (n: number) =>
+    n === 1 ? "First order discount" : n === 2 ? "Second order discount" : `Order #${n} discount`;
 
-  // Local calculation for immediate feedback, relying on backend validation on Apply
-  let currentCouponDiscount = 0;
-  if (selectedCoupon) {
-    // Logic mirrors backend for UI update purposes
-    if (
-      selectedCoupon.minOrderValue &&
-      subtotalBeforeCoupon < selectedCoupon.minOrderValue
-    ) {
-      // Invalid now
-    } else {
-      if (selectedCoupon.discountType === "percentage") {
-        currentCouponDiscount = Math.round(
-          (subtotalBeforeCoupon * selectedCoupon.discountValue) / 100
-        );
-        if (
-          selectedCoupon.maxDiscountAmount &&
-          currentCouponDiscount > selectedCoupon.maxDiscountAmount
-        ) {
-          currentCouponDiscount = selectedCoupon.maxDiscountAmount;
-        }
-      } else {
-        currentCouponDiscount = selectedCoupon.discountValue;
-      }
-    }
-  }
+  const grandTotal = quote
+    ? quote.total
+    : Math.max(0, discountedTotal + handlingCharge + deliveryCharge);
+  const isQuoteReady = !!quote && !quoteLoading;
 
-  // Calculate tip amount (use custom tip if custom tip input is shown, otherwise use selected tip)
-  const finalTipAmount = showCustomTipInput ? customTipAmount : tipAmount || 0;
-  const giftPackagingFee = giftPackaging ? 30 : 0;
-  const grandTotal = Math.max(
-    0,
-    discountedTotal +
-    handlingCharge +
-    deliveryCharge +
-    finalTipAmount +
-    giftPackagingFee -
-    currentCouponDiscount
-  );
+  const couponLabel = (coupon: ApiCoupon) => {
+    const value =
+      coupon.discountType === "Percentage"
+        ? `${coupon.discountValue}% off`
+        : `₹${coupon.discountValue} off`;
+    return coupon.title || `${value}${coupon.maximumDiscount ? ` up to ₹${coupon.maximumDiscount}` : ""}`;
+  };
 
   const handleApplyCoupon = async (coupon: ApiCoupon) => {
     setIsValidatingCoupon(true);
     setCouponError(null);
     try {
-      const result = await validateCoupon(coupon.code, subtotalBeforeCoupon);
-      if (result.success && result.data?.isValid) {
+      // Validate with the same pricing the order will use
+      const result = await getCheckoutQuote({
+        items: buildQuoteItems(),
+        address: quoteAddress(),
+        couponCode: coupon.code,
+        useCoins,
+      });
+      if (result.success && result.data.coupon.applied) {
         const isFirstTime = !hasAppliedCouponBefore;
+        setQuote(result.data);
         setSelectedCoupon(coupon);
-        setValidatedDiscount(result.data.discountAmount);
+        setValidatedDiscount(result.data.coupon.discount);
         setShowCouponSheet(false);
         if (isFirstTime) {
           setHasAppliedCouponBefore(true);
           setShowPartyPopper(true);
         }
       } else {
-        setCouponError(result.message || "Invalid coupon");
+        setCouponError(result.data?.coupon.error || result.message || "Invalid coupon");
       }
     } catch (err: any) {
       setCouponError(err.response?.data?.message || "Failed to apply coupon");
@@ -433,7 +488,7 @@ export default function Checkout() {
     // Only bypass if explicitly passed true (handles event objects from onClick)
     const bypassProfileCheck = arg === true;
 
-    if (!selectedAddress || cart.items.length === 0 || isSubmitting) {
+    if (!selectedAddress || cart.items.length === 0 || isSubmitting || !isQuoteReady) {
       return;
     }
 
@@ -497,9 +552,9 @@ export default function Checkout() {
       paymentMethod: paymentMethod,
       status: "Placed",
       createdAt: new Date().toISOString(),
-      tipAmount: finalTipAmount,
       gstin: gstin || undefined,
       couponCode: selectedCoupon?.code || undefined,
+      useCoins: !!quote?.loyalty.applied,
       giftPackaging: giftPackaging,
     };
 
@@ -523,6 +578,8 @@ export default function Checkout() {
         error.response?.data?.message ||
         "Failed to place order. Please try again.";
       alert(errorMessage);
+      // Prices, coupon or coins may have changed: reload the bill
+      setQuoteNonce((n) => n + 1);
     } finally {
       setIsSubmitting(false);
     }
@@ -1669,7 +1726,7 @@ export default function Checkout() {
                   {selectedCoupon.code}
                 </p>
                 <p className="text-[10px] truncate" style={{ color: currentTheme.accentColor }}>
-                  {selectedCoupon.title}
+                  {couponLabel(selectedCoupon)}
                 </p>
               </div>
             </div>
@@ -1702,6 +1759,54 @@ export default function Checkout() {
               />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* First / second order discount banner */}
+      {quote && (quote.orderSequence.applied || quote.orderSequence.message) && (
+        <div className="px-4 py-2 border-b border-neutral-200 bg-green-50">
+          <p className="text-xs font-semibold text-green-700">
+            {quote.orderSequence.applied
+              ? `${orderSequenceLabel(quote.orderSequence.orderNumber)} of ${quote.orderSequence.percent}% applied`
+              : quote.orderSequence.message}
+          </p>
+        </div>
+      )}
+
+      {/* Loyalty coins */}
+      {quote && quote.loyalty.enabled && quote.loyalty.balance > 0 && (
+        <div className="px-4 py-2 border-b border-neutral-200">
+          <label
+            className={`flex items-center justify-between gap-3 rounded-lg border p-2.5 ${quote.loyalty.maxUsableCoins > 0 ? "cursor-pointer" : "opacity-70"}`}
+            style={useCoins ? { borderColor: currentTheme.accentColor, backgroundColor: `${currentTheme.accentColor}10` } : { borderColor: "#E5E5E5" }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-bold text-yellow-700">₹</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-neutral-900">
+                  {quote.loyalty.maxUsableCoins > 0
+                    ? `Use ${quote.loyalty.maxUsableCoins} coins & save ₹${quote.loyalty.maxUsableDiscount}`
+                    : "Speedoo coins"}
+                </p>
+                <p className="text-[10px] text-neutral-600">
+                  Balance: {quote.loyalty.balance} coins (₹{quote.loyalty.balanceValue})
+                  {quote.loyalty.maxUsableCoins === 0 && quote.loyalty.message ? ` · ${quote.loyalty.message}` : ""}
+                </p>
+                <p className="text-[10px] text-neutral-500">
+                  Up to {quote.loyalty.maxRedeemPercent}% of the order can be paid with coins. Coins used are non-refundable.
+                </p>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="w-4 h-4 flex-shrink-0"
+              checked={useCoins}
+              disabled={quote.loyalty.maxUsableCoins === 0 || quoteLoading}
+              onChange={(e) => setUseCoins(e.target.checked)}
+            />
+          </label>
         </div>
       )}
 
@@ -1792,6 +1897,18 @@ export default function Checkout() {
             </div>
           </div>
 
+          {/* First / second order discount */}
+          {orderSequenceDiscount > 0 && quote && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-neutral-700">
+                {orderSequenceLabel(quote.orderSequence.orderNumber)} ({quote.orderSequence.percent}%)
+              </span>
+              <span className="text-xs font-medium text-green-700">
+                -₹{orderSequenceDiscount.toLocaleString("en-IN")}
+              </span>
+            </div>
+          )}
+
           {/* Coupon discount */}
           {selectedCoupon && currentCouponDiscount > 0 && (
             <div className="flex items-center justify-between">
@@ -1826,35 +1943,17 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Tip amount */}
-          {finalTipAmount > 0 && (
+          {/* Loyalty coins discount */}
+          {coinDiscount > 0 && quote && (
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-xs text-neutral-700">
-                  Tip to delivery partner
-                </span>
-              </div>
-              <span className="text-xs font-medium text-neutral-900">
-                ₹{finalTipAmount}
+              <span className="text-xs text-neutral-700">
+                Speedoo coins ({quote.loyalty.coinsUsed} used)
+              </span>
+              <span className="text-xs font-medium text-green-700">
+                -₹{coinDiscount.toLocaleString("en-IN")}
               </span>
             </div>
           )}
-
-
 
           {/* Grand total */}
           <div className="pt-2 border-t border-neutral-200 flex items-center justify-between">
@@ -1862,9 +1961,22 @@ export default function Checkout() {
               Grand total
             </span>
             <span className="text-sm font-bold text-neutral-900">
-              ₹{Math.max(0, grandTotal)}
+              {quoteLoading && !quote ? "..." : `₹${Math.max(0, grandTotal).toLocaleString("en-IN")}`}
             </span>
           </div>
+
+          {quote && quote.totalDiscount > 0 && (
+            <p className="text-[11px] font-medium text-green-700 text-right">
+              You save ₹{quote.totalDiscount.toLocaleString("en-IN")} on this order
+            </p>
+          )}
+          {quote && quote.coinsToEarn > 0 && (
+            <div className="mt-1 rounded-lg bg-yellow-50 border border-yellow-100 px-2.5 py-1.5">
+              <p className="text-[11px] font-semibold text-yellow-800">
+                You'll earn {quote.coinsToEarn} coins (worth ₹{quote.coinsToEarnValue}) once this order is delivered
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2008,11 +2120,9 @@ export default function Checkout() {
                 </div>
               ) : (
                 availableCoupons.map((coupon) => {
-                  const subtotalBeforeCoupon =
-                    discountedTotal + handlingCharge + deliveryCharge;
                   const meetsMinOrder =
-                    !coupon.minOrderValue ||
-                    subtotalBeforeCoupon >= coupon.minOrderValue;
+                    !coupon.minimumPurchase ||
+                    discountedTotal >= coupon.minimumPurchase;
                   const isSelected = selectedCoupon?._id === coupon._id;
 
                   return (
@@ -2032,15 +2142,15 @@ export default function Checkout() {
                               {coupon.code}
                             </span>
                             <span className="text-xs font-semibold text-neutral-900">
-                              {coupon.title}
+                              {couponLabel(coupon)}
                             </span>
                           </div>
                           <p className="text-[10px] text-neutral-600 mb-1">
                             {coupon.description}
                           </p>
-                          {coupon.minOrderValue && (
+                          {!!coupon.minimumPurchase && (
                             <p className="text-[10px] text-neutral-500">
-                              Min. order: ₹{coupon.minOrderValue}
+                              Min. order: ₹{coupon.minimumPurchase}
                             </p>
                           )}
                         </div>
@@ -2092,18 +2202,20 @@ export default function Checkout() {
         {selectedAddress ? (
           <button
             onClick={handlePlaceOrder}
-            disabled={cart.items.length === 0 || isSubmitting}
-            className={`w-full py-3 px-4 font-bold text-sm uppercase tracking-wide transition-colors ${(cart.items.length > 0 && !isSubmitting)
+            disabled={cart.items.length === 0 || isSubmitting || !isQuoteReady}
+            className={`w-full py-3 px-4 font-bold text-sm uppercase tracking-wide transition-colors ${(cart.items.length > 0 && !isSubmitting && isQuoteReady)
               ? "text-black shadow-[0_-4px_10px_rgba(0,0,0,0.1)]"
               : "bg-neutral-300 text-neutral-500 cursor-not-allowed"
               }`}
-            style={(cart.items.length > 0 && !isSubmitting) ? { backgroundColor: currentTheme.accentColor } : {}}
+            style={(cart.items.length > 0 && !isSubmitting && isQuoteReady) ? { backgroundColor: currentTheme.accentColor } : {}}
           >
             {isSubmitting 
               ? "Processing..." 
-              : paymentMethod === "Online" 
-                ? `Pay ₹${grandTotal.toLocaleString('en-IN')} Now` 
-                : "Place COD Order"
+              : !isQuoteReady
+                ? "Calculating total..."
+                : paymentMethod === "Online"
+                  ? `Pay ₹${grandTotal.toLocaleString('en-IN')} Now`
+                  : `Place COD Order · ₹${grandTotal.toLocaleString('en-IN')}`
             }
           </button>
         ) : (
@@ -2144,8 +2256,29 @@ export default function Checkout() {
               setShowOrderSuccess(true);
               showGlobalToast("Payment successful!", "success");
             }}
-            onFailure={(error) => {
+            onFailure={(error, paymentMayHaveSucceeded) => {
               setShowRazorpayCheckout(false);
+              const unpaidOrderId = pendingOrderId;
+              if (paymentMayHaveSucceeded && unpaidOrderId) {
+                // Money may have been taken: don't void the order. The server confirms it
+                // (or refunds in full) from the Razorpay webhook.
+                setPendingOrderId(null);
+                clearCart();
+                setPlacedOrderId(unpaidOrderId);
+                showGlobalToast(
+                  "We're confirming your payment. If it doesn't go through, any amount deducted will be refunded and your coins restored.",
+                  "info"
+                );
+                navigate(`/orders/${unpaidOrderId}`);
+                return;
+              }
+              // Payment failed or was cancelled before the order was placed:
+              // void the order so reserved stock, coins and coupon are restored
+              if (unpaidOrderId) {
+                cancelCustomerOrder(unpaidOrderId, "Online payment not completed")
+                  .catch((e) => console.error("Failed to cancel unpaid order", e))
+                  .finally(() => setQuoteNonce((n) => n + 1));
+              }
               setPendingOrderId(null);
               showGlobalToast(error || "Payment failed. Please try again.", "error");
             }}

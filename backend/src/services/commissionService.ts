@@ -801,7 +801,8 @@ export interface ICODOrderBreakdown {
     adminDeliveryCommission: number; // Admin's portion of delivery charge
 
     // Totals
-    totalAdminEarning: number; // adminProductCommission + platformFee + adminDeliveryCommission
+    platformDiscount: number; // customer discounts funded by the platform (order.discount)
+    totalAdminEarning: number; // adminProductCommission + platformFee + adminDeliveryCommission - platformDiscount
     totalOrderAmount: number; // Grand total customer pays
     amountDeliveryBoyOwesAdmin: number; // Total - deliveryBoyCommission
 
@@ -835,6 +836,7 @@ export const calculateOrderBreakdown = async (
             adminDeliveryCommission: 0,
             totalAdminEarning: 0,
             totalOrderAmount: order.total,
+            platformDiscount: 0,
             amountDeliveryBoyOwesAdmin: 0,
             deliveryBoyId: order.deliveryBoy?.toString(),
             deliveryDistanceKm: order.deliveryDistanceKm,
@@ -884,10 +886,14 @@ export const calculateOrderBreakdown = async (
         }
 
         // 3. Calculate Total Admin Earning
+        // All customer discounts (first/second order, coupon, loyalty coins) are funded
+        // by the platform, so they reduce admin earning; seller earnings stay on item totals.
+        breakdown.platformDiscount = order.discount || 0;
         breakdown.totalAdminEarning =
             breakdown.adminProductCommission +
             breakdown.platformFee +
-            breakdown.adminDeliveryCommission;
+            breakdown.adminDeliveryCommission -
+            breakdown.platformDiscount;
 
         // 4. Calculate Amount Delivery Boy Owes Admin
         breakdown.amountDeliveryBoyOwesAdmin =

@@ -38,9 +38,26 @@ export interface IOrder extends Document {
   tax: number;
   shipping: number;
   platformFee: number;
-  discount: number;
+  discount: number; // sum of all discounts below (orderSequence + coupon + loyalty)
   couponCode?: string;
   total: number;
+
+  // Discount breakdown (all borne by the platform, never by sellers)
+  orderSequenceNumber?: number; // 1 = customer's first order, 2 = second ...
+  orderSequencePercent?: number;
+  orderSequenceDiscount?: number;
+  coupon?: mongoose.Types.ObjectId;
+  couponDiscount?: number;
+  couponUsageReleased?: boolean;
+  loyaltyCoinsRedeemed?: number;
+  loyaltyDiscount?: number;
+  loyaltyCoinsPerRupee?: number;
+  loyaltyRedeemStatus?: "None" | "Redeemed" | "Released" | "Forfeited";
+
+  // Coins this order will earn on delivery (frozen at order time)
+  loyaltyCoinsToEarn?: number;
+  loyaltyCoinsEarned?: number;
+  loyaltyEarnStatus?: "None" | "Pending" | "Credited" | "Forfeited";
 
   // Payment
   paymentMethod: string;
@@ -248,6 +265,29 @@ const OrderSchema = new Schema<IOrder>(
       type: Number,
       required: [true, "Total is required"],
       min: [0, "Total cannot be negative"],
+    },
+
+    // Discount breakdown
+    orderSequenceNumber: { type: Number },
+    orderSequencePercent: { type: Number, default: 0 },
+    orderSequenceDiscount: { type: Number, default: 0, min: 0 },
+    coupon: { type: Schema.Types.ObjectId, ref: "Coupon" },
+    couponDiscount: { type: Number, default: 0, min: 0 },
+    couponUsageReleased: { type: Boolean, default: false },
+    loyaltyCoinsRedeemed: { type: Number, default: 0, min: 0 },
+    loyaltyDiscount: { type: Number, default: 0, min: 0 },
+    loyaltyCoinsPerRupee: { type: Number },
+    loyaltyRedeemStatus: {
+      type: String,
+      enum: ["None", "Redeemed", "Released", "Forfeited"],
+      default: "None",
+    },
+    loyaltyCoinsToEarn: { type: Number, default: 0, min: 0 },
+    loyaltyCoinsEarned: { type: Number, default: 0, min: 0 },
+    loyaltyEarnStatus: {
+      type: String,
+      enum: ["None", "Pending", "Credited", "Forfeited"],
+      default: "None",
     },
 
     // Payment

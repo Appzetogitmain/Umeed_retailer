@@ -12,11 +12,127 @@ import { Server as SocketIOServer } from "socket.io";
 import { calculateDeliveryStuff } from "./customerCartController";
 import { resolveItemUnitPrice } from "../../../utils/pricing";
 import { decrementProductStock } from "../../../utils/stockDecrement";
+import {
+    computeCheckoutPricing,
+    consumeCouponUsage,
+    serializePricing,
+    PricingLineInput,
+} from "../../../services/checkoutPricingService";
+import { expireDueLots, redeemCoinsForOrder } from "../../../services/loyaltyService";
+import { abortUnpaidOnlineOrder, isUnpaidOnlineOrder } from "../../../services/unpaidOrderService";
+
+// Resolve which variation an order line refers to (same matching for quote and order)
+const pickVariation = (product: any, variationValue: any) => {
+    let selectedVariation;
+    if (variationValue && product.variations) {
+        selectedVariation = product.variations.find((v: any) =>
+            (v._id && v._id.toString() === variationValue) ||
+            v.value === variationValue ||
+            v.title === variationValue ||
+            v.pack === variationValue
+        );
+    }
+    if (!selectedVariation && product.variations && product.variations.length > 0) {
+        // Fallback to first if no variation spec or not found (consistent with stock fallback)
+        selectedVariation = product.variations[0];
+    }
+    return selectedVariation;
+};
+
+const parseCoordinate = (value: any): number | null => {
+    if (value == null) return null;
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    return isNaN(n) ? null : n;
+};
+
+/**
+ * Checkout quote: the exact bill the customer will be charged, computed by the
+ * same pricing service createOrder uses (items, first/second-order discount,
+ * coupon, loyalty coins, fees and coins to be earned).
+ */
+export const getCheckoutQuote = async (req: Request, res: Response) => {
+    try {
+        const { items, address, couponCode, useCoins } = req.body;
+        const userId = req.user!.userId;
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: "Cart is empty" });
+        }
+
+        await expireDueLots(userId);
+
+        const ids = items
+            .map((i: any) => i?.product?.id)
+            .filter((id: any) => id && mongoose.isValidObjectId(id));
+        const products = await Product.find({ _id: { $in: ids } });
+        const productMap = new Map(products.map((p: any) => [p._id.toString(), p]));
+
+        const lines: PricingLineInput[] = [];
+        const itemsOut: any[] = [];
+        const unavailable: any[] = [];
+
+        for (const item of items) {
+            const product: any = productMap.get(String(item?.product?.id));
+            const qty = Number(item?.quantity) || 0;
+            if (!product || qty <= 0) {
+                unavailable.push({ productId: item?.product?.id, reason: "Product not found" });
+                continue;
+            }
+            const variationValue = item.variant || item.variation;
+            const selectedVariation = pickVariation(product, variationValue);
+            const unitPrice = resolveItemUnitPrice(product, selectedVariation || variationValue);
+            lines.push({ product, unitPrice, quantity: qty });
+            itemsOut.push({
+                productId: product._id,
+                variation: variationValue,
+                name: product.productName,
+                unitPrice,
+                quantity: qty,
+            });
+        }
+
+        if (lines.length === 0) {
+            return res.status(400).json({ success: false, message: "No valid items in cart", data: { unavailable } });
+        }
+
+        const lat = parseCoordinate(address?.latitude);
+        const lng = parseCoordinate(address?.longitude);
+        const sellerIds = Array.from(new Set(lines.map((l) => l.product.seller.toString())));
+        const subtotal = lines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.quantity, 0) / 100;
+        const fees = await calculateDeliveryStuff(subtotal, sellerIds.map((id) => ({ product: { seller: id } })), lat, lng);
+
+        const pricing = await computeCheckoutPricing({
+            customerId: userId,
+            lines,
+            platformFee: Number(fees.platformFee) || 0,
+            deliveryFee: Number(fees.estimatedDeliveryFee) || 0,
+            couponCode,
+            useCoins: !!useCoins,
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                ...serializePricing(pricing),
+                freeDeliveryThreshold: fees.freeDeliveryThreshold,
+                estimatedDeliveryTime: fees.estimatedDeliveryTime,
+                items: itemsOut.map((it, i) => ({ ...it, ...pricing.lines[i] })),
+                unavailable,
+            },
+        });
+    } catch (error: any) {
+        console.error("Error computing checkout quote:", error);
+        return res.status(500).json({ success: false, message: "Error computing checkout total", error: error.message });
+    }
+};
 
 // Create a new order
 export const createOrder = async (req: Request, res: Response) => {
     let session: mongoose.ClientSession | null = null;
     try {
+        // Expire any due coins first so the balance used below is accurate
+        await expireDueLots(req.user!.userId);
+
         // Only start session if we are on a replica set (required for transactions)
         // For simplicity in local dev, we check and fallback if it fails
         try {
@@ -29,7 +145,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
         // Note: `fees` is intentionally not read from req.body — platformFee/deliveryFee
         // are always recomputed server-side below (see computedFees) to prevent tampering.
-        const { items, address, paymentMethod, deliveryInstructions } = req.body;
+        const { items, address, paymentMethod, deliveryInstructions, couponCode, useCoins, expectedTotal } = req.body;
         const userId = req.user!.userId;
 
         // Log incoming request for debugging
@@ -156,10 +272,10 @@ export const createOrder = async (req: Request, res: Response) => {
             items: []
         });
 
-        let calculatedSubtotal = 0;
         const orderItemIds: mongoose.Types.ObjectId[] = [];
         const sellerIds = new Set<string>(); // Track unique sellers
-        const sellerSubtotals = new Map<string, number>(); // Track per-seller subtotals
+        const pricingLines: PricingLineInput[] = [];
+        const lineVariations: any[] = [];
 
         for (const item of items) {
             if (!item.product || !item.product.id) {
@@ -188,50 +304,11 @@ export const createOrder = async (req: Request, res: Response) => {
             }
 
             // Determine the price based on variation and discounts
-            let selectedVariation;
-            if (variationValue && product.variations) {
-                selectedVariation = product.variations.find((v: any) =>
-                    (v._id && v._id.toString() === variationValue) ||
-                    v.value === variationValue ||
-                    v.title === variationValue ||
-                    v.pack === variationValue
-                );
-            }
-            if (!selectedVariation && product.variations && product.variations.length > 0) {
-                // Fallback to first if no variation spec or not found (consistent with stock fallback)
-                selectedVariation = product.variations[0];
-            }
-
+            const selectedVariation = pickVariation(product, variationValue);
             const itemPrice = resolveItemUnitPrice(product, selectedVariation || variationValue);
-            const itemTotal = itemPrice * qty;
-            calculatedSubtotal += itemTotal;
 
-            // Track per-seller subtotal for COD splitting
-            const sellerIdStr = product.seller.toString();
-            sellerSubtotals.set(sellerIdStr, (sellerSubtotals.get(sellerIdStr) || 0) + itemTotal);
-
-            // Create OrderItem
-            const newOrderItemData = {
-                order: newOrder._id,
-                product: product._id,
-                seller: product.seller,
-                productName: product.productName,
-                productImage: product.mainImage,
-                sku: product.sku,
-                unitPrice: itemPrice,
-                quantity: qty,
-                total: itemTotal,
-                variation: variationValue,
-                status: 'Pending'
-            };
-
-            const newOrderItem = new OrderItem(newOrderItemData);
-            if (session) {
-                await newOrderItem.save({ session });
-            } else {
-                await newOrderItem.save();
-            }
-            orderItemIds.push(newOrderItem._id as mongoose.Types.ObjectId);
+            pricingLines.push({ product, unitPrice: itemPrice, quantity: qty });
+            lineVariations.push(variationValue);
         }
 
         // Validate all sellers can deliver to user's location
@@ -273,32 +350,108 @@ export const createOrder = async (req: Request, res: Response) => {
         // Recompute fees server-side from AppSettings/seller distance (same logic the
         // cart summary uses) instead of trusting the client-supplied `fees` object,
         // which could otherwise be tampered with to reduce or zero out what's charged.
+        const calculatedSubtotal = pricingLines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.quantity, 0) / 100;
         const sellerIdsForFees = Array.from(sellerIds).map((id) => ({ product: { seller: id } }));
         const computedFees = await calculateDeliveryStuff(calculatedSubtotal, sellerIdsForFees, deliveryLat, deliveryLng);
         const platformFee = Number(computedFees.platformFee) || 0;
         const deliveryFee = Number(computedFees.estimatedDeliveryFee) || 0;
-        const finalTotal = calculatedSubtotal + platformFee + deliveryFee;
+
+        // Same pricing service as the checkout quote -> what the customer saw is what is charged
+        const pricing = await computeCheckoutPricing({
+            customerId: userId,
+            lines: pricingLines,
+            platformFee,
+            deliveryFee,
+            couponCode,
+            useCoins: !!useCoins,
+            session,
+        });
+
+        if (couponCode && !pricing.coupon.applied) {
+            throw Object.assign(new Error(pricing.coupon.error || "Coupon could not be applied"), { statusCode: 400 });
+        }
+        if (expectedTotal != null && expectedTotal !== '' && Math.abs(Number(expectedTotal) - pricing.total) > 0.009) {
+            throw Object.assign(
+                new Error(`Your order total changed from ₹${Number(expectedTotal)} to ₹${pricing.total}. Please review and try again.`),
+                { statusCode: 409, code: 'PRICE_CHANGED', quote: serializePricing(pricing) }
+            );
+        }
+
+        // Create order items with their share of the platform-funded discount and coins to earn
+        for (let i = 0; i < pricingLines.length; i++) {
+            const { product, unitPrice, quantity } = pricingLines[i];
+            const priced = pricing.lines[i];
+            const newOrderItem = new OrderItem({
+                order: newOrder._id,
+                product: product._id,
+                seller: product.seller,
+                productName: product.productName,
+                productImage: product.mainImage,
+                sku: product.sku,
+                unitPrice,
+                quantity,
+                total: priced.lineTotal,
+                discountShare: priced.discountShare,
+                loyaltyCoins: priced.loyaltyCoins,
+                variation: lineVariations[i],
+                status: 'Pending'
+            });
+            if (session) {
+                await newOrderItem.save({ session });
+            } else {
+                await newOrderItem.save();
+            }
+            orderItemIds.push(newOrderItem._id as mongoose.Types.ObjectId);
+        }
 
         // Update Order with calculated values and items
-        newOrder.subtotal = Number(calculatedSubtotal.toFixed(2));
-        newOrder.shipping = Number(deliveryFee.toFixed(2));
-        newOrder.platformFee = Number(platformFee.toFixed(2));
-        newOrder.total = Number(finalTotal.toFixed(2));
+        newOrder.subtotal = pricing.subtotal;
+        newOrder.shipping = pricing.deliveryFee;
+        newOrder.platformFee = pricing.platformFee;
+        newOrder.discount = pricing.totalDiscount;
+        newOrder.total = pricing.total;
         newOrder.items = orderItemIds;
 
-        // Initialize sellerAcceptances for per-seller tracking
+        newOrder.orderSequenceNumber = pricing.orderSequence.orderNumber;
+        newOrder.orderSequencePercent = pricing.orderSequence.percent;
+        newOrder.orderSequenceDiscount = pricing.orderSequence.discount;
+        if (pricing.coupon.applied && pricing.coupon.couponId) {
+            newOrder.coupon = new mongoose.Types.ObjectId(pricing.coupon.couponId);
+            newOrder.couponCode = pricing.coupon.code;
+            newOrder.couponDiscount = pricing.coupon.discount;
+        }
+        newOrder.loyaltyCoinsPerRupee = pricing.loyalty.coinsPerRupee;
+        newOrder.loyaltyCoinsRedeemed = pricing.loyalty.coinsUsed;
+        newOrder.loyaltyDiscount = pricing.loyalty.discount;
+        newOrder.loyaltyRedeemStatus = pricing.loyalty.coinsUsed > 0 ? "Redeemed" : "None";
+        newOrder.loyaltyCoinsToEarn = pricing.coinsToEarn;
+        newOrder.loyaltyEarnStatus = pricing.coinsToEarn > 0 ? "Pending" : "None";
+
+        // Initialize sellerAcceptances for per-seller tracking.
+        // COD amounts are split in paise so they always add up to the order total exactly.
         const uniqueSellers = Array.from(sellerIds);
-        const feePerSeller = uniqueSellers.length > 0 ? (platformFee + deliveryFee) / uniqueSellers.length : 0;
-        
-        newOrder.sellerAcceptances = uniqueSellers.map(sellerId => {
-            const subtotal = sellerSubtotals.get(sellerId) || 0;
-            const codAmountToCollect = paymentMethod === 'COD' ? subtotal + feePerSeller : 0;
-            return {
-                seller: new mongoose.Types.ObjectId(sellerId),
-                status: "Pending",
-                codAmountToCollect: Number(codAmountToCollect.toFixed(2))
-            };
-        });
+        newOrder.sellerAcceptances = uniqueSellers.map(sellerId => ({
+            seller: new mongoose.Types.ObjectId(sellerId),
+            status: "Pending",
+            codAmountToCollect: paymentMethod === 'COD' ? (pricing.sellerAmounts.get(sellerId) || 0) : 0
+        }));
+
+        // Generates orderNumber (pre-validate hook) so the ledger can reference it
+        await newOrder.validate();
+
+        if (pricing.coupon.applied && pricing.coupon.couponId) {
+            await consumeCouponUsage(pricing.coupon.couponId, session);
+        }
+        if (pricing.loyalty.coinsUsed > 0) {
+            await redeemCoinsForOrder({
+                customerId: userId,
+                coins: pricing.loyalty.coinsUsed,
+                coinsPerRupee: pricing.loyalty.coinsPerRupee,
+                orderId: newOrder._id,
+                orderNumber: newOrder.orderNumber,
+                session,
+            });
+        }
 
         if (session) {
             await newOrder.save({ session });
@@ -337,6 +490,7 @@ export const createOrder = async (req: Request, res: Response) => {
             success: true,
             message: "Order placed successfully",
             data: newOrder,
+            pricing: serializePricing(pricing),
         });
 
     } catch (error: any) {
@@ -364,7 +518,10 @@ export const createOrder = async (req: Request, res: Response) => {
         let errorMessage = "Error creating order. " + error.message;
         let statusCode = 500;
 
-        if (error.name === 'ValidationError') {
+        if (error.statusCode) {
+            statusCode = error.statusCode;
+            errorMessage = error.message;
+        } else if (error.name === 'ValidationError') {
             statusCode = 400;
             const fields = Object.keys(error.errors).join(', ');
             errorMessage = `Validation failed for fields: ${fields}. ${error.message}`;
@@ -375,6 +532,8 @@ export const createOrder = async (req: Request, res: Response) => {
         return res.status(statusCode).json({
             success: false,
             message: errorMessage,
+            code: error.code,
+            quote: error.quote,
             error: error.message,
             details: error.errors,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -555,155 +714,58 @@ export const refreshDeliveryOtp = async (req: Request, res: Response) => {
 
 // Cancel Order
 export const cancelOrder = async (req: Request, res: Response) => {
-    let session: mongoose.ClientSession | null = null;
     try {
         const { id } = req.params;
         const { reason } = req.body;
         const userId = req.user!.userId;
 
-        if (!reason) {
-            return res.status(400).json({ success: false, message: "Cancellation reason is required" });
-        }
-
-        // Only start session if we are on a replica set (required for transactions)
-        try {
-            session = await mongoose.startSession();
-            session.startTransaction();
-        } catch (sessionError) {
-            console.warn("MongoDB Transactions not supported or failed to start. Proceeding without transaction.");
-            session = null;
-        }
-
-        const order = session
-            ? await Order.findOne({ _id: id, customer: userId }).session(session)
-            : await Order.findOne({ _id: id, customer: userId });
-
+        const order = await Order.findOne({ _id: id, customer: userId });
         if (!order) {
-            if (session) await session.abortTransaction();
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
-        const cancellableStatuses = ['Placed', 'Received', 'Pending'];
-        if (!cancellableStatuses.includes(order.status)) {
-            if (session) await session.abortTransaction();
-            return res.status(400).json({ success: false, message: `Cannot cancel order. Order is currently in '${order.status}' status and has already been accepted by the seller.` });
+        // Policy: once an order is placed (COD, or online after successful payment)
+        // the customer cannot cancel it or any product in it.
+        if (!isUnpaidOnlineOrder(order)) {
+            return res.status(400).json({
+                success: false,
+                message: "Orders cannot be cancelled once placed. Please contact support for help.",
+            });
         }
 
-        // Restore stock
-        for (const item of order.items) {
-            const orderItem = session
-                ? await OrderItem.findById(item).session(session)
-                : await OrderItem.findById(item);
-
-            if (orderItem) {
-                const product = session
-                    ? await Product.findById(orderItem.product).session(session)
-                    : await Product.findById(orderItem.product);
-
-                if (product) {
-                    // Check if it was a variation
-                    if (orderItem.variation) {
-                        // Try to find matching variation
-                        const variationIndex = product.variations?.findIndex((v: any) => v.value === orderItem.variation || v.title === orderItem.variation || v.pack === orderItem.variation);
-
-                        if (variationIndex !== undefined && variationIndex !== -1 && product.variations) {
-                            product.variations[variationIndex].stock += orderItem.quantity;
-                        } else if (product.variations && product.variations.length > 0) {
-                            // Fallback to first variation if specific one not found (should be rare)
-                            product.variations[0].stock += orderItem.quantity;
-                        }
-                    }
-
-                    // Helper: also increment main stock if variations are just attributes or if simple product
-                    product.stock += orderItem.quantity;
-                    if (session) {
-                        await product.save({ session });
-                    } else {
-                        await product.save();
-                    }
-                }
-
-                orderItem.status = 'Cancelled';
-                if (session) {
-                    await orderItem.save({ session });
-                } else {
-                    await orderItem.save();
-                }
-            }
-        }
-
-        order.status = 'Cancelled';
-        order.cancellationReason = reason;
-        order.cancelledAt = new Date();
-        order.cancelledBy = new mongoose.Types.ObjectId(userId); // Use Customer ID as canceller
-
-        if (session) {
-            await order.save({ session });
-            await session.commitTransaction();
-        } else {
-            await order.save();
-        }
-
-        // Notify
-        try {
-            const io = (req.app as any).get("io");
-            if (io) {
-                await notifySellersOfOrderUpdate(io, order, 'ORDER_CANCELLED');
-
-                // Notify delivery boy if assigned
-                if (order.deliveryBoy) {
-                    // Update delivery status to Failed since order is cancelled
-                    // We do this in background to not block response
-                    Order.findByIdAndUpdate(order._id, { deliveryBoyStatus: 'Failed' }).exec();
-
-                    // Notify the specific delivery boy
-                    const deliveryBoyId = order.deliveryBoy.toString();
-                    io.to(`delivery-${deliveryBoyId}`).emit('order-cancelled', {
-                        orderId: order._id,
-                        orderNumber: order.orderNumber,
-                        message: "Order has been cancelled by the customer"
-                    });
-
-                    console.log(`Notification sent to delivery boy ${deliveryBoyId} for cancelled order ${order.orderNumber}`);
-                }
-
-                // Emit to order room for real-time updates on tracking screen
-                io.to(`order-${order._id}`).emit('order-cancelled', {
-                    orderId: order._id,
-                    status: 'Cancelled',
-                    message: "Order has been cancelled"
-                });
-            }
-        } catch (err) {
-            console.error("Notification error:", err);
+        // Online payment did not complete: the order was never placed, so abort it
+        // and restore any reserved stock, coins and coupon use.
+        const aborted = await abortUnpaidOnlineOrder(
+            order._id.toString(),
+            (reason && String(reason).trim()) || "Online payment not completed",
+            userId
+        );
+        if (!aborted) {
+            return res.status(409).json({
+                success: false,
+                message: "This order's payment has already been completed, so it can no longer be cancelled.",
+            });
         }
 
         return res.status(200).json({
             success: true,
-            message: "Order cancelled successfully",
+            message: "Order cancelled. Any coins used have been returned to your wallet.",
             data: {
-                id: order._id,
-                status: order.status,
-                cancelledAt: order.cancelledAt
+                id: aborted._id,
+                status: aborted.status,
+                cancelledAt: aborted.cancelledAt
             }
         });
-
     } catch (error: any) {
-        if (session) {
-            try {
-                await session.abortTransaction();
-            } catch (e) { }
-        }
-        console.error('Error cancelling order:', error);
+        console.error("Error cancelling order:", error);
         return res.status(500).json({
             success: false,
-            message: "Failed to cancel order",
-            error: error.message
+            message: "Error cancelling order",
+            error: error.message,
         });
-    } finally {
-        if (session) session.endSession();
     }
 };
+
 
 // Update Order Notes (Instructions/Special Requests)
 export const updateOrderNotes = async (req: Request, res: Response) => {

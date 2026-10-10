@@ -8,6 +8,13 @@ import DeliveryAssignment from "../../../models/DeliveryAssignment";
 import Return from "../../../models/Return";
 import { notifySellersOfOrderUpdate } from "../../../services/sellerNotificationService";
 import { Server as SocketIOServer } from "socket.io";
+import {
+  creditEarnedCoinsForOrder,
+  markRedeemForfeited,
+  reverseEarnedCoinsForItem,
+} from "../../../services/loyaltyService";
+import { releaseCouponUsage } from "../../../services/checkoutPricingService";
+import { abortUnpaidOnlineOrder, isUnpaidOnlineOrder } from "../../../services/unpaidOrderService";
 
 /**
  * Get all orders with filters
@@ -149,6 +156,24 @@ export const updateOrderStatus = asyncHandler(
       });
     }
 
+    // Cancelling an online order that never got paid voids it: stock, reserved
+    // coins and coupon use are restored (it was never a placed order).
+    if (status === "Cancelled") {
+      const existing: any = await Order.findById(id);
+      if (existing && isUnpaidOnlineOrder(existing)) {
+        await abortUnpaidOnlineOrder(id, adminNotes || "Cancelled by admin before payment", req.user?.userId);
+        const voided = await Order.findById(id)
+          .populate("customer", "name email phone")
+          .populate("deliveryBoy", "name mobile")
+          .populate("items");
+        return res.status(200).json({
+          success: true,
+          message: "Unpaid order voided; reserved coins and stock restored",
+          data: voided,
+        });
+      }
+    }
+
     const updateData: any = { status };
     if (adminNotes) updateData.adminNotes = adminNotes;
 
@@ -174,6 +199,15 @@ export const updateOrderStatus = asyncHandler(
         success: false,
         message: "Order not found",
       });
+    }
+
+    // Loyalty side effects (idempotent): credit earned coins on delivery,
+    // forfeit coins / release coupon use when the admin cancels or rejects
+    if (status === "Delivered") {
+      await creditEarnedCoinsForOrder(order._id.toString());
+    } else if (status === "Cancelled" || status === "Rejected") {
+      await markRedeemForfeited(order._id.toString());
+      await releaseCouponUsage(order._id.toString());
     }
 
     // Trigger notification if status is "Processed" (Confirmed) or if paymentStatus changed to "Paid"
@@ -527,13 +561,34 @@ export const processReturnRequest = asyncHandler(
           message: "Transaction ID is required to process the refund",
         });
       }
+      // Refund only what the customer actually paid for the returned units.
+      // The item's discountShare holds its part of the first/second-order discount,
+      // coupon and redeemed coins; redeemed coins are non-refundable and coupon /
+      // order discounts were never paid, so none of that is refunded as cash.
+      const returnedItem: any = await OrderItem.findById(returnRequest.orderItem);
+      const itemQty = returnedItem?.quantity || 1;
+      const returnQty = Math.min(returnRequest.quantity || itemQty, itemQty);
+      const paidForItem = Math.max(0, (returnedItem?.total || 0) - (returnedItem?.discountShare || 0));
+      const maxRefund = Math.round(((paidForItem * returnQty) / itemQty) * 100) / 100;
+      if (refundAmount !== undefined && refundAmount !== null && refundAmount !== "" && Number(refundAmount) > maxRefund + 0.009) {
+        return res.status(400).json({
+          success: false,
+          message: `Refund cannot exceed ₹${maxRefund}, the amount the customer paid for this item (redeemed coins and discounts are non-refundable)`,
+          data: { maxRefund },
+        });
+      }
+
       updateData.status = "Refunded";
       updateData.transactionId = transactionId;
       updateData.refundedAt = new Date();
-      if (refundAmount) updateData.refundAmount = refundAmount;
+      updateData.refundAmount =
+        refundAmount !== undefined && refundAmount !== null && refundAmount !== "" ? Number(refundAmount) : maxRefund;
 
       // Update OrderItem status
       await OrderItem.findByIdAndUpdate(returnRequest.orderItem, { status: "Returned" });
+
+      // Take back the loyalty coins this item earned (redeemed coins are never refunded)
+      await reverseEarnedCoinsForItem(returnRequest.orderItem.toString(), req.user?.userId);
 
       // Check if all items in order are returned/cancelled
       const orderItems = await OrderItem.find({ order: returnRequest.order });

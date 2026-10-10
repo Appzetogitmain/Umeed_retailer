@@ -5,7 +5,10 @@ interface RazorpayCheckoutProps {
     orderId: string;
     amount: number;
     onSuccess: (paymentId: string) => void;
-    onFailure: (error: string) => void;
+    // paymentMayHaveSucceeded: true when money may already have been taken
+    // (verification failed after Razorpay accepted the payment). The order must
+    // then NOT be voided; the server confirms or refunds it via the webhook.
+    onFailure: (error: string, paymentMayHaveSucceeded?: boolean) => void;
     customerDetails: {
         name: string;
         email: string;
@@ -97,11 +100,11 @@ const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
                             if (verificationResponse.success) {
                                 onSuccess(response.razorpay_payment_id);
                             } else {
-                                onFailure(verificationResponse.message || 'Payment verification failed');
+                                onFailure(verificationResponse.message || 'Payment verification failed', true);
                             }
                         } catch (error: any) {
                             console.error('Payment verification error:', error);
-                            onFailure(error.response?.data?.message || 'Payment verification failed');
+                            onFailure(error.response?.data?.message || 'Payment verification failed', true);
                         }
                     },
                     modal: {

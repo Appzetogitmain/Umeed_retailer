@@ -268,16 +268,54 @@ export default function AdminOrderDetail() {
                 <span className="text-neutral-600">Shipping:</span>
                 <span className="font-medium">₹{order.shipping?.toFixed(2) || '0.00'}</span>
               </div>
-              {order.discount > 0 && (
+              {((order as any).platformFee || 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Platform fee:</span>
+                  <span className="font-medium">₹{Number((order as any).platformFee).toFixed(2)}</span>
+                </div>
+              )}
+              {((order as any).orderSequenceDiscount || 0) > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>Order #{(order as any).orderSequenceNumber} discount ({(order as any).orderSequencePercent}%):</span>
+                  <span className="font-medium">-₹{Number((order as any).orderSequenceDiscount).toFixed(2)}</span>
+                </div>
+              )}
+              {((order as any).couponDiscount || 0) > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>Coupon{order.couponCode ? ` (${order.couponCode})` : ''}:</span>
+                  <span className="font-medium">-₹{Number((order as any).couponDiscount).toFixed(2)}</span>
+                </div>
+              )}
+              {((order as any).loyaltyDiscount || 0) > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>Loyalty coins ({(order as any).loyaltyCoinsRedeemed} coins, {(order as any).loyaltyRedeemStatus}):</span>
+                  <span className="font-medium">-₹{Number((order as any).loyaltyDiscount).toFixed(2)}</span>
+                </div>
+              )}
+              {order.discount > 0 &&
+                !((order as any).orderSequenceDiscount || (order as any).couponDiscount || (order as any).loyaltyDiscount) && (
                 <div className="flex justify-between text-red-600">
                   <span>Discount:</span>
                   <span className="font-medium">-₹{order.discount.toFixed(2)}</span>
                 </div>
               )}
+              {order.discount > 0 && (
+                <p className="text-xs text-neutral-500">All discounts are funded by the platform; seller payout is on the full item price.</p>
+              )}
               <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
                 <span>Total:</span>
                 <span>₹{order.total?.toFixed(2) || '0.00'}</span>
               </div>
+              {((order as any).loyaltyCoinsToEarn || 0) > 0 && (
+                <div className="flex justify-between text-xs text-neutral-600">
+                  <span>Coins to earn on delivery:</span>
+                  <span>
+                    {(order as any).loyaltyEarnStatus === 'Credited'
+                      ? `${(order as any).loyaltyCoinsEarned} credited`
+                      : `${(order as any).loyaltyCoinsToEarn} (${(order as any).loyaltyEarnStatus})`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

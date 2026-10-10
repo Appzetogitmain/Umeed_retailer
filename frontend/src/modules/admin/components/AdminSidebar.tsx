@@ -339,6 +339,25 @@ const menuSections: MenuSection[] = [
         ),
       },
       {
+        label: "Loyalty Coins",
+        path: "/admin/loyalty",
+        icon: (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1 0-2-.5-2.5-1.5"></path>
+            <path d="M12 6.5V8M12 16v1.5"></path>
+          </svg>
+        ),
+      },
+      {
         label: "Delivery Boy",
         path: "/admin/delivery-boy",
         hasSubmenu: true,

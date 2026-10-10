@@ -45,6 +45,7 @@ const TermsOfService = lazy(() => import("./modules/user/TermsOfService"));
 const FAQ = lazy(() => import("./modules/user/FAQ"));
 const Support = lazy(() => import("./modules/user/Support"));
 const Wishlist = lazy(() => import("./modules/user/Wishlist"));
+const LoyaltyCoins = lazy(() => import("./modules/user/LoyaltyCoins"));
 const Addresses = lazy(() => import("./modules/user/Addresses"));
 const AddressBook = lazy(() => import("./modules/user/AddressBook"));
 const SpiritualStore = lazy(() => import("./modules/user/SpiritualStore"));
@@ -208,6 +209,7 @@ const AdminManageSellerList = lazy(
   () => import("./modules/admin/pages/AdminManageSellerList"),
 );
 const AdminCoupon = lazy(() => import("./modules/admin/pages/AdminCoupon"));
+const AdminLoyalty = lazy(() => import("./modules/admin/pages/AdminLoyalty"));
 const AdminNotification = lazy(
   () => import("./modules/admin/pages/AdminNotification"),
 );
@@ -756,6 +758,10 @@ function AppContent() {
                                       element={<AdminCoupon />}
                                     />
                                     <Route
+                                      path="loyalty"
+                                      element={<AdminLoyalty />}
+                                    />
+                                    <Route
                                       path="return"
                                       element={<AdminReturnRequest />}
                                     />
@@ -924,6 +930,14 @@ function AppContent() {
                                   <Route
                                     path="/wishlist"
                                     element={<Wishlist />}
+                                  />
+                                  <Route
+                                    path="/coins"
+                                    element={
+                                      <ProtectedRoute requiredUserType="Customer">
+                                        <LoyaltyCoins />
+                                      </ProtectedRoute>
+                                    }
                                   />
                                   <Route
                                     path="/categories"

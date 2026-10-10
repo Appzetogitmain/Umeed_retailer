@@ -141,6 +141,47 @@ export const capturePayment = async (
             throw err;
         }
 
+        // Already captured (e.g. verify called twice) -> nothing more to do
+        if (order.paymentStatus === 'Paid') {
+            await session.abortTransaction();
+            session.endSession();
+            isSessionEnded = true;
+            return { success: true, message: 'Payment already captured', data: { orderId: order._id } };
+        }
+
+        // Payment arrived after the unpaid order was voided (payment failed/abandoned and
+        // its stock, coins and coupon were already released). Never revive the order:
+        // record the payment and refund it in full.
+        if (order.status === 'Cancelled') {
+            const latePayment = new Payment({
+                order: orderId,
+                customer: order.customer,
+                paymentMethod: 'Online',
+                paymentGateway: 'Razorpay',
+                razorpayOrderId,
+                razorpayPaymentId,
+                razorpaySignature,
+                amount: order.total,
+                currency: 'INR',
+                status: 'Completed',
+                paidAt: new Date(),
+                gatewayResponse: { success: true, message: 'Payment received after order was voided' },
+            });
+            await latePayment.save({ session });
+            await session.commitTransaction();
+            session.endSession();
+            isSessionEnded = true;
+
+            const refund = await processRefund(latePayment._id.toString(), order.total, 'Payment received after order was voided');
+            console.warn(`[Payment] Late payment for voided order ${order.orderNumber}; refund ${refund.success ? 'issued' : 'FAILED'}`);
+            return {
+                success: false,
+                message: refund.success
+                    ? 'This order was cancelled because the payment was not completed in time. Your payment has been refunded in full.'
+                    : 'This order was cancelled because the payment was not completed in time. Please contact support for your refund.',
+            };
+        }
+
         // Create payment record
         const payment = new Payment({
             order: orderId,
@@ -374,6 +415,25 @@ const handlePaymentCaptured = async (payload: any) => {
 
         // Find payment record
         const payment = await Payment.findOne({ razorpayOrderId });
+
+        if (!payment) {
+            // The app's verify call never reached us (network drop, app closed...).
+            // The webhook is authenticated, so finalize through the same capture path:
+            //  - order still awaiting payment -> confirmed as paid
+            //  - order already voided as unpaid (coins/stock released) -> refunded in full
+            //  - already paid -> no-op
+            const orderId = payload.notes?.orderId;
+            const keySecret = process.env.RAZORPAY_KEY_SECRET;
+            if (orderId && mongoose.isValidObjectId(orderId) && keySecret) {
+                const signature = crypto
+                    .createHmac('sha256', keySecret)
+                    .update(razorpayOrderId + '|' + razorpayPaymentId)
+                    .digest('hex');
+                const result = await capturePayment(orderId, razorpayOrderId, razorpayPaymentId, signature);
+                console.log(`[Payment] Webhook capture for order ${orderId}: ${result.message}`);
+            }
+            return;
+        }
 
         if (payment) {
             payment.status = 'Completed';

@@ -1,5 +1,23 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+export interface ILoyaltyConfig {
+  enabled: boolean; // master switch for earning + redeeming coins
+  earnEnabled: boolean;
+  redeemEnabled: boolean;
+  coinsPerRupee: number; // e.g. 10 coins = Rs 1
+  maxRedeemPercent: number; // max % of order amount (before coins) payable with coins
+  minRedeemCoins: number; // minimum balance required before coins can be used
+  expiryEnabled: boolean;
+  expiryDays: number; // applies to coins credited after the setting is saved
+  orderDiscountsEnabled: boolean;
+  orderDiscounts: Array<{
+    orderNumber: number; // 1 = first order, 2 = second order, ...
+    percent: number;
+    maxDiscount: number; // 0 = no cap
+    minOrderValue: number; // 0 = no minimum
+  }>;
+}
+
 export interface IAppSettings extends Document {
   // App Info
   appName: string;
@@ -77,6 +95,9 @@ export interface IAppSettings extends Document {
     heavyItemBonus: number;
     heavyItemWeightThreshold: number;
   };
+
+  // Loyalty Coins & order-sequence discounts (admin-managed)
+  loyaltyConfig?: ILoyaltyConfig;
 
   // Tax Settings
   gstEnabled: boolean;
@@ -299,6 +320,34 @@ const AppSettingsSchema = new Schema<IAppSettings>(
       isRainModeActive: { type: Boolean, default: false },
       heavyItemBonus: { type: Number, default: 0, min: 0 },
       heavyItemWeightThreshold: { type: Number, default: 5, min: 0 }, // weight in kg
+    },
+
+    // Loyalty Coins & order-sequence discounts
+    loyaltyConfig: {
+      enabled: { type: Boolean, default: true },
+      earnEnabled: { type: Boolean, default: true },
+      redeemEnabled: { type: Boolean, default: true },
+      coinsPerRupee: { type: Number, default: 10, min: 1 },
+      maxRedeemPercent: { type: Number, default: 10, min: 0, max: 100 },
+      minRedeemCoins: { type: Number, default: 0, min: 0 },
+      expiryEnabled: { type: Boolean, default: false },
+      expiryDays: { type: Number, default: 365, min: 1 },
+      orderDiscountsEnabled: { type: Boolean, default: true },
+      orderDiscounts: {
+        type: [
+          {
+            _id: false,
+            orderNumber: { type: Number, required: true, min: 1 },
+            percent: { type: Number, required: true, min: 0, max: 100 },
+            maxDiscount: { type: Number, default: 0, min: 0 },
+            minOrderValue: { type: Number, default: 0, min: 0 },
+          },
+        ],
+        default: [
+          { orderNumber: 1, percent: 5, maxDiscount: 0, minOrderValue: 0 },
+          { orderNumber: 2, percent: 10, maxDiscount: 0, minOrderValue: 0 },
+        ],
+      },
     },
 
     // Tax Settings

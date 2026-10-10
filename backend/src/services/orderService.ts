@@ -2,6 +2,8 @@ import Order from "../models/Order";
 import { IOrderItem } from "../models/OrderItem";
 import Inventory from "../models/Inventory";
 import { distributeCommissions } from "./commissionService";
+import { creditEarnedCoinsForOrder, markRedeemForfeited } from "./loyaltyService";
+import { releaseCouponUsage } from "./checkoutPricingService";
 import { clearOrderCache } from "../socket/socketService";
 
 /**
@@ -26,10 +28,14 @@ export const processOrderStatusTransition = async (
   // Handle status-specific logic
   switch (newStatus) {
     case "Cancelled":
+    case "Rejected":
       // Restore inventory if order was confirmed
-      if (["Processed", "Shipped"].includes(previousStatus)) {
+      if (newStatus === "Cancelled" && ["Processed", "Shipped"].includes(previousStatus)) {
         await restoreInventory(order.items as any[]);
       }
+      // Coins redeemed on a placed order are non-refundable; coins to earn are dropped
+      await markRedeemForfeited(orderId);
+      await releaseCouponUsage(orderId);
       break;
 
     case "Processed":
@@ -40,6 +46,8 @@ export const processOrderStatusTransition = async (
     case "Delivered":
       // Create commissions for sellers and delivery boys
       await distributeCommissions(orderId);
+      // Credit loyalty coins earned on the delivered items (idempotent)
+      await creditEarnedCoinsForOrder(orderId);
       break;
   }
 

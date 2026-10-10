@@ -14,6 +14,10 @@ export const createProduct = asyncHandler(
     const sellerId = (req as any).user.userId;
     const productData = req.body;
 
+    // Loyalty coins are configured by admin only
+    delete productData.loyaltyCoinType;
+    delete productData.loyaltyCoinValue;
+
     // Ensure sellerId matches authenticated seller
     if (productData.sellerId && productData.sellerId !== sellerId) {
       return res.status(403).json({
@@ -315,6 +319,9 @@ export const updateProduct = asyncHandler(
 
     // Remove sellerId from update data if present (cannot change owner)
     delete updateData.sellerId;
+    // Loyalty coins are configured by admin only
+    delete updateData.loyaltyCoinType;
+    delete updateData.loyaltyCoinValue;
 
     // Map frontend field names to model field names (same as createProduct)
     if (updateData.headerCategoryId !== undefined) {

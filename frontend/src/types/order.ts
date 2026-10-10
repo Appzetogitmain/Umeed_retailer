@@ -50,6 +50,19 @@ export interface Order {
   donationAmount?: number;
   gstin?: string;
   couponCode?: string;
+  useCoins?: boolean;
+  // Discount breakdown returned by the server (all funded by Speedoo)
+  discount?: number;
+  orderSequenceNumber?: number;
+  orderSequencePercent?: number;
+  orderSequenceDiscount?: number;
+  couponDiscount?: number;
+  loyaltyCoinsRedeemed?: number;
+  loyaltyDiscount?: number;
+  loyaltyCoinsToEarn?: number;
+  loyaltyCoinsEarned?: number;
+  loyaltyEarnStatus?: 'None' | 'Pending' | 'Credited' | 'Forfeited';
+  loyaltyRedeemStatus?: 'None' | 'Redeemed' | 'Released' | 'Forfeited';
   giftPackaging?: boolean;
   deliveryInstructions?: string;
   specialRequests?: string;

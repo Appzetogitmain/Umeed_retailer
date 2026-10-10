@@ -16,6 +16,11 @@ import { getProductById } from "../../services/api/customerProductService";
 import WishlistButton from "../../components/WishlistButton";
 import StarRating from "../../components/ui/StarRating";
 import { calculateProductPrice } from "../../utils/priceUtils";
+import {
+  coinsForProduct,
+  getLoyaltyProgram,
+  LoyaltyProgram,
+} from "../../services/api/customerLoyaltyService";
 import { normalizeImageUrl } from "../../utils/imageUrl";
 
 export default function ProductDetail() {
@@ -45,6 +50,11 @@ export default function ProductDetail() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [loyaltyProgram, setLoyaltyProgram] = useState<LoyaltyProgram | null>(null);
+
+  useEffect(() => {
+    getLoyaltyProgram().then(setLoyaltyProgram);
+  }, []);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -671,6 +681,17 @@ export default function ProductDetail() {
               </>
             )}
           </div>
+
+          {/* Loyalty coins earned on this product */}
+          {(() => {
+            const coins = coinsForProduct(product as any, variantPrice, loyaltyProgram);
+            if (coins <= 0 || !loyaltyProgram) return null;
+            return (
+              <p className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-800 bg-yellow-50 border border-yellow-100 rounded-full px-2.5 py-1 mb-1.5">
+                Earn {coins} coins (₹{Math.round((coins / loyaltyProgram.coinsPerRupee) * 100) / 100}) on delivery
+              </p>
+            );
+          })()}
 
           {/* Stock Status */}
           {variantStock !== 0 &&

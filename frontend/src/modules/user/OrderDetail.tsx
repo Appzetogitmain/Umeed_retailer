@@ -1,4 +1,5 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import OrderBillSummary from "./components/OrderBillSummary";
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Button from "../../components/ui/button";
@@ -798,7 +799,7 @@ export default function OrderDetail() {
       handleRefresh();
     } catch (error) {
       console.error("Error cancelling order:", error);
-      alert("Failed to cancel order");
+      alert((error as any)?.response?.data?.message || "Failed to cancel order");
     }
   };
 
@@ -1095,6 +1096,13 @@ export default function OrderDetail() {
                   : "This order was set for Cash on Delivery. No payment was collected or needs to be refunded."}
               </p>
             </div>
+            {(order.loyaltyCoinsRedeemed || 0) > 0 && (
+              <p className="mt-2 text-xs text-neutral-600 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                {order.loyaltyRedeemStatus === "Released"
+                  ? `${order.loyaltyCoinsRedeemed} coins used on this order were returned to your coin wallet.`
+                  : `${order.loyaltyCoinsRedeemed} coins used on this order are non-refundable. Only the amount you paid is refunded.`}
+              </p>
+            )}
           </motion.div>
         </div>
 
@@ -1670,9 +1678,10 @@ export default function OrderDetail() {
             </div>
             <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
           </Link>
-          {(orderStatus === "Placed" ||
-            orderStatus === "Received" ||
-            orderStatus === "Pending") && (
+          {/* Placed orders can't be cancelled; only an online order whose payment never completed */}
+          {orderStatus === "Pending" &&
+            order?.paymentMethod === "Online" &&
+            (order as any)?.paymentStatus !== "Paid" && (
             <SectionItem
               icon={CircleSlashIcon}
               title="Cancel order"
@@ -1858,6 +1867,7 @@ export default function OrderDetail() {
                   </div>
                 ))}
               </div>
+              <OrderBillSummary order={order} />
               <Button
                 className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => setShowItemsModal(false)}>

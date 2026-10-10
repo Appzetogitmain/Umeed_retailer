@@ -20,6 +20,8 @@ import { initializeSocket } from "./socket/socketService";
 import { PRODUCTION_ALLOWED_ORIGINS, isLocalhostOrigin } from "./config/corsOrigins";
 import { ensureUploadDirs } from "./utils/ensureUploadDirs";
 import { cleanupTempFiles } from "./services/imageService";
+import { startLoyaltyExpiryScheduler } from "./services/loyaltyService";
+import { startUnpaidOrderSweeper } from "./services/unpaidOrderService";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -137,6 +139,8 @@ async function startServer() {
   await ensureDefaultAdmin();
   await seedHeaderCategories();
   await seedFAQs();
+  startLoyaltyExpiryScheduler();
+  startUnpaidOrderSweeper();
 
   httpServer.listen(PORT, () => {
     console.log("\n\x1b[32m✓\x1b[0m \x1b[1mKosil Server Started\x1b[0m");

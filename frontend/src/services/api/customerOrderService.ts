@@ -34,7 +34,57 @@ export interface CreateOrderData {
         deliveryFee: number;
         platformFee: number;
     };
+    couponCode?: string;
+    useCoins?: boolean;
+    // Total the customer was shown; the server rejects the order (409) if its own total differs
+    expectedTotal?: number;
 }
+
+export interface CheckoutQuoteRequest {
+    items: { product: { id: string }; quantity: number; variant?: string }[];
+    address?: { latitude?: number; longitude?: number };
+    couponCode?: string;
+    useCoins?: boolean;
+}
+
+export interface CheckoutQuote {
+    subtotal: number;
+    platformFee: number;
+    deliveryFee: number;
+    orderSequence: { orderNumber: number; percent: number; discount: number; applied: boolean; message?: string };
+    coupon: { code?: string; couponId?: string; discount: number; applied: boolean; error?: string; description?: string };
+    loyalty: {
+        enabled: boolean;
+        balance: number;
+        balanceValue: number;
+        coinsPerRupee: number;
+        maxRedeemPercent: number;
+        minRedeemCoins: number;
+        maxUsableCoins: number;
+        maxUsableDiscount: number;
+        coinsUsed: number;
+        discount: number;
+        applied: boolean;
+        message?: string;
+    };
+    totalDiscount: number;
+    amountBeforeCoins: number;
+    total: number;
+    coinsToEarn: number;
+    coinsToEarnValue: number;
+    freeDeliveryThreshold?: number;
+    estimatedDeliveryTime?: string;
+    items: { productId: string; name: string; unitPrice: number; quantity: number; lineTotal: number; discountShare: number; loyaltyCoins: number }[];
+    unavailable: { productId: string; reason: string }[];
+}
+
+/**
+ * Server-computed checkout bill (same calculation used when the order is placed)
+ */
+export const getCheckoutQuote = async (data: CheckoutQuoteRequest): Promise<{ success: boolean; data: CheckoutQuote; message?: string }> => {
+    const response = await api.post('/customer/orders/quote', data);
+    return response.data;
+};
 
 export interface OrderResponse {
     success: boolean;

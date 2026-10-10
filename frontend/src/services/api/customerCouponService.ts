@@ -1,18 +1,21 @@
 import api from './config';
 
+// Mirrors the backend Coupon model (backend/src/models/Coupon.ts)
 export interface Coupon {
     _id: string;
     code: string;
-    title: string;
-    description: string;
-    discountType: 'percentage' | 'fixed';
+    title?: string;
+    description?: string;
+    discountType: 'Percentage' | 'Fixed';
     discountValue: number;
-    minOrderValue?: number;
-    maxDiscountAmount?: number;
-    validFrom: string;
-    validUntil: string;
+    minimumPurchase?: number;
+    maximumDiscount?: number;
+    startDate: string;
+    endDate: string;
     usageLimit?: number;
-    usedCount: number;
+    usageCount: number;
+    usageLimitPerUser?: number;
+    applicableTo?: 'All' | 'Category' | 'Product' | 'Seller';
     isActive: boolean;
 }
 

@@ -25,6 +25,9 @@ import * as settingsController from "../modules/admin/controllers/adminSettingsC
 // Coupon Controllers
 import * as couponController from "../modules/admin/controllers/adminCouponController";
 
+// Loyalty Coins Controllers
+import * as loyaltyController from "../modules/admin/controllers/adminLoyaltyController";
+
 // Notification Controllers
 import * as notificationController from "../modules/admin/controllers/adminNotificationController";
 
@@ -232,6 +235,20 @@ router.get("/coupons/:id", couponController.getCouponById);
 router.put("/coupons/:id", couponController.updateCoupon);
 router.delete("/coupons/:id", couponController.deleteCoupon);
 router.post("/coupons/validate", couponController.validateCoupon);
+
+// ==================== Loyalty Coins Routes ====================
+router.get("/loyalty/settings", loyaltyController.getLoyaltySettings);
+router.put("/loyalty/settings", loyaltyController.updateLoyaltySettings);
+router.get("/loyalty/overview", loyaltyController.getLoyaltyOverview);
+router.get("/loyalty/transactions", loyaltyController.getLoyaltyTransactions);
+router.get("/loyalty/customers", loyaltyController.getLoyaltyCustomers);
+router.get("/loyalty/customers/:id", loyaltyController.getLoyaltyCustomerDetail);
+router.post("/loyalty/customers/:id/adjust", loyaltyController.adjustCustomerCoins);
+router.get("/loyalty/products", loyaltyController.getLoyaltyProducts);
+router.put("/loyalty/products/bulk", loyaltyController.bulkUpdateProductCoins);
+router.put("/loyalty/products/:id", loyaltyController.updateProductCoins);
+router.post("/loyalty/expire-now", loyaltyController.runLoyaltyExpiry);
+router.post("/loyalty/reconcile", loyaltyController.reconcileLoyaltyBalances);
 
 // ==================== Notification Routes ====================
 router.post("/notifications", notificationController.createNotification);

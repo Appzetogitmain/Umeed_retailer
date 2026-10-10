@@ -120,6 +120,9 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
           deliveryFee: order.fees?.deliveryFee || 0,
           platformFee: order.fees?.platformFee || 0,
         },
+        couponCode: order.couponCode || undefined,
+        useCoins: !!order.useCoins,
+        expectedTotal: order.totalAmount,
       };
 
       const response = await createOrder(payload);

@@ -387,6 +387,12 @@ export default function Account() {
               { id: 'address', label: 'Address Book', icon: (
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               ), onClick: () => navigate("/address-book") },
+              { id: 'coins', label: 'Speedoo Coins', icon: (
+                <>
+                  <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                  <path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1 0-2-.5-2.5-1.5M12 6.5V8m0 8v1.5" strokeWidth="2" strokeLinecap="round" />
+                </>
+              ), onClick: () => navigate("/coins") },
               { id: 'wishlist', label: 'Your Wishlist', icon: (
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               ), onClick: () => navigate("/wishlist") },

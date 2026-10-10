@@ -13,6 +13,18 @@ export interface ICustomer extends Document {
   deliveryOtp: string; // Permanent 4-digit OTP for delivery verification
   totalOrders: number;
   totalSpent: number;
+  // Loyalty coins wallet (separate from any refund/payment balance).
+  // Always mutated through loyaltyService so it stays equal to the ledger.
+  loyaltyCoins: number;
+  loyaltyStats?: {
+    totalEarned: number;
+    totalRedeemed: number;
+    totalExpired: number;
+    totalAdminCredited: number;
+    totalAdminDebited: number;
+    totalReversed: number; // earned coins taken back on returns
+    totalReleased: number; // redeemed coins given back for unpaid/aborted orders
+  };
   // Location fields
   latitude?: number;
   longitude?: number;
@@ -120,6 +132,20 @@ const CustomerSchema = new Schema<ICustomer>(
       type: Number,
       default: 0,
       min: [0, 'Total spent cannot be negative'],
+    },
+    loyaltyCoins: {
+      type: Number,
+      default: 0,
+      min: [0, 'Loyalty coins cannot be negative'],
+    },
+    loyaltyStats: {
+      totalEarned: { type: Number, default: 0 },
+      totalRedeemed: { type: Number, default: 0 },
+      totalExpired: { type: Number, default: 0 },
+      totalAdminCredited: { type: Number, default: 0 },
+      totalAdminDebited: { type: Number, default: 0 },
+      totalReversed: { type: Number, default: 0 },
+      totalReleased: { type: Number, default: 0 },
     },
     // Location fields
     latitude: {
