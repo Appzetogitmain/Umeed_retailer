@@ -10,6 +10,7 @@ import { useThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import AuthPrompt from '../../components/AuthPrompt';
 import { normalizeImageUrl } from '../../utils/imageUrl';
+import { useLoyaltyProgram, coinsForProduct } from '../../services/api/customerLoyaltyService';
 
 
 export default function OrderAgain() {
@@ -19,6 +20,7 @@ export default function OrderAgain() {
   const { cart, addToCart, updateQuantity } = useCart();
   const navigate = useNavigate();
   const { currentTheme } = useThemeContext();
+  const loyaltyProgram = useLoyaltyProgram();
 
   const brandPrimary = currentTheme.primary[2] || '#9048A5';
 
@@ -81,6 +83,7 @@ export default function OrderAgain() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
               {previousProducts.map((product) => {
                 const { displayPrice, mrp, discount, hasDiscount } = calculateProductPrice(product);
+                const earnedCoins = coinsForProduct(product as any, displayPrice, loyaltyProgram);
                 const cartItem = cart.items.find(item => item?.product && item.product.id === product.id);
                 const inCartQty = cartItem?.quantity || 0;
 
@@ -104,6 +107,14 @@ export default function OrderAgain() {
                       {discount > 0 && (
                         <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg shadow-sm">
                           {discount}% OFF
+                        </div>
+                      )}
+
+                      {/* Loyalty Coins Badge */}
+                      {earnedCoins > 0 && (
+                        <div className="absolute top-2 right-10 z-10 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-lg shadow-sm flex items-center gap-0.5">
+                          <span>🪙</span>
+                          <span>+{earnedCoins}</span>
                         </div>
                       )}
 
@@ -177,6 +188,14 @@ export default function OrderAgain() {
                       </p>
                       
                       <div className="mt-auto pt-2 border-t border-neutral-50">
+                        {earnedCoins > 0 && (
+                          <div className="mb-1">
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded px-1.5 py-0.5">
+                              <span>🪙</span>
+                              <span>+{earnedCoins} coins</span>
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-sm font-black text-neutral-900">
                             ₹{displayPrice.toLocaleString('en-IN')}

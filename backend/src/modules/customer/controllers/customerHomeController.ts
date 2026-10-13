@@ -131,7 +131,7 @@ async function fetchSectionData(
         .sort({ createdAt: -1 }) // Show newest items first
         .limit(limit || 8)
         .select(
-          "productName mainImage price mrp discount rating reviewsCount pack seller",
+          "productName mainImage price mrp discount rating reviewsCount pack seller loyaltyCoinType loyaltyCoinValue",
         )
         .lean();
 
@@ -157,6 +157,8 @@ async function fetchSectionData(
           type: "product",
           isAvailable: true,
           seller: p.seller,
+          loyaltyCoinType: p.loyaltyCoinType,
+          loyaltyCoinValue: p.loyaltyCoinValue,
         };
       });
     }

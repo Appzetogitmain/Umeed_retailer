@@ -13,6 +13,7 @@ import StarRating from '../../../components/ui/StarRating';
 import { calculateProductPrice } from '../../../utils/priceUtils';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { normalizeImageUrl } from '../../../utils/imageUrl';
+import { useLoyaltyProgram, coinsForProduct } from '../../../services/api/customerLoyaltyService';
 // Helper to get consistent product ID across MongoDB _id and virtual id
 export const getProductId = (p: any): string => String(p?.id || p?._id || '');
 
@@ -136,6 +137,9 @@ export default function ProductCard({
 
   // Get Price and MRP using utility
   const { displayPrice, mrp, discount } = calculateProductPrice(product);
+
+  const loyaltyProgram = useLoyaltyProgram();
+  const earnedCoins = coinsForProduct(product as any, displayPrice, loyaltyProgram);
 
   const handleCardClick = () => {
     navigate(`/product/${((product as any).id || product._id) as string}`);
@@ -283,6 +287,15 @@ export default function ProductCard({
             </Badge>
           )}
 
+          {earnedCoins > 0 && (
+            <div
+              className={`absolute ${(!showPackBadge && !showHeartIcon) ? 'top-2 right-2' : (categoryStyle ? (discount > 0 ? 'top-7 left-2' : 'top-2 left-2') : ((badgeText || discount > 0) ? 'top-8 left-2' : 'top-2 left-2'))} z-10 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 tracking-tight`}
+            >
+              <span>🪙</span>
+              <span>+{earnedCoins}</span>
+            </div>
+          )}
+
           {showHeartIcon && (
             <button
               onClick={(e) => {
@@ -419,12 +432,20 @@ export default function ProductCard({
                 <span>14 MINS</span>
               </p>
 
-              {/* 4. % OFF */}
-               {discount > 0 && (
-                <p className="text-[9px] font-semibold mb-0.5 leading-tight" style={{ color: currentTheme.primary[2] }}>
-                  {discount}% OFF
-                </p>
-              )}
+              {/* 4. % OFF & Coin Rewards */}
+              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                {discount > 0 && (
+                  <p className="text-[9px] font-semibold leading-tight" style={{ color: currentTheme.primary[2] }}>
+                    {discount}% OFF
+                  </p>
+                )}
+                {earnedCoins > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded px-1 py-0.2 leading-tight">
+                    <span>🪙</span>
+                    <span>+{earnedCoins} coins</span>
+                  </span>
+                )}
+              </div>
 
               {/* 5. Price with discount */}
               <div className="mt-auto">
@@ -479,6 +500,14 @@ export default function ProductCard({
               )}
 
               <div className="mt-auto mb-2">
+                {earnedCoins > 0 && (
+                  <div className="mb-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded-full px-2 py-0.5">
+                      <span>🪙</span>
+                      <span>Earn {earnedCoins} coins</span>
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-base font-bold text-neutral-900">
                     ₹{displayPrice}

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import api from './config';
 
 export type LoyaltyTxnType =
@@ -85,18 +86,44 @@ export const getLoyaltyHistory = async (params?: { page?: number; limit?: number
 };
 
 let programCache: { at: number; data: LoyaltyProgram } | null = null;
+let programPromise: Promise<LoyaltyProgram | null> | null = null;
+
 export const getLoyaltyProgram = async (): Promise<LoyaltyProgram | null> => {
     if (programCache && Date.now() - programCache.at < 5 * 60 * 1000) return programCache.data;
-    try {
-        const response = await api.get('/customer/loyalty/program');
-        if (response.data?.success) {
-            programCache = { at: Date.now(), data: response.data.data };
-            return response.data.data;
+    if (programPromise) return programPromise;
+    programPromise = (async () => {
+        try {
+            const response = await api.get('/customer/loyalty/program');
+            if (response.data?.success) {
+                programCache = { at: Date.now(), data: response.data.data };
+                return response.data.data;
+            }
+        } catch {
+            /* program info is optional for display */
+        } finally {
+            programPromise = null;
         }
-    } catch {
-        /* program info is optional for display */
-    }
-    return null;
+        return null;
+    })();
+    return programPromise;
+};
+
+export const useLoyaltyProgram = (): LoyaltyProgram | null => {
+    const [program, setProgram] = useState<LoyaltyProgram | null>(() => (programCache ? programCache.data : null));
+
+    useEffect(() => {
+        let mounted = true;
+        getLoyaltyProgram().then((p) => {
+            if (mounted && p) {
+                setProgram(p);
+            }
+        });
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    return program;
 };
 
 /**

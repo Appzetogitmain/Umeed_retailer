@@ -9,6 +9,7 @@ import { useThemeContext } from '../../../context/ThemeContext';
 import { Product } from '../../../types/domain';
 import { useWishlist } from '../../../hooks/useWishlist';
 import { calculateProductPrice } from '../../../utils/priceUtils';
+import { useLoyaltyProgram, coinsForProduct } from '../../../services/api/customerLoyaltyService';
 
 interface LowestPricesEverProps {
   activeTab?: string;
@@ -39,6 +40,9 @@ const ProductCard = memo(({
 
   // Get Price and MRP using utility
   const { displayPrice, mrp, discount, hasDiscount } = calculateProductPrice(product);
+
+  const loyaltyProgram = useLoyaltyProgram();
+  const earnedCoins = coinsForProduct(product as any, displayPrice, loyaltyProgram);
 
   // Use cartQuantity from props
   const inCartQty = cartQuantity;
@@ -78,6 +82,14 @@ const ProductCard = memo(({
             {discount > 0 && (
               <div className="absolute top-1 left-1 z-10 bg-red-600 text-white text-[9px] font-bold px-1 py-0.5 rounded">
                 {discount}% OFF
+              </div>
+            )}
+
+            {/* Loyalty Coins Badge */}
+            {earnedCoins > 0 && (
+              <div className="absolute top-1 right-9 z-10 bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                <span>🪙</span>
+                <span>+{earnedCoins}</span>
               </div>
             )}
 
@@ -235,12 +247,20 @@ const ProductCard = memo(({
             20 MINS
           </div>
 
-          {/* Discount - Blue Text */}
-          {discount > 0 && (
-            <div className="text-[9px] text-blue-600 font-semibold mb-0.5">
-              {discount}% OFF
-            </div>
-          )}
+          {/* Discount & Coin Rewards */}
+          <div className="flex items-center gap-1 flex-wrap mb-0.5">
+            {discount > 0 && (
+              <div className="text-[9px] text-blue-600 font-semibold leading-tight">
+                {discount}% OFF
+              </div>
+            )}
+            {earnedCoins > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded px-1 py-0.2 leading-tight">
+                <span>🪙</span>
+                <span>+{earnedCoins}</span>
+              </span>
+            )}
+          </div>
 
           {/* Price */}
           <div className="mb-1">

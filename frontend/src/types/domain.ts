@@ -46,5 +46,7 @@ export interface Product {
   maxReturnDays?: number;
   sellerId?: string;
   isAvailable?: boolean;
+  loyaltyCoinType?: "none" | "fixed" | "percent" | string;
+  loyaltyCoinValue?: number;
 }
 
