@@ -11,6 +11,8 @@ import { useAuth } from '../../context/AuthContext';
 import AuthPrompt from '../../components/AuthPrompt';
 import { normalizeImageUrl } from '../../utils/imageUrl';
 import { useLoyaltyProgram, coinsForProduct } from '../../services/api/customerLoyaltyService';
+import LoyaltyPointsBadge from './components/LoyaltyPointsBadge';
+import { getPackLabel } from '../../utils/packLabel';
 
 
 export default function OrderAgain() {
@@ -110,14 +112,6 @@ export default function OrderAgain() {
                         </div>
                       )}
 
-                      {/* Loyalty Coins Badge */}
-                      {earnedCoins > 0 && (
-                        <div className="absolute top-2 right-10 z-10 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-lg shadow-sm flex items-center gap-0.5">
-                          <span>🪙</span>
-                          <span>+{earnedCoins}</span>
-                        </div>
-                      )}
-
                       {/* Wishlist Button */}
                       <WishlistButton
                         productId={product.id}
@@ -180,22 +174,15 @@ export default function OrderAgain() {
 
                     {/* Product Details */}
                     <div className="p-3 flex flex-col flex-1">
+                      <LoyaltyPointsBadge points={earnedCoins} size="sm" className="mb-1.5" />
                       <h3 className="text-[11px] font-bold text-neutral-800 line-clamp-2 leading-tight mb-1" onClick={() => navigate(`/product/${product.id}`)}>
                         {product.productName || product.name}
                       </h3>
                       <p className="text-[10px] text-neutral-400 font-medium mb-2 uppercase tracking-wide">
-                        {product.pack || product.smallDescription || 'Standard Pack'}
+                        {getPackLabel(product) || product.smallDescription || 'Standard Pack'}
                       </p>
                       
                       <div className="mt-auto pt-2 border-t border-neutral-50">
-                        {earnedCoins > 0 && (
-                          <div className="mb-1">
-                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded px-1.5 py-0.5">
-                              <span>🪙</span>
-                              <span>+{earnedCoins} coins</span>
-                            </span>
-                          </div>
-                        )}
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-sm font-black text-neutral-900">
                             ₹{displayPrice.toLocaleString('en-IN')}

@@ -27,7 +27,7 @@ export default function LoyaltyCoins() {
   useEffect(() => {
     getLoyaltySummary()
       .then((res) => res.success && setSummary(res.data))
-      .catch(() => setError("Could not load your coins. Please try again."));
+      .catch(() => setError("Could not load your Points. Please try again."));
   }, []);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function LoyaltyCoins() {
         setPage(1);
         setPages(res.pagination.pages || 1);
       })
-      .catch(() => !cancelled && setError("Could not load coin history."))
+      .catch(() => !cancelled && setError("Could not load Points history."))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -74,21 +74,21 @@ export default function LoyaltyCoins() {
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <h1 className="text-white text-lg font-bold">Speedoo Coins</h1>
+          <h1 className="text-white text-lg font-bold">Speedoo Points</h1>
         </div>
       </div>
 
       <div className="px-4 max-w-2xl mx-auto">
         {/* Balance card */}
         <div className="mt-4 rounded-2xl bg-gradient-to-r from-[#FFC107] to-[#B95F15] p-5 text-white shadow-md">
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Available coins</p>
+          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Available Points</p>
           <p className="text-4xl font-extrabold mt-1">{summary ? summary.balance.toLocaleString("en-IN") : "—"}</p>
           <p className="text-sm font-medium mt-1 opacity-95">
             {summary ? `Worth ₹${summary.balanceValue.toLocaleString("en-IN")}` : ""}
           </p>
           {summary && summary.expiringSoon.coins > 0 && (
             <p className="mt-3 text-xs font-semibold bg-white/20 rounded-lg px-2.5 py-1.5 inline-block">
-              {summary.expiringSoon.coins} coins expire by {formatDate(summary.expiringSoon.nextExpiry)}
+              {summary.expiringSoon.coins} Points expire by {formatDate(summary.expiringSoon.nextExpiry)}
             </p>
           )}
         </div>
@@ -96,18 +96,18 @@ export default function LoyaltyCoins() {
         {/* How it works */}
         {summary && (
           <div className="mt-4 bg-white rounded-2xl border border-neutral-100 p-4 shadow-sm">
-            <h2 className="text-[11px] font-bold text-neutral-500 uppercase tracking-[0.1em] mb-2">How coins work</h2>
+            <h2 className="text-[11px] font-bold text-neutral-500 uppercase tracking-[0.1em] mb-2">How Points work</h2>
             <ul className="space-y-1.5 text-xs text-neutral-700">
-              <li>• {summary.coinsPerRupee} coins = ₹1 discount at checkout.</li>
-              {summary.earnEnabled && <li>• Earn coins on eligible products once your order is delivered.</li>}
+              <li>• {summary.coinsPerRupee} Points = ₹1 discount at checkout.</li>
+              {summary.earnEnabled && <li>• Earn Points on eligible products once your order is delivered.</li>}
               {summary.redeemEnabled && (
                 <li>
-                  • Use coins for up to {summary.maxRedeemPercent}% of your order amount
-                  {summary.minRedeemCoins > 0 ? ` (minimum ${summary.minRedeemCoins} coins)` : ""}.
+                  • Use Points for up to {summary.maxRedeemPercent}% of your order amount
+                  {summary.minRedeemCoins > 0 ? ` (minimum ${summary.minRedeemCoins} Points)` : ""}.
                 </li>
               )}
-              <li>• Coins used on an order are non-refundable and are kept separate from refunds.</li>
-              {summary.expiryEnabled && <li>• Coins expire {summary.expiryDays} days after they are credited.</li>}
+              <li>• Points used on an order are non-refundable and are kept separate from refunds.</li>
+              {summary.expiryEnabled && <li>• Points expire {summary.expiryDays} days after they are credited.</li>}
             </ul>
             <div className="grid grid-cols-3 gap-2 mt-3">
               <Stat label="Earned" value={(summary.stats.totalEarned || 0) + (summary.stats.totalAdminCredited || 0)} />
@@ -119,7 +119,7 @@ export default function LoyaltyCoins() {
 
         {/* History */}
         <div className="mt-4 flex items-center justify-between">
-          <h2 className="text-[11px] font-bold text-neutral-500 uppercase tracking-[0.1em]">Coin history</h2>
+          <h2 className="text-[11px] font-bold text-neutral-500 uppercase tracking-[0.1em]">Points history</h2>
           <div className="flex gap-1">
             {(["ALL", "CREDIT", "DEBIT"] as Filter[]).map((f) => (
               <button
@@ -138,7 +138,7 @@ export default function LoyaltyCoins() {
           {loading ? (
             <p className="p-6 text-center text-sm text-neutral-400">Loading…</p>
           ) : rows.length === 0 ? (
-            <p className="p-6 text-center text-sm text-neutral-400">No coin activity yet. Shop to start earning!</p>
+            <p className="p-6 text-center text-sm text-neutral-400">No Points activity yet. Shop to start earning!</p>
           ) : (
             rows.map((r) => (
               <div key={r._id} className="flex items-start justify-between gap-3 px-4 py-3">

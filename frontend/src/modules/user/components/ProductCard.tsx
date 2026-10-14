@@ -14,6 +14,8 @@ import { calculateProductPrice } from '../../../utils/priceUtils';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { normalizeImageUrl } from '../../../utils/imageUrl';
 import { useLoyaltyProgram, coinsForProduct } from '../../../services/api/customerLoyaltyService';
+import LoyaltyPointsBadge from './LoyaltyPointsBadge';
+import { getPackLabel } from '../../../utils/packLabel';
 // Helper to get consistent product ID across MongoDB _id and virtual id
 export const getProductId = (p: any): string => String(p?.id || p?._id || '');
 
@@ -140,6 +142,7 @@ export default function ProductCard({
 
   const loyaltyProgram = useLoyaltyProgram();
   const earnedCoins = coinsForProduct(product as any, displayPrice, loyaltyProgram);
+  const packLabel = getPackLabel(product);
 
   const handleCardClick = () => {
     navigate(`/product/${((product as any).id || product._id) as string}`);
@@ -260,40 +263,34 @@ export default function ProductCard({
             </div>
           )}
 
-           {categoryStyle && showBadge && discount > 0 && (
-            <div 
-              className="absolute top-2 left-2 z-10 text-white text-[10px] font-semibold px-2 py-0.5 rounded"
-              style={{ backgroundColor: currentTheme.primary[2] }}
-            >
-              {discount}% off
-            </div>
-          )}
+          {/* Top-left discount badge */}
+          <div className="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+            {categoryStyle && showBadge && discount > 0 && (
+              <div
+                className="text-white text-[10px] font-semibold px-2 py-0.5 rounded"
+                style={{ backgroundColor: currentTheme.primary[2] }}
+              >
+                {discount}% off
+              </div>
+            )}
 
-          {!categoryStyle && showBadge && (badgeText || discount > 0) && (
-            <Badge
-              variant="destructive"
-              className="absolute top-2 left-2 z-10 text-xs px-2 py-1"
-            >
-              {badgeText || `${discount}% OFF`}
-            </Badge>
-          )}
+            {!categoryStyle && showBadge && (badgeText || discount > 0) && (
+              <Badge
+                variant="destructive"
+                className="text-xs px-2 py-1"
+              >
+                {badgeText || `${discount}% OFF`}
+              </Badge>
+            )}
+          </div>
 
-          {showPackBadge && (
+          {showPackBadge && packLabel && (
             <Badge
               variant="outline"
               className="absolute top-2 right-2 z-10 text-xs px-2 py-1 font-medium"
             >
-              {product.variations?.[0]?.value || product.pack}
+              {packLabel}
             </Badge>
-          )}
-
-          {earnedCoins > 0 && (
-            <div
-              className={`absolute ${(!showPackBadge && !showHeartIcon) ? 'top-2 right-2' : (categoryStyle ? (discount > 0 ? 'top-7 left-2' : 'top-2 left-2') : ((badgeText || discount > 0) ? 'top-8 left-2' : 'top-2 left-2'))} z-10 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 tracking-tight`}
-            >
-              <span>🪙</span>
-              <span>+{earnedCoins}</span>
-            </div>
           )}
 
           {showHeartIcon && (
@@ -402,11 +399,14 @@ export default function ProductCard({
             // Category Style Layout: Quantity, Name, Time, % off, Price
             <>
               {/* 1. Quantity */}
-              {!showPackBadge && (product.pack || product.variations?.[0]?.value) && (
+              {!showPackBadge && packLabel && (
                 <p className="text-[9px] text-neutral-600 mb-0.5 leading-tight">
-                  {product.variations?.[0]?.value || product.pack}
+                  {packLabel}
                 </p>
               )}
+
+              {/* 1.5. Loyalty points */}
+              <LoyaltyPointsBadge points={earnedCoins} size="sm" className="mb-1" />
 
               {/* 2. Name */}
               <h3 className="text-[10px] font-bold text-neutral-900 mb-0.5 line-clamp-2 leading-tight min-h-[1.75rem] max-h-[1.75rem] overflow-hidden">
@@ -432,20 +432,12 @@ export default function ProductCard({
                 <span>14 MINS</span>
               </p>
 
-              {/* 4. % OFF & Coin Rewards */}
-              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                {discount > 0 && (
-                  <p className="text-[9px] font-semibold leading-tight" style={{ color: currentTheme.primary[2] }}>
-                    {discount}% OFF
-                  </p>
-                )}
-                {earnedCoins > 0 && (
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded px-1 py-0.2 leading-tight">
-                    <span>🪙</span>
-                    <span>+{earnedCoins} coins</span>
-                  </span>
-                )}
-              </div>
+              {/* 4. % OFF */}
+              {discount > 0 && (
+                <p className="text-[9px] font-semibold mb-0.5 leading-tight" style={{ color: currentTheme.primary[2] }}>
+                  {discount}% OFF
+                </p>
+              )}
 
               {/* 5. Price with discount */}
               <div className="mt-auto">
@@ -464,11 +456,13 @@ export default function ProductCard({
           ) : (
             // Non-category style layout (original)
             <>
-              {!showPackBadge && (
+              {!showPackBadge && packLabel && (
                 <p className={`${compact ? 'text-[10px] md:text-xs' : 'text-xs md:text-sm'} text-neutral-500 mb-1`}>
-                    {product.variations?.[0]?.value || product.pack}
+                    {packLabel}
                 </p>
               )}
+
+              <LoyaltyPointsBadge points={earnedCoins} size={compact ? 'sm' : 'md'} className="mb-1.5" />
 
               <h3 className={`${compact ? 'text-xs md:text-sm' : 'text-sm md:text-base'} font-semibold text-neutral-900 ${compact ? 'mb-1' : 'mb-2'} line-clamp-2 ${compact ? 'min-h-[2rem]' : 'min-h-[2.5rem]'}`}>
                 {product.name || product.productName || ''}
@@ -500,14 +494,6 @@ export default function ProductCard({
               )}
 
               <div className="mt-auto mb-2">
-                {earnedCoins > 0 && (
-                  <div className="mb-1">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/90 rounded-full px-2 py-0.5">
-                      <span>🪙</span>
-                      <span>Earn {earnedCoins} coins</span>
-                    </span>
-                  </div>
-                )}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-base font-bold text-neutral-900">
                     ₹{displayPrice}

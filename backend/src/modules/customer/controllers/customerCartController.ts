@@ -183,7 +183,7 @@ export const getCart = async (req: Request, res: Response) => {
             path: 'items',
             populate: {
                 path: 'product',
-                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations'
+                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations loyaltyCoinType loyaltyCoinValue'
             }
         });
 
@@ -321,7 +321,7 @@ export const addToCart = async (req: Request, res: Response) => {
             path: 'items',
             populate: {
                 path: 'product',
-                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations'
+                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations loyaltyCoinType loyaltyCoinValue'
             }
         });
 
@@ -411,7 +411,7 @@ export const updateCartItem = async (req: Request, res: Response) => {
             path: 'items',
             populate: {
                 path: 'product',
-                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations'
+                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations loyaltyCoinType loyaltyCoinValue'
             }
         });
 
@@ -476,7 +476,7 @@ export const removeFromCart = async (req: Request, res: Response) => {
             path: 'items',
             populate: {
                 path: 'product',
-                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations'
+                select: 'productName price mainImage stock pack mrp category seller status publish discPrice variations loyaltyCoinType loyaltyCoinValue'
             }
         });
 

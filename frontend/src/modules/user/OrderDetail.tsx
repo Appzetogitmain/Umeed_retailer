@@ -1113,8 +1113,8 @@ export default function OrderDetail() {
             {(order.loyaltyCoinsRedeemed || 0) > 0 && (
               <p className="mt-2 text-xs text-neutral-600 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
                 {order.loyaltyRedeemStatus === "Released"
-                  ? `${order.loyaltyCoinsRedeemed} coins used on this order were returned to your coin wallet.`
-                  : `${order.loyaltyCoinsRedeemed} coins used on this order are non-refundable. Only the amount you paid is refunded.`}
+                  ? `${order.loyaltyCoinsRedeemed} Points used on this order were returned to your Points wallet.`
+                  : `${order.loyaltyCoinsRedeemed} Points used on this order are non-refundable. Only the amount you paid is refunded.`}
               </p>
             )}
           </motion.div>
@@ -1298,20 +1298,20 @@ export default function OrderDetail() {
               className="rounded-2xl bg-gradient-to-r from-[#FFC107] to-[#B95F15] p-4 text-white shadow-md">
               {coins > 0 && (
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-white/25 flex items-center justify-center text-2xl flex-shrink-0">🪙</div>
+                  <div className="w-11 h-11 rounded-full bg-white/25 flex items-center justify-center text-2xl flex-shrink-0">⭐</div>
                   <div className="flex-1 min-w-0">
                     {credited ? (
                       <>
-                        <p className="text-base font-extrabold">You earned {coins} coins!</p>
-                        <p className="text-xs font-medium opacity-95">Worth ₹{(coins / perRupee).toFixed(2)} · added to your coin wallet</p>
+                        <p className="text-base font-extrabold">You earned {coins} Points!</p>
+                        <p className="text-xs font-medium opacity-95">Worth ₹{(coins / perRupee).toFixed(2)} · added to your Points wallet</p>
                       </>
                     ) : order.loyaltyEarnStatus === "Pending" ? (
                       <>
-                        <p className="text-base font-extrabold">{coins} coins on the way</p>
+                        <p className="text-base font-extrabold">{coins} Points on the way</p>
                         <p className="text-xs font-medium opacity-95">Worth ₹{(coins / perRupee).toFixed(2)} · being added to your wallet</p>
                       </>
                     ) : (
-                      <p className="text-sm font-semibold">No coins were earned on this order</p>
+                      <p className="text-sm font-semibold">No Points were earned on this order</p>
                     )}
                   </div>
                   <Link to="/coins" className="text-xs font-bold bg-white text-[#B95F15] px-3 py-1.5 rounded-full flex-shrink-0">
@@ -1321,7 +1321,7 @@ export default function OrderDetail() {
               )}
               {(order.loyaltyCoinsRedeemed || 0) > 0 && (
                 <p className={`text-xs font-medium opacity-95 ${coins > 0 ? "mt-2 pt-2 border-t border-white/30" : ""}`}>
-                  You used {order.loyaltyCoinsRedeemed} coins and saved ₹{Number(order.loyaltyDiscount || 0).toFixed(2)} on this order
+                  You used {order.loyaltyCoinsRedeemed} Points and saved ₹{Number(order.loyaltyDiscount || 0).toFixed(2)} on this order
                 </p>
               )}
             </motion.div>

@@ -1,4 +1,5 @@
 import { Product } from '../../../types/domain';
+import { getPackLabel } from '../../../utils/packLabel';
 import { useNavigate } from 'react-router-dom';
 import { calculateProductPrice } from '../../../utils/priceUtils';
 
@@ -51,7 +52,7 @@ export default function SimilarProducts({ products, currentProductId }: SimilarP
                 {/* Info */}
                 <div className="p-2">
                   <p className="text-xs text-neutral-500 mb-1">
-                      {product.variations?.[0]?.value || product.pack}
+                      {getPackLabel(product)}
                   </p>
                   <h4 className="text-xs font-semibold text-neutral-900 line-clamp-2 mb-1 min-h-[2rem]">
                     {product.name}

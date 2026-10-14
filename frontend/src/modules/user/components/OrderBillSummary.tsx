@@ -22,11 +22,11 @@ export default function OrderBillSummary({ order }: OrderBillSummaryProps) {
     const toEarn = order.loyaltyCoinsToEarn || 0;
     switch (order.loyaltyEarnStatus) {
       case "Credited":
-        return { text: `${order.loyaltyCoinsEarned} coins credited to your wallet`, tone: "text-green-700 bg-green-50" };
+        return { text: `${order.loyaltyCoinsEarned} Points credited to your wallet`, tone: "text-green-700 bg-green-50" };
       case "Pending":
-        return { text: `You'll earn ${toEarn} coins once this order is delivered`, tone: "text-yellow-800 bg-yellow-50" };
+        return { text: `You'll earn ${toEarn} Points once this order is delivered`, tone: "text-yellow-800 bg-yellow-50" };
       case "Forfeited":
-        return toEarn > 0 ? { text: `${toEarn} coins not earned (order not delivered)`, tone: "text-neutral-600 bg-neutral-50" } : null;
+        return toEarn > 0 ? { text: `${toEarn} Points not earned (order not delivered)`, tone: "text-neutral-600 bg-neutral-50" } : null;
       default:
         return null;
     }
@@ -50,7 +50,7 @@ export default function OrderBillSummary({ order }: OrderBillSummaryProps) {
       )}
       {(order.loyaltyDiscount || 0) > 0 && (
         <Row
-          label={`Speedoo coins (${order.loyaltyCoinsRedeemed} used${order.loyaltyRedeemStatus === "Released" ? ", returned to wallet" : ""})`}
+          label={`Speedoo Points (${order.loyaltyCoinsRedeemed} used${order.loyaltyRedeemStatus === "Released" ? ", returned to wallet" : ""})`}
           value={`-${money(order.loyaltyDiscount)}`}
           green
         />

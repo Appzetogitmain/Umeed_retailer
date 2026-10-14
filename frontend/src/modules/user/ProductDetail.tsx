@@ -22,6 +22,7 @@ import {
   LoyaltyProgram,
 } from "../../services/api/customerLoyaltyService";
 import { normalizeImageUrl } from "../../utils/imageUrl";
+import { getPackLabel } from "../../utils/packLabel";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -659,9 +660,11 @@ export default function ProductDetail() {
           )}
 
           {/* Quantity/Pack */}
-          <p className="text-sm md:text-base text-neutral-600 mb-1">
-            {variantTitle}
-          </p>
+          {getPackLabel({ variations: [selectedVariant], pack: product.pack }) && (
+            <p className="text-sm md:text-base text-neutral-600 mb-1">
+              {getPackLabel({ variations: [selectedVariant], pack: product.pack })}
+            </p>
+          )}
 
           {/* Price section */}
           <div className="flex items-center gap-1.5 mb-1.5">
@@ -687,8 +690,11 @@ export default function ProductDetail() {
             const coins = coinsForProduct(product as any, variantPrice, loyaltyProgram);
             if (coins <= 0 || !loyaltyProgram) return null;
             return (
-              <p className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-800 bg-yellow-50 border border-yellow-100 rounded-full px-2.5 py-1 mb-1.5">
-                Earn {coins} coins (₹{Math.round((coins / loyaltyProgram.coinsPerRupee) * 100) / 100}) on delivery
+              <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#7E22CE] bg-[#F3E8FF] border border-[#E9D5FF] rounded-full px-3 py-1.5 mb-2">
+                <span aria-hidden="true">★</span>
+                <span>
+                  Earn <span className="font-bold">{coins} Points</span> on delivery
+                </span>
               </p>
             );
           })()}
@@ -1019,14 +1025,16 @@ export default function ProductDetail() {
                         </span>
                       </div>
                     )}
-                    <div className="flex items-start">
-                      <span className="text-xs font-semibold text-neutral-800 w-[180px] flex-shrink-0">
-                        Unit:
-                      </span>
-                      <span className="text-xs text-neutral-600">
-                        {product.pack}
-                      </span>
-                    </div>
+                    {getPackLabel(product) && (
+                      <div className="flex items-start">
+                        <span className="text-xs font-semibold text-neutral-800 w-[180px] flex-shrink-0">
+                          Unit:
+                        </span>
+                        <span className="text-xs text-neutral-600">
+                          {getPackLabel(product)}
+                        </span>
+                      </div>
+                    )}
                     {product.fssaiLicNo && (
                       <div className="flex items-start">
                         <span className="text-xs font-semibold text-neutral-800 w-[180px] flex-shrink-0">

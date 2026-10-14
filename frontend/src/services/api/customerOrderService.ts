@@ -74,7 +74,7 @@ export interface CheckoutQuote {
     coinsToEarnValue: number;
     freeDeliveryThreshold?: number;
     estimatedDeliveryTime?: string;
-    items: { productId: string; name: string; unitPrice: number; quantity: number; lineTotal: number; discountShare: number; loyaltyCoins: number }[];
+    items: { productId: string; variation?: string; name: string; unitPrice: number; quantity: number; lineTotal: number; discountShare: number; loyaltyCoins: number }[];
     unavailable: { productId: string; reason: string }[];
 }
 

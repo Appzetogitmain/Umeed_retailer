@@ -145,3 +145,24 @@ export const coinsForProduct = (
     }
     return 0;
 };
+
+/**
+ * Coins a cart line earns (unit price × quantity), mirroring the server's
+ * computeLineEarnCoins so the number matches what the order will credit.
+ */
+export const coinsForCartLine = (
+    product: { loyaltyCoinType?: string; loyaltyCoinValue?: number } | null | undefined,
+    unitPrice: number,
+    quantity: number,
+    program: LoyaltyProgram | null
+): number => {
+    if (!product || !program || !program.enabled || !program.earnEnabled || quantity <= 0) return 0;
+    const value = Number(product.loyaltyCoinValue) || 0;
+    if (value <= 0) return 0;
+    if (product.loyaltyCoinType === 'fixed') return Math.floor(value * quantity + 1e-9);
+    if (product.loyaltyCoinType === 'percent') {
+        const linePaise = Math.round(unitPrice * 100) * quantity;
+        return Math.floor((linePaise * value * program.coinsPerRupee) / 10000 + 1e-9);
+    }
+    return 0;
+};

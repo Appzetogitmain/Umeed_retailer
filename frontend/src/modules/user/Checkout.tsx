@@ -41,6 +41,8 @@ import { addToWishlist } from "../../services/api/customerWishlistService";
 import { updateProfile } from "../../services/api/customerService";
 import { calculateProductPrice } from "../../utils/priceUtils";
 import { normalizeImageUrl } from "../../utils/imageUrl";
+import { useLoyaltyProgram, coinsForCartLine } from "../../services/api/customerLoyaltyService";
+import LoyaltyPointsBadge from "./components/LoyaltyPointsBadge";
 // const STORAGE_KEY = 'saved_address'; // Removed
 
 // Similar products helper removed - using API
@@ -100,6 +102,7 @@ export default function Checkout() {
 
   // Server-computed bill (same calculation the server uses when placing the order)
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const loyaltyProgram = useLoyaltyProgram();
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteNonce, setQuoteNonce] = useState(0);
   const [useCoins, setUseCoins] = useState(false);
@@ -358,6 +361,19 @@ export default function Checkout() {
   const displayItems = (cart?.items || []).filter(
     (item) => item && item.product
   );
+
+  // Points a cart line earns: the server quote's figure when it matches the
+  // current quantity, otherwise the same rule computed locally until the
+  // quote refreshes (e.g. right after a quantity change).
+  const pointsForItem = (item: (typeof displayItems)[number]) => {
+    const productId = String(item.product.id || (item.product as { _id?: string })._id || "");
+    const quoteLine = quote?.items.find(
+      (q) => String(q.productId) === productId && String(q.variation ?? "") === String(item.variant ?? "")
+    );
+    if (quoteLine && quoteLine.quantity === item.quantity) return quoteLine.loyaltyCoins || 0;
+    const { displayPrice } = calculateProductPrice(item.product, item.variant);
+    return coinsForCartLine(item.product as any, displayPrice, item.quantity, loyaltyProgram);
+  };
   const displayCart = {
     ...cart,
     items: displayItems,
@@ -1219,6 +1235,7 @@ export default function Checkout() {
                     <p className="text-[10px] text-neutral-600 mb-0.5">
                       {item.quantity} × {item.product?.pack}
                     </p>
+                    <LoyaltyPointsBadge points={pointsForItem(item)} size="sm" className="mb-1" />
                       <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1787,15 +1804,15 @@ export default function Checkout() {
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-neutral-900">
                   {quote.loyalty.maxUsableCoins > 0
-                    ? `Use ${quote.loyalty.maxUsableCoins} coins & save ₹${quote.loyalty.maxUsableDiscount}`
-                    : "Speedoo coins"}
+                    ? `Use ${quote.loyalty.maxUsableCoins} Points & save ₹${quote.loyalty.maxUsableDiscount}`
+                    : "Speedoo Points"}
                 </p>
                 <p className="text-[10px] text-neutral-600">
-                  Balance: {quote.loyalty.balance} coins (₹{quote.loyalty.balanceValue})
-                  {quote.loyalty.maxUsableCoins === 0 && quote.loyalty.message ? ` · ${quote.loyalty.message}` : ""}
+                  Balance: {quote.loyalty.balance} Points (₹{quote.loyalty.balanceValue})
+                  {quote.loyalty.maxUsableCoins === 0 && quote.loyalty.message ? ` · ${quote.loyalty.message.replace(/\bcoins\b/gi, "Points")}` : ""}
                 </p>
                 <p className="text-[10px] text-neutral-500">
-                  Up to {quote.loyalty.maxRedeemPercent}% of the order can be paid with coins. Coins used are non-refundable.
+                  Up to {quote.loyalty.maxRedeemPercent}% of the order can be paid with Points. Points used are non-refundable.
                 </p>
               </div>
             </div>
@@ -1947,7 +1964,7 @@ export default function Checkout() {
           {coinDiscount > 0 && quote && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-neutral-700">
-                Speedoo coins ({quote.loyalty.coinsUsed} used)
+                Speedoo Points ({quote.loyalty.coinsUsed} used)
               </span>
               <span className="text-xs font-medium text-green-700">
                 -₹{coinDiscount.toLocaleString("en-IN")}
@@ -1973,7 +1990,7 @@ export default function Checkout() {
           {quote && quote.coinsToEarn > 0 && (
             <div className="mt-1 rounded-lg bg-yellow-50 border border-yellow-100 px-2.5 py-1.5">
               <p className="text-[11px] font-semibold text-yellow-800">
-                You'll earn {quote.coinsToEarn} coins (worth ₹{quote.coinsToEarnValue}) once this order is delivered
+                You'll earn {quote.coinsToEarn} Points (worth ₹{quote.coinsToEarnValue}) once this order is delivered
               </p>
             </div>
           )}
@@ -2266,7 +2283,7 @@ export default function Checkout() {
                 clearCart();
                 setPlacedOrderId(unpaidOrderId);
                 showGlobalToast(
-                  "We're confirming your payment. If it doesn't go through, any amount deducted will be refunded and your coins restored.",
+                  "We're confirming your payment. If it doesn't go through, any amount deducted will be refunded and your Points restored.",
                   "info"
                 );
                 navigate(`/orders/${unpaidOrderId}`);

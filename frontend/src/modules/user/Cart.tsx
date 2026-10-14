@@ -3,6 +3,8 @@ import { useCart } from '../../context/CartContext';
 import Button from '../../components/ui/button';
 import { appConfig } from '../../services/configService';
 import { calculateProductPrice } from '../../utils/priceUtils';
+import { useLoyaltyProgram, coinsForCartLine } from '../../services/api/customerLoyaltyService';
+import LoyaltyPointsBadge from './components/LoyaltyPointsBadge';
 
 export default function Cart() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -12,6 +14,14 @@ export default function Cart() {
   const deliveryFee = cart.estimatedDeliveryFee ?? (cart.total >= threshold ? 0 : appConfig.deliveryFee);
   const platformFee = cart.platformFee ?? appConfig.platformFee;
   const totalAmount = cart.total + deliveryFee + platformFee;
+
+  // Points each line earns (same rule the server applies when the order is placed)
+  const loyaltyProgram = useLoyaltyProgram();
+  const pointsForItem = (item: (typeof cart.items)[number]) => {
+    const { displayPrice } = calculateProductPrice(item.product, item.variant);
+    return coinsForCartLine(item.product as any, displayPrice, item.quantity, loyaltyProgram);
+  };
+  const totalPoints = cart.items.reduce((sum, item) => sum + pointsForItem(item), 0);
 
   const handleCheckout = () => {
     navigate('/checkout');
@@ -54,6 +64,7 @@ export default function Cart() {
       <div className="px-4 md:px-6 lg:px-8 space-y-4 md:space-y-6 mb-4 md:mb-6">
         {cart.items.map((item) => {
           const { displayPrice, mrp, hasDiscount } = calculateProductPrice(item.product, item.variant);
+          const itemPoints = pointsForItem(item);
           return (
             <div
               key={item.product.id}
@@ -81,6 +92,7 @@ export default function Cart() {
                     {item.product.name}
                   </h3>
                   <p className="text-xs md:text-sm text-neutral-500 mb-2">{item.product.pack}</p>
+                  <LoyaltyPointsBadge points={itemPoints} className="mb-2 md:text-sm" />
                   <div className="flex items-center gap-2 mb-3 md:mb-4">
                     <span className="text-base md:text-lg font-bold text-neutral-900">
                       ₹{displayPrice.toLocaleString('en-IN')}
@@ -160,6 +172,11 @@ export default function Cart() {
             {cart.total < threshold && (
               <div className="text-xs md:text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
                 Add ₹{(threshold - cart.total).toLocaleString('en-IN')} more for free delivery
+              </div>
+            )}
+            {totalPoints > 0 && loyaltyProgram && (
+              <div className="text-xs md:text-sm font-semibold text-[#7E22CE] bg-[#F3E8FF] px-2 py-1 rounded">
+                You'll earn {totalPoints} Points (worth ₹{Math.round((totalPoints / loyaltyProgram.coinsPerRupee) * 100) / 100}) once this order is delivered
               </div>
             )}
           </div>
