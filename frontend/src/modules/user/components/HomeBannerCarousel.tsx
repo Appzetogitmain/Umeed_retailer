@@ -31,7 +31,7 @@ const HomeBannerCarousel = ({ banners }: HomeBannerCarouselProps) => {
 
   return (
     <div className="w-full px-4 md:px-6 lg:px-8 mt-4 md:mt-6">
-      <div className="relative overflow-hidden rounded-2xl aspect-[21/9] md:aspect-[3/1] lg:aspect-[4/1] bg-neutral-100">
+      <div className="relative overflow-hidden rounded-2xl aspect-[21/9] md:aspect-[3/1] bg-neutral-100">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentSlide}
@@ -42,11 +42,19 @@ const HomeBannerCarousel = ({ banners }: HomeBannerCarouselProps) => {
             className="absolute inset-0">
             <Link
               to={banners[currentSlide].link}
-              className="block w-full h-full">
+              className="block relative w-full h-full">
+              {/* Blurred fill behind the banner on wider screens, where the
+                  whole banner is shown instead of being cropped */}
+              <img
+                src={banners[currentSlide].image}
+                alt=""
+                aria-hidden="true"
+                className="hidden md:block absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-80"
+              />
               <img
                 src={banners[currentSlide].image}
                 alt={banners[currentSlide].title}
-                className="w-full h-full object-cover"
+                className="relative w-full h-full object-cover md:object-contain"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
             </Link>
