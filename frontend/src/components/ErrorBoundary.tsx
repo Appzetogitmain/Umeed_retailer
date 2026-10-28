@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { isChunkLoadError, reloadForNewVersion } from '../utils/chunkReload';
 
 interface Props {
   children: ReactNode;
@@ -25,10 +26,35 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    // A new version was deployed - reload silently to load the new files
+    if (isChunkLoadError(error)) {
+      reloadForNewVersion();
+    }
   }
 
   render() {
     if (this.state.hasError) {
+      if (isChunkLoadError(this.state.error)) {
+        return this.props.fallback || (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center p-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                App updated
+              </h2>
+              <p className="text-gray-600 mb-4">
+                A new version is available. Please reload to continue.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return this.props.fallback || (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center p-8">
