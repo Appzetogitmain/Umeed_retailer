@@ -261,16 +261,12 @@ export default function DeliverySignUp() {
 
       setUploadingDocs(true);
 
-      const drivingLicenseResult = await uploadDocument(
-        drivingLicenseFile,
-        "Speedoo/delivery/documents"
-      );
+      // Upload both documents in parallel to speed up registration
+      const [drivingLicenseResult, nationalIdResult] = await Promise.all([
+        uploadDocument(drivingLicenseFile, "Speedoo/delivery/documents"),
+        uploadDocument(nationalIdentityCardFile, "Speedoo/delivery/documents"),
+      ]);
       drivingLicenseUrl = drivingLicenseResult.secureUrl;
-
-      const nationalIdResult = await uploadDocument(
-        nationalIdentityCardFile,
-        "Speedoo/delivery/documents"
-      );
       nationalIdentityCardUrl = nationalIdResult.secureUrl;
 
       setUploadingDocs(false);
@@ -305,11 +301,20 @@ export default function DeliverySignUp() {
           userType: "Delivery",
         });
 
-        // Navigate to delivery dashboard
-        navigate("/delivery");
+        // New riders need admin approval before they can take orders
+        navigate(
+          response.data.user.status === "Active"
+            ? "/delivery"
+            : "/delivery/under-review",
+          { replace: true }
+        );
       }
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+      setError(
+        err.response?.data?.message ||
+          (!err.response && err.message) ||
+          "Registration failed. Please try again."
+      );
     } finally {
       setLoading(false);
       setUploadingDocs(false);

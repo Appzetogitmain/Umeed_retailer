@@ -191,16 +191,20 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const normalizedMobile = cleanMobile;
+  const normalizedEmail = String(email).trim().toLowerCase();
 
   // Check if delivery partner already exists
   const existingDelivery = await Delivery.findOne({
-    $or: [{ mobile: normalizedMobile }, { email }],
+    $or: [{ mobile: normalizedMobile }, { email: normalizedEmail }],
   });
 
   if (existingDelivery) {
     return res.status(409).json({
       success: false,
-      message: "Delivery partner already exists with this mobile or email",
+      message:
+        existingDelivery.mobile === normalizedMobile
+          ? "This mobile number is already registered. Please log in instead."
+          : "This email is already registered. Please use a different email or log in.",
     });
   }
 
@@ -208,7 +212,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   const delivery = await Delivery.create({
     name,
     mobile: normalizedMobile,
-    email,
+    email: normalizedEmail,
     dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
     password: password || undefined,
     address,

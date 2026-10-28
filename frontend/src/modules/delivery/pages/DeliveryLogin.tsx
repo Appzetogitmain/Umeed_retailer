@@ -83,7 +83,11 @@ export default function DeliveryLogin() {
           ...response.data.user,
           userType: "Delivery",
         });
-        navigate("/delivery");
+        navigate(
+          response.data.user.status === "Inactive"
+            ? "/delivery/under-review"
+            : "/delivery"
+        );
       }
     } catch (err: any) {
       const message =

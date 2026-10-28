@@ -125,6 +125,9 @@ const DeliveryLogin = lazy(
 const DeliverySignUp = lazy(
   () => import("./modules/delivery/pages/DeliverySignUp"),
 );
+const DeliveryUnderReview = lazy(
+  () => import("./modules/delivery/pages/DeliveryUnderReview"),
+);
 
 // Lazy load seller routes
 const SellerLayout = lazy(
@@ -500,6 +503,18 @@ function AppContent() {
                         />
 
                         {/* Delivery App Routes */}
+                        <Route
+                          path="/delivery/under-review"
+                          element={
+                            <ProtectedRoute
+                              requiredUserType="Delivery"
+                              redirectTo="/delivery/login">
+                              <Suspense fallback={<IconLoader forceShow />}>
+                                <DeliveryUnderReview />
+                              </Suspense>
+                            </ProtectedRoute>
+                          }
+                        />
                         <Route
                           path="/delivery/*"
                           element={
