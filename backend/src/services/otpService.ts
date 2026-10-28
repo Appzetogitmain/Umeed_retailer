@@ -141,6 +141,7 @@ async function sendSmsViaApi(mobile: string, message: string): Promise<void> {
     timeout: API_TIMEOUT,
   });
 
+  console.log('[SMS India HUB] Response:', JSON.stringify(response.data), 'DLT_TE_ID:', params.DLT_TE_ID || '(none)');
   handleSmsResponse(response.data);
 }
 
@@ -251,6 +252,7 @@ export async function sendSmsOtp(
 
     // Mock mode
     if (isMockMode()) {
+      console.warn('[OTP] Mock mode active - SMS not sent (USE_MOCK_OTP=true or SMS India HUB credentials missing)');
       await saveOtpToDb(mobile, otp, userType);
       return {
         success: true,
@@ -368,6 +370,7 @@ export async function sendOTP(
 
     // Mock mode
     if (isMockMode()) {
+      console.warn('[OTP] Mock mode active - SMS not sent (USE_MOCK_OTP=true or SMS India HUB credentials missing)');
       await saveOtpToDb(mobile, otp, userType);
       return {
         success: true,
