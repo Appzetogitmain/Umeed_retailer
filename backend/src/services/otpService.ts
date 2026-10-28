@@ -82,7 +82,15 @@ function buildOtpMessage(otp: string): string {
 /**
  * Parse and handle SMS India HUB API response
  */
-function handleSmsResponse(responseData: SmsIndiaHubResponse): void {
+function handleSmsResponse(responseData: SmsIndiaHubResponse | string): void {
+  // Some failures come back as plain text, e.g. "Failed#senderid not valid"
+  if (typeof responseData === 'string') {
+    if (/^failed/i.test(responseData.trim())) {
+      throw new Error(`SMS India HUB: ${responseData.replace(/^failed#?/i, '').trim()}`);
+    }
+    return;
+  }
+
   const errorCode = responseData.ErrorCode || '';
   const errorMsg = responseData.ErrorMessage || '';
 
@@ -131,7 +139,7 @@ async function sendSmsViaApi(mobile: string, message: string): Promise<void> {
     params.DLT_TE_ID = SMS_INDIA_HUB_DLT_TEMPLATE_ID.trim();
   }
 
-  const response = await axios.get<SmsIndiaHubResponse>(SMS_INDIA_HUB_API_URL, {
+  const response = await axios.get<SmsIndiaHubResponse | string>(SMS_INDIA_HUB_API_URL, {
     params,
     paramsSerializer: (params: any) => {
       return Object.keys(params)

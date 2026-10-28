@@ -24,6 +24,8 @@ import { startLoyaltyExpiryScheduler } from "./services/loyaltyService";
 import { startUnpaidOrderSweeper } from "./services/unpaidOrderService";
 
 const app: Application = express();
+// Behind Nginx: trust the first proxy so rate limiting sees real client IPs
+app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 // Allow-list shared with socketService.ts via config/corsOrigins.ts so HTTP
